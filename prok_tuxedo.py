@@ -31,7 +31,7 @@ def run_alignment(genome_list, library_dict, parameters, output_dir):
                     name1=os.path.splitext(os.path.basename(r["read1"]))
                     sam_file=os.path.join(target_dir,name1+".sam")
                 bam_file=sam_file[:-4]+".bam"
-                r[genome]=bam_file
+                r[genome["genome"]]=bam_file
                 if os.path.exists(sam_file) or os.path.exists(bam_file):
                     sys.stderr.write(sam_file+" alignments file already exists. skipping\n")
                     continue
@@ -55,7 +55,7 @@ def run_cufflinks(genome_list, library_dict, parameters):
                 cur_dir=os.path.dirname(os.path.realpath(r[genome]))
                 os.chdir(cur_dir)
                 cur_cmd=list(cmd)
-                cur_cmd+=r[genome]
+                cur_cmd+=r[genome["genome"]]
                 subprocess.check_call(cur_cmd)
 
 def run_cuffdiff(genome_list, library_dict, parameters):
