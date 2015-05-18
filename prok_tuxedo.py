@@ -52,7 +52,7 @@ def run_cufflinks(genome_list, library_dict, parameters):
         cmd=["cufflinks","-g",genome["annotation"],"-b",genome_link,"-I","50"]
         for library in library_dict:
             for r in library_dict[library]["replicates"]:
-                cur_dir=os.path.dirname(os.path.realpath(r[genome]))
+                cur_dir=os.path.dirname(os.path.realpath(r[genome["genome"]]))
                 os.chdir(cur_dir)
                 cur_cmd=list(cmd)
                 cur_cmd+=r[genome["genome"]]
