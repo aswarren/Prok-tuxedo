@@ -36,7 +36,7 @@ def run_alignment(genome_list, library_dict, parameters, output_dir):
                     sys.stderr.write(sam_file+" alignments file already exists. skipping\n")
                     continue
                 cur_cmd+=["-S",sam_file]
-                thread_count=multiprocessing.cpu_count()-2
+                thread_count=multiprocessing.cpu_count()
                 if thread_count < 1: thread_count=1
                 cur_cmd+=["-p",str(thread_count)]
                 print cur_cmd
