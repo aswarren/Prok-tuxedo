@@ -3,6 +3,8 @@
 import os, sys
 import argparse
 import subprocess
+import multiprocessing
+
 
 def run_alignment(genome_list, library_dict, parameters, output_dir): 
     #modifies library_dict sub replicates to include 'bowtie' dict recording output files
@@ -34,6 +36,9 @@ def run_alignment(genome_list, library_dict, parameters, output_dir):
                     sys.stderr.write(sam_file+" alignments file already exists. skipping\n")
                     continue
                 cur_cmd+=["-S",sam_file]
+                thread_count=multiprocessing.cpu_count()-2
+                if thread_count < 1: thread_count=1
+                cur_cmd+=["-p",thread_count]
                 print cur_cmd
                 subprocess.check_call(cur_cmd) #call bowtie2
                 subprocess.check_call("samtools view -Shu "+sam_file+" | \ samtools sort -o - - > "+bam_file, shell=True)#convert to bam
