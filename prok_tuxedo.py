@@ -38,7 +38,7 @@ def run_alignment(genome_list, library_dict, parameters, output_dir):
                 cur_cmd+=["-S",sam_file]
                 thread_count=multiprocessing.cpu_count()-2
                 if thread_count < 1: thread_count=1
-                cur_cmd+=["-p",thread_count]
+                cur_cmd+=["-p",str(thread_count)]
                 print cur_cmd
                 subprocess.check_call(cur_cmd) #call bowtie2
                 subprocess.check_call("samtools view -Shu "+sam_file+" | \ samtools sort -o - - > "+bam_file, shell=True)#convert to bam
@@ -49,7 +49,7 @@ def run_cufflinks(genome_list, library_dict, parameters):
         genome_link=os.path.join(output_dir, os.path.basename(genome["genome"]))
         if not os.path.exists(genome_link):
             subprocess.check_call(["ln","-s",genome["genome"],genome_link])
-        cmd=["cufflinks","-g",genome["annotation"],"-b",genome_link,"I",50]
+        cmd=["cufflinks","-g",genome["annotation"],"-b",genome_link,"-I","50"]
         for library in library_dict:
             for r in library_dict[library]["replicates"]:
                 cur_dir=os.path.dirname(os.path.realpath(r[genome]))
