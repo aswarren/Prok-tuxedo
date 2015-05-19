@@ -14,6 +14,6 @@ optional arguments:
   -o O        output directory. defaults to current directory.
 
 
-An example run:
+An example run (small pair against itself):
 
-python ./prok_tuxedo.py -L lib1,lib2 -g ./test/14028s ./test/READ1_SHORT.fastq%./test/READ2_SHORT.fastq ./test/READ1_SHORT.fastq%./test/READ2_SHORT.fastq
+python ./prok_tuxedo.py -L lib1,lib2 -g /home/anwarren/mcclelland/reference/14028s_test -p somefile /home/anwarren/mcclelland/test/READ1_SHORT.fastq%/home/anwarren/mcclelland/test/READ2_SHORT.fastq /home/anwarren/mcclelland/test/READ1_SHORT.fastq%/home/anwarren/mcclelland/test/READ2_SHORT.fastq
