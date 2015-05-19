@@ -20,11 +20,12 @@ def run_alignment(genome_list, library_dict, parameters, output_dir):
         if genome["dir"].endswith('/'):
             genome["dir"]=genome["dir"][:-1]
         genome["dir"]=os.path.abspath(genome["dir"])
+        genome["output"]=os.path.join(output_dir,os.path.basename(genome["dir"]))
         for library in library_dict:
             rcount=0
             for r in library_dict[library]["replicates"]:
                 rcount+=1
-                target_dir=os.path.join(output_dir,os.path.basename(genome["dir"]),library,str(rcount))
+                target_dir=os.path.join(genome["output"],library,"replicate"+str(rcount))
                 target_dir=os.path.abspath(target_dir)
                 subprocess.call(["mkdir","-p",target_dir])
                 cur_cmd=list(cmd)
@@ -50,7 +51,7 @@ def run_alignment(genome_list, library_dict, parameters, output_dir):
                     subprocess.check_call("samtools view -Su "+sam_file+" | samtools sort -o - - > "+bam_file, shell=True)#convert to bam
                     #subprocess.check_call('samtools view -S -b %s > %s' % (sam_file, bam_file+".tmp"), shell=True)
                     #subprocess.check_call('samtools sort %s %s' % (bam_file+".tmp", bam_file), shell=True)
-                #subprocess.call(["rm", sam_file])
+                subprocess.call(["rm", sam_file])
 
 def run_cufflinks(genome_list, library_dict, parameters, output_dir):
     for genome in genome_list:
@@ -83,15 +84,26 @@ def run_diffexp(genome_list, library_dict, parameters, output_dir):
         if not os.path.exists(genome_link):
             subprocess.check_call(["ln","-s",genome["genome"],genome_link])
         merge_cmd=["cuffmerge","-g",genome["annotation"]]
-        merge_manifest=os.path.join(genome["dir"],"gtf_manifest.txt")
-        merge_file=os.path.join(genome["dir"],"merged.gtf")
+        merge_manifest=os.path.join(genome["output"],"gtf_manifest.txt")
+        merge_folder=os.path.join(genome["output"],"merged_annotation")
+        merge_file=os.path.join(merge_folder,"merged.gtf")
         thread_count=multiprocessing.cpu_count()
-        merge_cmd+=["-p",str(thread_count)]
+        merge_cmd+=["-p",str(thread_count),"-o", merge_folder]
+        for library in library_dict:
+            for r in library_dict[library]["replicates"]:
+                with open(merge_manifest, "a") as manifest: manifest.write("\n"+os.path.join(r[genome_file]["dir"],"transcripts.gtf"))
+        merge_cmd+=[merge_manifest]
         diff_cmd=["cuffdiff",merge_file,"-p",str(thread_count),"-b",genome_link,"-L",",".join(library_dict.keys())]
+        if not os.path.exists(merge_file):
+            print " ".join(merge_cmd)
+            subprocess.check_call(merge_cmd)
+        else:
+            sys.stderr.write(merge_file+" cuffmerge file already exists. skipping\n")
         for library in library_dict:
             quant_list=[]
             for r in library_dict[library]["replicates"]:
-                quant_cmd=["cuffquant",genome["annotation"],r[genome_file]["bam"]]
+                #quant_cmd=["cuffquant",genome["annotation"],r[genome_file]["bam"]]
+                quant_cmd=["cuffquant",merge_file,r[genome_file]["bam"]]
                 cur_dir=r[genome_file]["dir"]#directory for this replicate/genome
                 os.chdir(cur_dir)
                 quant_file=os.path.join(cur_dir,"abundances.cxb")
@@ -101,15 +113,8 @@ def run_diffexp(genome_list, library_dict, parameters, output_dir):
                 else:
                     print " ".join(quant_cmd)
                     sys.stderr.write(quant_file+" cuffquant file already exists. skipping\n")
-                with open(merge_manifest, "a") as manifest: manifest.write("\n"+os.path.join(r[genome_file]["dir"],"transcripts.gtf"))
             diff_cmd.append(",".join(quant_list))
-        merge_cmd+=[merge_manifest,"-o",merge_file]
-        if not os.path.exists(merge_file):
-            print " ".join(merge_cmd)
-            subprocess.check_call(merge_cmd)
-        else:
-            sys.stderr.write(merge_file+" cuffmerge file already exists. skipping\n")
-        cur_dir=genome["dir"]
+        cur_dir=genome["output"]
         os.chdir(cur_dir)
         cds_tracking=os.path.join(cur_dir,"cds.fpkm_tracking")
         if not os.path.exists(cds_tracking):
@@ -140,7 +145,7 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument('-g', help='csv list of directories each containing a genome file *.fna and annotation *.gff', required=True)
     parser.add_argument('-L', help='csv list of library names for comparison', required=False)
-    parser.add_argument('-p', help='JSON formatted parameter list for tuxedo suite keyed to program', required=True)
+    parser.add_argument('-p', help='JSON formatted parameter list for tuxedo suite keyed to program', required=False)
     parser.add_argument('-o', help='output directory. defaults to current directory.', required=False)
     parser.add_argument('readfiles', nargs='+', help="whitespace sep list of read files. shoudld be \
             in corresponding order as library list. ws separates libraries,\
