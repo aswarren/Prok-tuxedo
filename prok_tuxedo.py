@@ -14,10 +14,12 @@ def run_alignment(genome_list, library_dict, parameters, output_dir):
             subprocess.check_call(["ln","-s",genome["genome"],genome_link])
         subprocess.check_call(["bowtie2-build", genome_link, genome_link])
         cmd=["bowtie2", "-x", genome_link]
-        if genome["dir"].endswith('/') and not genome["dir"]=="./":
+        if genome["dir"].endswith('/'):
             genome["dir"]=genome["dir"][:-1]
+        genome["dir"]=os.path.abspath(genome["dir"])
         target_dir=os.path.join(output_dir,os.path.basename(genome["dir"]))
         subprocess.call(["mkdir","-p",target_dir])
+        target_dir=os.path.abspath(target_dir)
         for library in library_dict:
             for r in library_dict[library]["replicates"]:
                 cur_cmd=list(cmd)
@@ -32,19 +34,22 @@ def run_alignment(genome_list, library_dict, parameters, output_dir):
                     sam_file=os.path.join(target_dir,name1+".sam")
                 bam_file=sam_file[:-4]+".bam"
                 r[genome["genome"]]=bam_file
-                if os.path.exists(sam_file) or os.path.exists(bam_file):
-                    sys.stderr.write(sam_file+" alignments file already exists. skipping\n")
-                    continue
                 cur_cmd+=["-S",sam_file]
                 thread_count=multiprocessing.cpu_count()
                 if thread_count < 1: thread_count=1
                 cur_cmd+=["-p",str(thread_count)]
-                print cur_cmd
-                subprocess.check_call(cur_cmd) #call bowtie2
-                subprocess.check_call("samtools view -Shu "+sam_file+" | \ samtools sort -o - - > "+bam_file, shell=True)#convert to bam
+                if os.path.exists(sam_file):
+                    sys.stderr.write(sam_file+" alignments file already exists. skipping\n")
+                else:
+                    print cur_cmd
+                    subprocess.check_call(cur_cmd) #call bowtie2
+                if not os.path.exists(bam_file):
+                    subprocess.check_call("samtools view -Su "+sam_file+" | samtools sort -o - - > "+bam_file, shell=True)#convert to bam
+                    #subprocess.check_call('samtools view -S -b %s > %s' % (sam_file, bam_file+".tmp"), shell=True)
+                    #subprocess.check_call('samtools sort %s %s' % (bam_file+".tmp", bam_file), shell=True)
                 #subprocess.call(["rm", sam_file])
 
-def run_cufflinks(genome_list, library_dict, parameters):
+def run_cufflinks(genome_list, library_dict, parameters, output_dir):
     for genome in genome_list:
         genome_link=os.path.join(output_dir, os.path.basename(genome["genome"]))
         if not os.path.exists(genome_link):
@@ -55,7 +60,8 @@ def run_cufflinks(genome_list, library_dict, parameters):
                 cur_dir=os.path.dirname(os.path.realpath(r[genome["genome"]]))
                 os.chdir(cur_dir)
                 cur_cmd=list(cmd)
-                cur_cmd+=r[genome["genome"]]
+                cur_cmd+=[r[genome["genome"]]]
+                print " ".join(cur_cmd)
                 subprocess.check_call(cur_cmd)
 
 def run_cuffdiff(genome_list, library_dict, parameters):
@@ -66,12 +72,13 @@ def main(genome_list, library_dict, parameters_file, output_dir):
     #list of genomes [{"genome":somefile,"annotation":somefile}]
     #dictionary of library dictionaries structured as {libraryname:{library:libraryname, replicates:[{read1:read1file, read2:read2file}]}}
     #parametrs_file is json parameters list keyed as bowtie, cufflinks, cuffdiff.
+    output_dir=os.path.abspath(output_dir)
     if os.path.exists(parameters_file):
     	parameters=json.load(open(parameters_file,'r'))
     else:
         parameters=[]
     run_alignment(genome_list, library_dict, parameters, output_dir)
-    run_cufflinks(genome_list, library_dict, parameters)
+    run_cufflinks(genome_list, library_dict, parameters, output_dir)
 
 
 if __name__ == "__main__":
