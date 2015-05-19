@@ -5,6 +5,7 @@ import argparse
 import subprocess
 import multiprocessing
 
+#pretty simple: its for prokaryotes in that parameters will be attuned to give best performance and no tophat
 
 def run_alignment(genome_list, library_dict, parameters, output_dir): 
     #modifies library_dict sub replicates to include 'bowtie' dict recording output files
@@ -14,14 +15,18 @@ def run_alignment(genome_list, library_dict, parameters, output_dir):
             subprocess.check_call(["ln","-s",genome["genome"],genome_link])
         subprocess.check_call(["bowtie2-build", genome_link, genome_link])
         cmd=["bowtie2", "-x", genome_link]
+        thread_count=multiprocessing.cpu_count()
+        cmd+=["-p",str(thread_count)]
         if genome["dir"].endswith('/'):
             genome["dir"]=genome["dir"][:-1]
         genome["dir"]=os.path.abspath(genome["dir"])
-        target_dir=os.path.join(output_dir,os.path.basename(genome["dir"]))
-        subprocess.call(["mkdir","-p",target_dir])
-        target_dir=os.path.abspath(target_dir)
         for library in library_dict:
+            rcount=0
             for r in library_dict[library]["replicates"]:
+                rcount+=1
+                target_dir=os.path.join(output_dir,os.path.basename(genome["dir"]),library,str(rcount))
+                target_dir=os.path.abspath(target_dir)
+                subprocess.call(["mkdir","-p",target_dir])
                 cur_cmd=list(cmd)
                 if "read2" in r:
                     cur_cmd+=["-1",r["read1"]," -2",r["read2"]]
@@ -33,11 +38,9 @@ def run_alignment(genome_list, library_dict, parameters, output_dir):
                     name1=os.path.splitext(os.path.basename(r["read1"]))
                     sam_file=os.path.join(target_dir,name1+".sam")
                 bam_file=sam_file[:-4]+".bam"
-                r[genome["genome"]]=bam_file
+                r[genome["genome"]]={}
+		r[genome["genome"]]["bam"]=bam_file
                 cur_cmd+=["-S",sam_file]
-                thread_count=multiprocessing.cpu_count()
-                if thread_count < 1: thread_count=1
-                cur_cmd+=["-p",str(thread_count)]
                 if os.path.exists(sam_file):
                     sys.stderr.write(sam_file+" alignments file already exists. skipping\n")
                 else:
@@ -51,21 +54,70 @@ def run_alignment(genome_list, library_dict, parameters, output_dir):
 
 def run_cufflinks(genome_list, library_dict, parameters, output_dir):
     for genome in genome_list:
+        genome_file=genome["genome"]
         genome_link=os.path.join(output_dir, os.path.basename(genome["genome"]))
         if not os.path.exists(genome_link):
             subprocess.check_call(["ln","-s",genome["genome"],genome_link])
         cmd=["cufflinks","-g",genome["annotation"],"-b",genome_link,"-I","50"]
+        thread_count=multiprocessing.cpu_count()
+        cmd+=["-p",str(thread_count)]
         for library in library_dict:
             for r in library_dict[library]["replicates"]:
-                cur_dir=os.path.dirname(os.path.realpath(r[genome["genome"]]))
+                cur_dir=os.path.dirname(os.path.realpath(r[genome_file]["bam"]))
                 os.chdir(cur_dir)
                 cur_cmd=list(cmd)
-                cur_cmd+=[r[genome["genome"]]]
-                print " ".join(cur_cmd)
-                subprocess.check_call(cur_cmd)
+		r[genome_file]["dir"]=cur_dir
+                cur_cmd+=[r[genome_file]["bam"]]#each replicate has the bam file
+                cuff_gtf=os.path.join(cur_dir,"transcripts.gtf")
+                if not os.path.exists(cuff_gtf):
+                    print " ".join(cur_cmd)
+                    subprocess.check_call(cur_cmd)
+                else:
+                    sys.stderr.write(cuff_gtf+" cufflinks file already exists. skipping\n")
 
-def run_cuffdiff(genome_list, library_dict, parameters):
-    pass
+def run_diffexp(genome_list, library_dict, parameters, output_dir):
+    #run cuffquant on every replicate, cuffmerge on all resulting gtf, and cuffdiff on the results. all per genome.
+    for genome in genome_list:
+        genome_file=genome["genome"]
+        genome_link=os.path.join(output_dir, os.path.basename(genome["genome"]))
+        if not os.path.exists(genome_link):
+            subprocess.check_call(["ln","-s",genome["genome"],genome_link])
+        merge_cmd=["cuffmerge","-g",genome["annotation"]]
+        merge_manifest=os.path.join(genome["dir"],"gtf_manifest.txt")
+        merge_file=os.path.join(genome["dir"],"merged.gtf")
+        thread_count=multiprocessing.cpu_count()
+        merge_cmd+=["-p",str(thread_count)]
+        diff_cmd=["cuffdiff",merge_file,"-p",str(thread_count),"-b",genome_link,"-L",",".join(library_dict.keys())]
+        for library in library_dict:
+            quant_list=[]
+            for r in library_dict[library]["replicates"]:
+                quant_cmd=["cuffquant",genome["annotation"],r[genome_file]["bam"]]
+                cur_dir=r[genome_file]["dir"]#directory for this replicate/genome
+                os.chdir(cur_dir)
+                quant_file=os.path.join(cur_dir,"abundances.cxb")
+                quant_list.append(quant_file)
+                if not os.path.exists(quant_file):
+                    subprocess.check_call(quant_cmd)
+                else:
+                    print " ".join(quant_cmd)
+                    sys.stderr.write(quant_file+" cuffquant file already exists. skipping\n")
+                with open(merge_manifest, "a") as manifest: manifest.write("\n"+os.path.join(r[genome_file]["dir"],"transcripts.gtf"))
+            diff_cmd.append(",".join(quant_list))
+        merge_cmd+=[merge_manifest,"-o",merge_file]
+        if not os.path.exists(merge_file):
+            print " ".join(merge_cmd)
+            subprocess.check_call(merge_cmd)
+        else:
+            sys.stderr.write(merge_file+" cuffmerge file already exists. skipping\n")
+        cur_dir=genome["dir"]
+        os.chdir(cur_dir)
+        cds_tracking=os.path.join(cur_dir,"cds.fpkm_tracking")
+        if not os.path.exists(cds_tracking):
+            print " ".join(diff_cmd)
+            subprocess.check_call(diff_cmd)
+        else:
+            sys.stderr.write(cds_tracking+" cuffdiff file already exists. skipping\n")
+        
 
 def main(genome_list, library_dict, parameters_file, output_dir):
     #arguments:
@@ -79,6 +131,8 @@ def main(genome_list, library_dict, parameters_file, output_dir):
         parameters=[]
     run_alignment(genome_list, library_dict, parameters, output_dir)
     run_cufflinks(genome_list, library_dict, parameters, output_dir)
+    if len(library_dict.keys()) > 1:
+        run_diffexp(genome_list, library_dict, parameters, output_dir)
 
 
 if __name__ == "__main__":
