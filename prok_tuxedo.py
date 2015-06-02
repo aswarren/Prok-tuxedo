@@ -130,7 +130,7 @@ def main(genome_list, library_dict, parameters_file, output_dir):
     #dictionary of library dictionaries structured as {libraryname:{library:libraryname, replicates:[{read1:read1file, read2:read2file}]}}
     #parametrs_file is json parameters list keyed as bowtie, cufflinks, cuffdiff.
     output_dir=os.path.abspath(output_dir)
-    if os.path.exists(parameters_file):
+    if parameters_file and os.path.exists(parameters_file):
     	parameters=json.load(open(parameters_file,'r'))
     else:
         parameters=[]
@@ -184,9 +184,9 @@ if __name__ == "__main__":
         cur_genome={"genome":[],"annotation":[],"dir":g}
         for f in os.listdir(g):
             if f.endswith(".fna") or f.endswith(".fa") or f.endswith(".fasta"):
-                cur_genome["genome"].append(os.path.join(g,f))
+                cur_genome["genome"].append(os.path.abspath(os.path.join(g,f)))
             elif f.endswith(".gff"):
-                cur_genome["annotation"].append(os.path.join(g,f))
+                cur_genome["annotation"].append(os.path.abspath(os.path.join(g,f)))
         if len(cur_genome["genome"]) != 1:
             sys.stderr.write("Too many or too few fasta files present in "+g+"\n")
             sys.exit(2)
