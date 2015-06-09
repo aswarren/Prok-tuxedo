@@ -35,8 +35,8 @@ def run_alignment(genome_list, library_dict, parameters, output_dir):
                     name2=os.path.splitext(os.path.basename(r["read2"]))[0]
                     sam_file=os.path.join(target_dir,name1+"_"+name2+".sam")
                 else:
-                    cur_cmd+=" -U "+r["read1"]
-                    name1=os.path.splitext(os.path.basename(r["read1"]))
+                    cur_cmd+=[" -U",r["read1"]]
+                    name1=os.path.splitext(os.path.basename(r["read1"]))[0]
                     sam_file=os.path.join(target_dir,name1+".sam")
                 bam_file=sam_file[:-4]+".bam"
                 r[genome["genome"]]={}
@@ -130,6 +130,7 @@ def main(genome_list, library_dict, parameters_file, output_dir):
     #dictionary of library dictionaries structured as {libraryname:{library:libraryname, replicates:[{read1:read1file, read2:read2file}]}}
     #parametrs_file is json parameters list keyed as bowtie, cufflinks, cuffdiff.
     output_dir=os.path.abspath(output_dir)
+    subprocess.call(["mkdir","-p",output_dir])
     if parameters_file and os.path.exists(parameters_file):
     	parameters=json.load(open(parameters_file,'r'))
     else:
