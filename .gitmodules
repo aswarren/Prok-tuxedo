@@ -1,0 +1,3 @@
+[submodule "p3diffexp"]
+	path = p3diffexp
+	url = https://github.com/PATRIC3/p3diffexp.git
