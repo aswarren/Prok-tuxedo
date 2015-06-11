@@ -156,7 +156,7 @@ if __name__ == "__main__":
     parser.add_argument('-L', help='csv list of library names for comparison', required=False)
     parser.add_argument('-p', help='JSON formatted parameter list for tuxedo suite keyed to program', required=False)
     parser.add_argument('-o', help='output directory. defaults to current directory.', required=False)
-    parser.add_argument('-x', action="store_true", help='run the gene matrix conversion and create a patric expression object', required=False)
+    #parser.add_argument('-x', action="store_true", help='run the gene matrix conversion and create a patric expression object', required=False)
     parser.add_argument('readfiles', nargs='+', help="whitespace sep list of read files. shoudld be \
             in corresponding order as library list. ws separates libraries,\
             a comma separates replicates, and a percent separates pairs.")
@@ -170,7 +170,7 @@ if __name__ == "__main__":
         library_list=args.L.strip().split(',')
     #create library dict
     if not len(library_list): library_list.append("results")
-    gene_matrix=args.x
+    gene_matrix=True
     if not args.o:
         output_dir="./"
     else:
