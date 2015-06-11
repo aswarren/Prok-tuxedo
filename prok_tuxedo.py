@@ -123,7 +123,14 @@ def run_diffexp(genome_list, library_dict, parameters, output_dir, gene_matrix):
             subprocess.check_call(diff_cmd)
         else:
             sys.stderr.write(cds_tracking+" cuffdiff file already exists. skipping\n")
-        
+        if gene_matrix:
+            de_file=os.path.join(cur_dir,"gene_exp.diff")
+            gmx_file=os.path.join(cur_dir,"gene_exp.gmx")
+            cuffdiff_to_genematrix.main([de_file],gmx_file)
+            #convert_cmd=[os.path.join(os.path.realpath(__file__),"p3diffexp","expression_transform.py")]
+            #convert_cmd+=]
+            #subprocess.check_call(convert_cmd)
+            
 
 def main(genome_list, library_dict, parameters_file, output_dir, gene_matrix=False):
     #arguments:
@@ -149,7 +156,7 @@ if __name__ == "__main__":
     parser.add_argument('-L', help='csv list of library names for comparison', required=False)
     parser.add_argument('-p', help='JSON formatted parameter list for tuxedo suite keyed to program', required=False)
     parser.add_argument('-o', help='output directory. defaults to current directory.', required=False)
-    parser.add_argument('-x', help='run the gene matrix conversion and create a patric expression object', required=False)
+    parser.add_argument('-x', action="store_true", help='run the gene matrix conversion and create a patric expression object', required=False)
     parser.add_argument('readfiles', nargs='+', help="whitespace sep list of read files. shoudld be \
             in corresponding order as library list. ws separates libraries,\
             a comma separates replicates, and a percent separates pairs.")
@@ -163,9 +170,7 @@ if __name__ == "__main__":
         library_list=args.L.strip().split(',')
     #create library dict
     if not len(library_list): library_list.append("results")
-    gene_matrix=False
-    if args.x:
-        gene_matrix=True
+    gene_matrix=args.x
     if not args.o:
         output_dir="./"
     else:

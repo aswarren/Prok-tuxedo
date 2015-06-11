@@ -22,14 +22,15 @@ def main(init_args, output_file):
             status='NOT OK'
             if len(parts)==14:
                 try:
-                    (gene_id, sample1, sample2, status, value1, value2, log_change) = (parts[1], parts[4], parts[5], parts[6], float(parts[7]), float(parts[8]), float(parts[9]))
+                    #test_id gene_id gene    locus   sample_1        sample_2        status  value_1 value_2 log2(fold_change)       test_stat       p_value q_value significant
+                    (gene_id, sample1, sample2, status, value1, value2, log_change) = (parts[2], parts[4], parts[5], parts[6], float(parts[7]), float(parts[8]), float(parts[9]))
                 except ValueError:
                     sys.stderr.write('One of the input files does not match the formatting of a CuffDiff gene differential expression testing file\n')
                     sys.exit()
             else:
                 sys.stderr.write('One of the input files does not match the formatting of a CuffDiff gene differential expression testing file\n')
                 sys.exit()
-            if status != 'OK':
+            if status != 'OK' or ',' in gene_id:
                 continue
             changed=False
             if value1 == 0:
