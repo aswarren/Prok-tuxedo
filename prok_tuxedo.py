@@ -43,8 +43,8 @@ def run_alignment(genome_list, library_dict, parameters, output_dir):
                 r[genome["genome"]]={}
                 r[genome["genome"]]["bam"]=bam_file
                 cur_cmd+=["-S",sam_file]
-                if os.path.exists(sam_file):
-                    sys.stderr.write(sam_file+" alignments file already exists. skipping\n")
+                if os.path.exists(bam_file):
+                    sys.stderr.write(bam_file+" alignments file already exists. skipping\n")
                 else:
                     print cur_cmd
                     subprocess.check_call(cur_cmd) #call bowtie2
