@@ -4,6 +4,7 @@ import os, sys
 import argparse
 import subprocess
 import multiprocessing
+import tarfile
 
 #pretty simple: its for prokaryotes in that parameters will be attuned to give best performance and no tophat
 
@@ -13,8 +14,14 @@ def run_alignment(genome_list, library_dict, parameters, output_dir):
         genome_link=os.path.join(output_dir, os.path.basename(genome["genome"]))
         if not os.path.exists(genome_link):
             subprocess.check_call(["ln","-s",genome["genome"],genome_link])
-        subprocess.check_call(["bowtie2-build", genome_link, genome_link])
-        cmd=["bowtie2", "-x", genome_link]
+        if "hisat_index" in genome:
+            cmd=["hisat2","--dta-cufflinks", "-x", genome_link.replace(".fna","")] #bone head move. right now all the indices were built without the fna in the prefix
+            archive = tarfile.open(genome["hisat_index"])
+            archive.extractall(path=output_dir)
+            archive.close()
+        else:
+            subprocess.check_call(["bowtie2-build", genome_link, genome_link])
+            cmd=["bowtie2", "-x", genome_link]
         thread_count=multiprocessing.cpu_count()
         cmd+=["-p",str(thread_count)]
         if genome["dir"].endswith('/'):
@@ -40,7 +47,7 @@ def run_alignment(genome_list, library_dict, parameters, output_dir):
                     sam_file=os.path.join(target_dir,name1+".sam")
                 bam_file=sam_file[:-4]+".bam"
                 r[genome["genome"]]={}
-		r[genome["genome"]]["bam"]=bam_file
+                r[genome["genome"]]["bam"]=bam_file
                 cur_cmd+=["-S",sam_file]
                 if os.path.exists(sam_file):
                     sys.stderr.write(sam_file+" alignments file already exists. skipping\n")
@@ -49,6 +56,7 @@ def run_alignment(genome_list, library_dict, parameters, output_dir):
                     subprocess.check_call(cur_cmd) #call bowtie2
                 if not os.path.exists(bam_file):
                     subprocess.check_call("samtools view -Su "+sam_file+" | samtools sort -o - - > "+bam_file, shell=True)#convert to bam
+                    subprocess.check_call("samtools index "+bam_file, shell=True)
                     #subprocess.check_call('samtools view -S -b %s > %s' % (sam_file, bam_file+".tmp"), shell=True)
                     #subprocess.check_call('samtools sort %s %s' % (bam_file+".tmp", bam_file), shell=True)
                 subprocess.call(["rm", sam_file])
@@ -67,7 +75,7 @@ def run_cufflinks(genome_list, library_dict, parameters, output_dir):
                 cur_dir=os.path.dirname(os.path.realpath(r[genome_file]["bam"]))
                 os.chdir(cur_dir)
                 cur_cmd=list(cmd)
-		r[genome_file]["dir"]=cur_dir
+                r[genome_file]["dir"]=cur_dir
                 cur_cmd+=[r[genome_file]["bam"]]#each replicate has the bam file
                 cuff_gtf=os.path.join(cur_dir,"transcripts.gtf")
                 if not os.path.exists(cuff_gtf):
@@ -145,6 +153,7 @@ if __name__ == "__main__":
     #modelling input parameters after rockhopper
     parser = argparse.ArgumentParser()
     parser.add_argument('-g', help='csv list of directories each containing a genome file *.fna and annotation *.gff', required=True)
+    parser.add_argument('--index', help='flag for enabling using HISAT2 indices', action='store_true', required=False)
     parser.add_argument('-L', help='csv list of library names for comparison', required=False)
     parser.add_argument('-p', help='JSON formatted parameter list for tuxedo suite keyed to program', required=False)
     parser.add_argument('-o', help='output directory. defaults to current directory.', required=False)
@@ -188,6 +197,9 @@ if __name__ == "__main__":
                 cur_genome["genome"].append(os.path.abspath(os.path.join(g,f)))
             elif f.endswith(".gff"):
                 cur_genome["annotation"].append(os.path.abspath(os.path.join(g,f)))
+            elif f.endswith(".ht2.tar"):
+                cur_genome["hisat_index"].append(os.path.abspath(os.path.join(g,f)))
+
         if len(cur_genome["genome"]) != 1:
             sys.stderr.write("Too many or too few fasta files present in "+g+"\n")
             sys.exit(2)
@@ -198,6 +210,9 @@ if __name__ == "__main__":
             sys.exit(2)
         else:
             cur_genome["annotation"]=cur_genome["annotation"][0]
+        if args.index and len(cur_genome["hisat_index"]) != 1:
+            sys.stderr.write("Missing hisat index tar file for "+g+"\n")
+            sys.exit(2)
 
 
         genome_list.append(cur_genome)
