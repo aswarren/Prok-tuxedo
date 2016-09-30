@@ -4,6 +4,7 @@ import os, sys
 import argparse
 import subprocess
 import multiprocessing
+import cuffdiff_to_genematrix
 import tarfile
 
 #pretty simple: its for prokaryotes in that parameters will be attuned to give best performance and no tophat
@@ -49,8 +50,8 @@ def run_alignment(genome_list, library_dict, parameters, output_dir):
                 r[genome["genome"]]={}
                 r[genome["genome"]]["bam"]=bam_file
                 cur_cmd+=["-S",sam_file]
-                if os.path.exists(sam_file):
-                    sys.stderr.write(sam_file+" alignments file already exists. skipping\n")
+                if os.path.exists(bam_file):
+                    sys.stderr.write(bam_file+" alignments file already exists. skipping\n")
                 else:
                     print cur_cmd
                     subprocess.check_call(cur_cmd) #call bowtie2
@@ -84,7 +85,7 @@ def run_cufflinks(genome_list, library_dict, parameters, output_dir):
                 else:
                     sys.stderr.write(cuff_gtf+" cufflinks file already exists. skipping\n")
 
-def run_diffexp(genome_list, library_dict, parameters, output_dir):
+def run_diffexp(genome_list, library_dict, parameters, output_dir, gene_matrix):
     #run cuffquant on every replicate, cuffmerge on all resulting gtf, and cuffdiff on the results. all per genome.
     for genome in genome_list:
         genome_file=genome["genome"]
@@ -130,9 +131,16 @@ def run_diffexp(genome_list, library_dict, parameters, output_dir):
             subprocess.check_call(diff_cmd)
         else:
             sys.stderr.write(cds_tracking+" cuffdiff file already exists. skipping\n")
-        
+        if gene_matrix:
+            de_file=os.path.join(cur_dir,"gene_exp.diff")
+            gmx_file=os.path.join(cur_dir,"gene_exp.gmx")
+            cuffdiff_to_genematrix.main([de_file],gmx_file)
+            #convert_cmd=[os.path.join(os.path.realpath(__file__),"p3diffexp","expression_transform.py")]
+            #convert_cmd+=]
+            #subprocess.check_call(convert_cmd)
+            
 
-def main(genome_list, library_dict, parameters_file, output_dir):
+def main(genome_list, library_dict, parameters_file, output_dir, gene_matrix=False):
     #arguments:
     #list of genomes [{"genome":somefile,"annotation":somefile}]
     #dictionary of library dictionaries structured as {libraryname:{library:libraryname, replicates:[{read1:read1file, read2:read2file}]}}
@@ -146,7 +154,7 @@ def main(genome_list, library_dict, parameters_file, output_dir):
     run_alignment(genome_list, library_dict, parameters, output_dir)
     run_cufflinks(genome_list, library_dict, parameters, output_dir)
     if len(library_dict.keys()) > 1:
-        run_diffexp(genome_list, library_dict, parameters, output_dir)
+        run_diffexp(genome_list, library_dict, parameters, output_dir, gene_matrix)
 
 
 if __name__ == "__main__":
@@ -157,6 +165,7 @@ if __name__ == "__main__":
     parser.add_argument('-L', help='csv list of library names for comparison', required=False)
     parser.add_argument('-p', help='JSON formatted parameter list for tuxedo suite keyed to program', required=False)
     parser.add_argument('-o', help='output directory. defaults to current directory.', required=False)
+    #parser.add_argument('-x', action="store_true", help='run the gene matrix conversion and create a patric expression object', required=False)
     parser.add_argument('readfiles', nargs='+', help="whitespace sep list of read files. shoudld be \
             in corresponding order as library list. ws separates libraries,\
             a comma separates replicates, and a percent separates pairs.")
@@ -170,6 +179,7 @@ if __name__ == "__main__":
         library_list=args.L.strip().split(',')
     #create library dict
     if not len(library_list): library_list.append("results")
+    gene_matrix=True
     if not args.o:
         output_dir="./"
     else:
@@ -217,6 +227,6 @@ if __name__ == "__main__":
 
         genome_list.append(cur_genome)
     
-    main(genome_list,library_dict,args.p,output_dir)
+    main(genome_list,library_dict,args.p,output_dir,gene_matrix)
 
 
