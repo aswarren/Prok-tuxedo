@@ -19,7 +19,7 @@ def run_alignment(genome_list, library_dict, parameters, output_dir):
         if "hisat_index" in genome:
             cmd=["hisat2","--dta-cufflinks", "-x", genome_link.replace(".fna","")] #bone head move. right now all the indices were built without the fna in the prefix
             archive = tarfile.open(genome["hisat_index"])
-            cleanup+= [os.path.join(output_dir,os.path.basename(x)) for x in tarfile.getnames()]
+            cleanup+= [os.path.join(output_dir,os.path.basename(x)) for x in archive.getnames()]
             archive.extractall(path=output_dir)
             archive.close()
         else:
