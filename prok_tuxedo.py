@@ -205,7 +205,7 @@ if __name__ == "__main__":
     genome_dirs=args.g.strip().split(',')
     genome_list=[]
     for g in genome_dirs:
-        cur_genome={"genome":[],"annotation":[],"dir":g}
+        cur_genome={"genome":[],"annotation":[],"dir":g,"hisat_index":[]}
         for f in os.listdir(g):
             if f.endswith(".fna") or f.endswith(".fa") or f.endswith(".fasta"):
                 cur_genome["genome"].append(os.path.abspath(os.path.join(g,f)))
@@ -224,9 +224,12 @@ if __name__ == "__main__":
             sys.exit(2)
         else:
             cur_genome["annotation"]=cur_genome["annotation"][0]
-        if args.index and len(cur_genome["hisat_index"]) != 1:
-            sys.stderr.write("Missing hisat index tar file for "+g+"\n")
-            sys.exit(2)
+        if args.index
+            if len(cur_genome["hisat_index"]) != 1:
+                sys.stderr.write("Missing hisat index tar file for "+g+"\n")
+                sys.exit(2)
+            else:
+                cur_genome["hisat_index"]=cur_genome["hisat_index"][0]
 
 
         genome_list.append(cur_genome)
