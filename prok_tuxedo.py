@@ -21,8 +21,9 @@ def run_alignment(genome_list, library_dict, parameters, output_dir):
             indices= [os.path.join(output_dir,os.path.basename(x)) for x in archive.getnames()]
             cleanup+=indices
             archive.extractall(path=output_dir)
+            index_prefix = os.path.join(output_dir, os.path.basename(genome["hisat_index"]).replace(".ht2.tar","")) #somewhat fragile convention. tar prefix is underlying index prefix
             archive.close()
-            cmd=["hisat2","--dta-cufflinks", "-x", genome["hisat_index"].replace(".ht2.tar","")] #bone head move. right now all the indices were built without the fna in the prefix
+            cmd=["hisat2","--dta-cufflinks", "-x", index_prefix] 
         else:
             subprocess.check_call(["bowtie2-build", genome_link, genome_link])
             cmd=["bowtie2", "-x", genome_link]
