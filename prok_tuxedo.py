@@ -17,11 +17,12 @@ def run_alignment(genome_list, library_dict, parameters, output_dir):
         if not os.path.exists(genome_link):
             subprocess.check_call(["ln","-s",genome["genome"],genome_link])
         if "hisat_index" in genome:
-            cmd=["hisat2","--dta-cufflinks", "-x", genome_link.replace(".fna","")] #bone head move. right now all the indices were built without the fna in the prefix
             archive = tarfile.open(genome["hisat_index"])
-            cleanup+= [os.path.join(output_dir,os.path.basename(x)) for x in archive.getnames()]
+            indices= [os.path.join(output_dir,os.path.basename(x)) for x in archive.getnames()]
+            cleanup+=indices
             archive.extractall(path=output_dir)
             archive.close()
+            cmd=["hisat2","--dta-cufflinks", "-x", os.path.basename(genome["hisat_index"]).replace(".tar","")] #bone head move. right now all the indices were built without the fna in the prefix
         else:
             subprocess.check_call(["bowtie2-build", genome_link, genome_link])
             cmd=["bowtie2", "-x", genome_link]
