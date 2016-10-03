@@ -13,11 +13,13 @@ def run_alignment(genome_list, library_dict, parameters, output_dir):
     #modifies library_dict sub replicates to include 'bowtie' dict recording output files
     for genome in genome_list:
         genome_link=os.path.join(output_dir, os.path.basename(genome["genome"]))
+        cleanup=[]
         if not os.path.exists(genome_link):
             subprocess.check_call(["ln","-s",genome["genome"],genome_link])
         if "hisat_index" in genome:
             cmd=["hisat2","--dta-cufflinks", "-x", genome_link.replace(".fna","")] #bone head move. right now all the indices were built without the fna in the prefix
             archive = tarfile.open(genome["hisat_index"])
+            cleanup+= [os.path.join(output_dir,os.path.basename(x)) for x in tarfile.getnames()]
             archive.extractall(path=output_dir)
             archive.close()
         else:
@@ -46,6 +48,7 @@ def run_alignment(genome_list, library_dict, parameters, output_dir):
                     cur_cmd+=[" -U",r["read1"]]
                     name1=os.path.splitext(os.path.basename(r["read1"]))[0]
                     sam_file=os.path.join(target_dir,name1+".sam")
+                cleanup.append(sam_file)
                 bam_file=sam_file[:-4]+".bam"
                 r[genome["genome"]]={}
                 r[genome["genome"]]["bam"]=bam_file
@@ -60,7 +63,8 @@ def run_alignment(genome_list, library_dict, parameters, output_dir):
                     subprocess.check_call("samtools index "+bam_file, shell=True)
                     #subprocess.check_call('samtools view -S -b %s > %s' % (sam_file, bam_file+".tmp"), shell=True)
                     #subprocess.check_call('samtools sort %s %s' % (bam_file+".tmp", bam_file), shell=True)
-                subprocess.call(["rm", sam_file])
+                for garbage in cleanup:
+                    subprocess.call(["rm", garbage])
 
 def run_cufflinks(genome_list, library_dict, parameters, output_dir):
     for genome in genome_list:
