@@ -22,7 +22,7 @@ def run_alignment(genome_list, library_dict, parameters, output_dir):
             cleanup+=indices
             #archive.extractall(path=output_dir)
             archive.close()
-            subprocess.check_call(["tar -xvf", genome["hisat_index"], output_dir])
+            subprocess.check_call(["tar","-xvf", genome["hisat_index"], output_dir])
             index_prefix = os.path.join(output_dir, os.path.basename(genome["hisat_index"]).replace(".ht2.tar","")) #somewhat fragile convention. tar prefix is underlying index prefix
             cmd=["hisat2","--dta-cufflinks", "-x", index_prefix] 
         else:
