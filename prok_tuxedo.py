@@ -224,7 +224,7 @@ if __name__ == "__main__":
             sys.exit(2)
         else:
             cur_genome["annotation"]=cur_genome["annotation"][0]
-        if args.index
+        if args.index:
             if len(cur_genome["hisat_index"]) != 1:
                 sys.stderr.write("Missing hisat index tar file for "+g+"\n")
                 sys.exit(2)
