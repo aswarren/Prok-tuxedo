@@ -22,7 +22,7 @@ def run_alignment(genome_list, library_dict, parameters, output_dir):
             cleanup+=indices
             archive.extractall(path=output_dir)
             archive.close()
-            cmd=["hisat2","--dta-cufflinks", "-x", os.path.basename(genome["hisat_index"]).replace(".tar","")] #bone head move. right now all the indices were built without the fna in the prefix
+            cmd=["hisat2","--dta-cufflinks", "-x", os.path.basename(genome["hisat_index"]).replace(".ht2.tar","")] #bone head move. right now all the indices were built without the fna in the prefix
         else:
             subprocess.check_call(["bowtie2-build", genome_link, genome_link])
             cmd=["bowtie2", "-x", genome_link]
