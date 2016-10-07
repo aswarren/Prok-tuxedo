@@ -16,7 +16,7 @@ def run_alignment(genome_list, library_dict, parameters, output_dir):
         final_cleanup=[]
         if not os.path.exists(genome_link):
             subprocess.check_call(["ln","-s",genome["genome"],genome_link])
-        if "hisat_index" in genome:
+        if "hisat_index" in genome and genome["hisat_index"]:
             archive = tarfile.open(genome["hisat_index"])
             indices= [os.path.join(output_dir,os.path.basename(x)) for x in archive.getnames()]
             final_cleanup+=indices
