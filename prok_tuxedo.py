@@ -173,6 +173,7 @@ if __name__ == "__main__":
     parser.add_argument('-g', help='csv list of directories each containing a genome file *.fna and annotation *.gff', required=True)
     parser.add_argument('--index', help='flag for enabling using HISAT2 indices', action='store_true', required=False)
     parser.add_argument('-L', help='csv list of library names for comparison', required=False)
+    parser.add_argument('-C', help='csv list of comparisons. comparisons are library names separated by percent. ', required=False)
     parser.add_argument('-p', help='JSON formatted parameter list for tuxedo suite keyed to program', required=False)
     parser.add_argument('-o', help='output directory. defaults to current directory.', required=False)
     #parser.add_argument('-x', action="store_true", help='run the gene matrix conversion and create a patric expression object', required=False)
@@ -185,8 +186,12 @@ if __name__ == "__main__":
     args = parser.parse_args()
     library_dict={}
     library_list=[]
+    comparison_list=[]
     if args.L:
         library_list=args.L.strip().split(',')
+    if args.C:
+        comparison_list=[i.split("%") for i in args.C.strip().split(',')]
+        
     #create library dict
     if not len(library_list): library_list.append("results")
     gene_matrix=True
