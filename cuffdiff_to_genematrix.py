@@ -49,7 +49,7 @@ def main(init_args, output_file):
             #pandas would be better for this
             for gene_id in gene_ids:
                 master_list_genes.add(gene_id)
-                comp_id=sample1+'_vs_'+sample2
+                comp_id=sample1+' vs '+sample2
                 master_list_comparisons.add(comp_id)
                 if comp_id not in log_lookup:
                     log_lookup[comp_id]={}
