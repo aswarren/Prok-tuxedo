@@ -78,7 +78,7 @@ def run_cufflinks(genome_list, library_dict, parameters, output_dir):
         genome_link=os.path.join(output_dir, os.path.basename(genome["genome"]))
         if not os.path.exists(genome_link):
             subprocess.check_call(["ln","-s",genome["genome"],genome_link])
-        cmd=["cufflinks","-g",genome["annotation"],"-b",genome_link,"-I","50"]
+        cmd=["cufflinks","-q","-g",genome["annotation"],"-b",genome_link,"-I","50"]
         thread_count=multiprocessing.cpu_count()
         cmd+=["-p",str(thread_count)]
         for library in library_dict:
