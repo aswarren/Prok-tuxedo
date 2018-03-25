@@ -96,7 +96,7 @@ def run_cufflinks(genome_list, condition_dict, parameters, output_dir):
                 else:
                     sys.stderr.write(cuff_gtf+" cufflinks file already exists. skipping\n")
 
-def run_diffexp(genome_list, condition_dict, parameters, output_dir, gene_matrix, contrasts, job_data):
+def run_diffexp(genome_list, condition_dict, parameters, output_dir, gene_matrix, contrasts, job_data, map_args):
     #run cuffquant on every replicate, cuffmerge on all resulting gtf, and cuffdiff on the results. all per genome.
     for genome in genome_list:
         genome_file=genome["genome"]
