@@ -166,7 +166,7 @@ def run_diffexp(genome_list, condition_dict, parameters, output_dir, gene_matrix
             #subprocess.check_call(convert_cmd)
             
 
-def main(genome_list, condition_dict, parameters_file, output_dir, gene_matrix=False, contrasts=[], job_data):
+def main(genome_list, condition_dict, parameters_file, output_dir, gene_matrix=False, contrasts=[], job_data=None):
     #arguments:
     #list of genomes [{"genome":somefile,"annotation":somefile}]
     #dictionary of library dictionaries structured as {libraryname:{library:libraryname, replicates:[{read1:read1file, read2:read2file}]}}
