@@ -169,13 +169,13 @@ def run_diffexp(genome_list, condition_dict, parameters, output_dir, gene_matrix
                 experiment_path=cur_dir
                 with open(params_file, 'w') as params_handle:
                     params_handle.write(json.dumps(transform_params))
-                convert_cmd=[transform_script, "--ufile", params_file, "--sstring", job_data.sstring, "--output_path",experiment_path,"--xfile",gmx_file]
+                convert_cmd=[transform_script, "--ufile", params_file, "--sstring", map_args.sstring, "--output_path",experiment_path,"--xfile",gmx_file]
                 print " ".join(convert_cmd)
                 subprocess.check_call(convert_cmd)
             #convert_cmd+=]
             
 
-def main(genome_list, condition_dict, parameters_file, output_dir, gene_matrix=False, contrasts=[], job_data=None):
+def main(genome_list, condition_dict, parameters_file, output_dir, gene_matrix=False, contrasts=[], job_data=None, map_args=None):
     #arguments:
     #list of genomes [{"genome":somefile,"annotation":somefile}]
     #dictionary of library dictionaries structured as {libraryname:{library:libraryname, replicates:[{read1:read1file, read2:read2file}]}}
@@ -189,7 +189,7 @@ def main(genome_list, condition_dict, parameters_file, output_dir, gene_matrix=F
     run_alignment(genome_list, condition_dict, parameters, output_dir)
     run_cufflinks(genome_list, condition_dict, parameters, output_dir)
     if len(condition_dict.keys()) > 1:
-        run_diffexp(genome_list, condition_dict, parameters, output_dir, gene_matrix, contrasts, job_data)
+        run_diffexp(genome_list, condition_dict, parameters, output_dir, gene_matrix, contrasts, job_data, map_args)
 
 
 if __name__ == "__main__":
@@ -281,6 +281,6 @@ if __name__ == "__main__":
 
 
         genome_list.append(cur_genome)
-    main(genome_list,condition_dict,map_args.p,output_dir,gene_matrix,contrasts, map_args)
+    main(genome_list,condition_dict,map_args.p,output_dir,gene_matrix,contrasts, job_data, map_args)
 
 
