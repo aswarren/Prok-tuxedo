@@ -164,12 +164,12 @@ def run_diffexp(genome_list, condition_dict, parameters, output_dir, gene_matrix
                 transform_params = {"output_path":cur_dir, "xfile":gmx_file, "xformat":"tsv",\
                         "xsetup":"gene_matrix", "source_id_type":"feature_id",\
                         "data_type":"Transcriptomics", "experiment_title":"RNA-Seq", "experiment_description":"RNA-Seq",\
-                        "organism":job_data.get(genome_id)}
+                        "organism":job_data.get("genome_id")}
                 params_file=os.path.join(cur_dir, "diff_exp_params.json")
                 experiment_path=cur_dir
                 with open(params_file, 'w') as params_handle:
                     params_handle.write(json.dumps(transform_params))
-                convert_cmd=[transform_script, "--ufile", params_file, "--sstring", map_args.sstring, "--output_path",experiment_path,"--xfile",gmx_file]
+                convert_cmd=["python",transform_script, "--ufile", params_file, "--sstring", map_args.sstring, "--output_path",experiment_path,"--xfile",gmx_file]
                 print " ".join(convert_cmd)
                 subprocess.check_call(convert_cmd)
             #convert_cmd+=]
