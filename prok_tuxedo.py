@@ -159,8 +159,8 @@ def run_diffexp(genome_list, condition_dict, parameters, output_dir, gene_matrix
             de_file=os.path.join(cur_dir,"gene_exp.diff")
             gmx_file=os.path.join(cur_dir,"gene_exp.gmx")
             cuffdiff_to_genematrix.main([de_file],gmx_file)
-            transform_script =os.path.join(os.path.realpath(__file__),"p3diffexp","expression_transform.py")
-            if os.path.exists(transform_script) and os.path.exists(gmx_file):
+            transform_script = "expression_transform.py"
+            if os.path.exists(gmx_file):
                 transform_params = {"output_path":cur_dir, "xfile":gmx_file, "xformat":"tsv",\
                         "xsetup":"gene_matrix", "source_id_type":"feature_id",\
                         "data_type":"Transcriptomics", "title":"RNA-Seq", "description":"RNA-Seq",\
@@ -281,7 +281,6 @@ if __name__ == "__main__":
 
 
         genome_list.append(cur_genome)
-    
     main(genome_list,condition_dict,map_args.p,output_dir,gene_matrix,contrasts, map_args)
 
 
