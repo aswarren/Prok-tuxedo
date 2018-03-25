@@ -220,7 +220,7 @@ if __name__ == "__main__":
         
     #create library dict
     with open(map_args.jfile, 'r') as job_handle:
-        job_data = json.load(map_args.jfile)
+        job_data = json.load(job_handle)
     condition_list= job_data.get("experimental_conditions",[])
     if not len(condition_list): condition_list.append("results")
     gene_matrix=True
