@@ -242,7 +242,7 @@ if __name__ == "__main__":
         condition_index = int(read.get("condition", count+1))-1 #if no condition return position so everything is diff condition
         rep_store=condition_dict[condition_list[condition_index]].setdefault("replicates",[]).append(read)
         count+=1
-    genome_dirs=args.g.strip().split(',')
+    genome_dirs=map_args.g.strip().split(',')
     genome_list=[]
     for g in genome_dirs:
         cur_genome={"genome":[],"annotation":[],"dir":g,"hisat_index":[]}
@@ -264,7 +264,7 @@ if __name__ == "__main__":
             sys.exit(2)
         else:
             cur_genome["annotation"]=cur_genome["annotation"][0]
-        if args.index:
+        if map_args.index:
             if len(cur_genome["hisat_index"]) != 1:
                 sys.stderr.write("Missing hisat index tar file for "+g+"\n")
                 sys.exit(2)
@@ -274,6 +274,6 @@ if __name__ == "__main__":
 
         genome_list.append(cur_genome)
     
-    main(genome_list,condition_dict,args.p,output_dir,gene_matrix,contrasts, map_args)
+    main(genome_list,condition_dict,map_args.p,output_dir,gene_matrix,contrasts, map_args)
 
 
