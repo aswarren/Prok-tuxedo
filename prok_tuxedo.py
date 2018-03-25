@@ -113,12 +113,26 @@ def run_diffexp(genome_list, condition_dict, parameters, output_dir, gene_matrix
             for r in condition_dict[library]["replicates"]:
                 with open(merge_manifest, "a") as manifest: manifest.write("\n"+os.path.join(r[genome_file]["dir"],"transcripts.gtf"))
         merge_cmd+=[merge_manifest]
-        diff_cmd=["cuffdiff",merge_file,"-p",str(thread_count),"-b",genome_link,"-L",",".join(condition_dict.keys())]
+
         if not os.path.exists(merge_file):
             print " ".join(merge_cmd)
             subprocess.check_call(merge_cmd)
         else:
             sys.stderr.write(merge_file+" cuffmerge file already exists. skipping\n")
+
+        #setup diff command
+        cur_dir=genome["output"]
+        diff_cmd=["cuffdiff",merge_file,"-p",str(thread_count),"-b",genome_link,"-L",",".join(condition_dict.keys())]
+        os.chdir(cur_dir)
+        cds_tracking=os.path.join(cur_dir,"cds.fpkm_tracking")
+        contrasts_file = os.path.join(cur_dir, "contrasts.txt")
+        with open(contrasts_file,'w') as contrasts_handle:
+            contrasts_handle.write("condition_A\tcondition_B\n")
+            for c in contrasts:
+                contrasts_handle.write(str(c[0])+"\t"+str(c[1])+"\n")
+        diff_cmd+=["--contrast-file",contrasts_file]
+
+        #create quant files and add to diff command
         for library in condition_dict:
             quant_list=[]
             for r in condition_dict[library]["replicates"]:
@@ -134,15 +148,8 @@ def run_diffexp(genome_list, condition_dict, parameters, output_dir, gene_matrix
                     print " ".join(quant_cmd)
                     sys.stderr.write(quant_file+" cuffquant file already exists. skipping\n")
             diff_cmd.append(",".join(quant_list))
+
         cur_dir=genome["output"]
-        os.chdir(cur_dir)
-        cds_tracking=os.path.join(cur_dir,"cds.fpkm_tracking")
-        contrasts_file = os.path.join(cur_dir, "contrasts.txt")
-        with open(contrasts_file,'w') as contrasts_handle:
-            contrasts_handle.write("condition_A\tcondition_B\n")
-            for c in contrasts:
-                contrasts_handle.write(str(c[0])+"\t"+str(c[1])+"\n")
-        diff_cmd+=["--contrast-file",contrasts_file]
         if not os.path.exists(cds_tracking):
             print " ".join(diff_cmd)
             subprocess.check_call(diff_cmd)
@@ -152,7 +159,7 @@ def run_diffexp(genome_list, condition_dict, parameters, output_dir, gene_matrix
             de_file=os.path.join(cur_dir,"gene_exp.diff")
             gmx_file=os.path.join(cur_dir,"gene_exp.gmx")
             cuffdiff_to_genematrix.main([de_file],gmx_file)
-            trasform_script =os.path.join(os.path.realpath(__file__),"p3diffexp","expression_transform.py")
+            transform_script =os.path.join(os.path.realpath(__file__),"p3diffexp","expression_transform.py")
             if os.path.exists(transform_script) and os.path.exists(gmx_file):
                 transform_params = {"output_path":cur_dir, "xfile":gmx_file, "xformat":"tsv",\
                         "xsetup":"gene_matrix", "source_id_type":"feature_id",\
