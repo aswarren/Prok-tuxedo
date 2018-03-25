@@ -139,7 +139,7 @@ def run_diffexp(genome_list, condition_dict, parameters, output_dir, gene_matrix
         cds_tracking=os.path.join(cur_dir,"cds.fpkm_tracking")
         contrasts_file = os.path.join(cur_dir, "contrasts.txt")
         with open(contrasts_file,'w') as contrasts_handle:
-            constrasts_handle.write("condition_A\tcondition_B\n")
+            contrasts_handle.write("condition_A\tcondition_B\n")
             for c in contrasts:
                 contrasts_handle.write(str(c[0])+"\t"+str(c[1])+"\n")
         diff_cmd+=["--contrast-file",contrasts_file]
