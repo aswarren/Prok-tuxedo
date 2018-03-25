@@ -5,7 +5,7 @@ import argparse
 import subprocess
 import multiprocessing
 import cuffdiff_to_genematrix
-import tarfile
+import tarfile, json
 
 #pretty simple: its for prokaryotes in that parameters will be attuned to give best performance and no tophat
 
