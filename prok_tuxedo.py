@@ -219,15 +219,15 @@ if __name__ == "__main__":
     #    comparison_list=[i.split("%") for i in args.C.strip().split(',')]
         
     #create library dict
-    with open(args.jfile, 'r') as job_handle:
+    with open(map_args.jfile, 'r') as job_handle:
         job_data = json.load(args.jfile)
     condition_list= job_data.get("experimental_conditions",[])
     if not len(condition_list): condition_list.append("results")
     gene_matrix=True
-    if not args.o:
+    if not map_args.o:
         output_dir="./"
     else:
-        output_dir=args.o
+        output_dir=map_args.o
     for cond in condition_list:
         condition_dict[cond]={"condition":cond}
     count=0
