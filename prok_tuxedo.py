@@ -173,7 +173,7 @@ def run_diffexp(genome_list, condition_dict, parameters, output_dir, gene_matrix
                 experiment_path=cur_dir
                 with open(params_file, 'w') as params_handle:
                     params_handle.write(json.dumps(transform_params))
-                convert_cmd=["python",transform_script, "--ufile", params_file, "--sstring", map_args.sstring, "--output_path",experiment_path,"--xfile",gmx_file]
+                convert_cmd=[transform_script, "--ufile", params_file, "--sstring", map_args.sstring, "--output_path",experiment_path,"--xfile",gmx_file]
                 print " ".join(convert_cmd)
                 subprocess.check_call(convert_cmd)
             #convert_cmd+=]
