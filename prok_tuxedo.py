@@ -43,6 +43,7 @@ def run_alignment(genome_list, condition_dict, parameters, output_dir):
                 target_dir=os.path.join(genome["output"],library,"replicate"+str(rcount))
                 target_dir=os.path.abspath(target_dir)
                 fastqc_cmd=["fastqc","--outdir",target_dir]
+                samstat_cmd=["samstat"]
                 subprocess.call(["mkdir","-p",target_dir])
                 cur_cmd=list(cmd)
                 if "read2" in r:
@@ -58,9 +59,11 @@ def run_alignment(genome_list, condition_dict, parameters, output_dir):
                     fastqc_cmd+=[r["read1"]]
                 cur_cleanup.append(sam_file)
                 bam_file=sam_file[:-4]+".bam"
+                samstat_cmd.append(bam_file)
                 r[genome["genome"]]={}
                 r[genome["genome"]]["bam"]=bam_file
                 cur_cmd+=["-S",sam_file]
+                print " ".join(fastqc_cmd)
                 subprocess.check_call(fastqc_cmd)
                 if os.path.exists(bam_file):
                     sys.stderr.write(bam_file+" alignments file already exists. skipping\n")
@@ -72,6 +75,9 @@ def run_alignment(genome_list, condition_dict, parameters, output_dir):
                     subprocess.check_call("samtools index "+bam_file, shell=True)
                     #subprocess.check_call('samtools view -S -b %s > %s' % (sam_file, bam_file+".tmp"), shell=True)
                     #subprocess.check_call('samtools sort %s %s' % (bam_file+".tmp", bam_file), shell=True)
+                print " ".join(samstat_cmd)
+                subprocess.check_call(samstat_cmd)
+
                 for garbage in cur_cleanup:
                     subprocess.call(["rm", garbage])
         for garbage in final_cleanup:
