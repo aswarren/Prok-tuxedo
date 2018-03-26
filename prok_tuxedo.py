@@ -42,6 +42,7 @@ def run_alignment(genome_list, condition_dict, parameters, output_dir):
                 rcount+=1
                 target_dir=os.path.join(genome["output"],library,"replicate"+str(rcount))
                 target_dir=os.path.abspath(target_dir)
+                fastqc_cmd=["fastqc","--outdir",target_dir]
                 subprocess.call(["mkdir","-p",target_dir])
                 cur_cmd=list(cmd)
                 if "read2" in r:
@@ -49,15 +50,18 @@ def run_alignment(genome_list, condition_dict, parameters, output_dir):
                     name1=os.path.splitext(os.path.basename(r["read1"]))[0]
                     name2=os.path.splitext(os.path.basename(r["read2"]))[0]
                     sam_file=os.path.join(target_dir,name1+"_"+name2+".sam")
+                    fastqc_cmd+=[r["read1"],r["read2"]]
                 else:
                     cur_cmd+=[" -U",r["read1"]]
                     name1=os.path.splitext(os.path.basename(r["read1"]))[0]
                     sam_file=os.path.join(target_dir,name1+".sam")
+                    fastqc_cmd+=[r["read1"]]
                 cur_cleanup.append(sam_file)
                 bam_file=sam_file[:-4]+".bam"
                 r[genome["genome"]]={}
                 r[genome["genome"]]["bam"]=bam_file
                 cur_cmd+=["-S",sam_file]
+                subprocess.check_call(fastqc_cmd)
                 if os.path.exists(bam_file):
                     sys.stderr.write(bam_file+" alignments file already exists. skipping\n")
                 else:
