@@ -234,7 +234,7 @@ if __name__ == "__main__":
     if len(sys.argv) ==1:
         parser.print_help()
         sys.exit(2)
-    map_args = parsier.parse_args()
+    map_args = parser.parse_args()
     assert map_args.d.startswith(".") # job object folder name needs a .
     condition_dict={}
     condition_list=[]
