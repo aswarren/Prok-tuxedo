@@ -106,7 +106,7 @@ def run_cufflinks(genome_list, condition_dict, parameters, output_dir):
                 else:
                     sys.stderr.write(cuff_gtf+" cufflinks file already exists. skipping\n")
 
-def run_diffexp(genome_list, condition_dict, parameters, output_dir, gene_matrix, contrasts, job_data, map_args):
+def run_diffexp(genome_list, condition_dict, parameters, output_dir, gene_matrix, contrasts, job_data, map_args, diffexp_json):
     #run cuffquant on every replicate, cuffmerge on all resulting gtf, and cuffdiff on the results. all per genome.
     for genome in genome_list:
         genome_file=genome["genome"]
@@ -171,21 +171,26 @@ def run_diffexp(genome_list, condition_dict, parameters, output_dir, gene_matrix
             cuffdiff_to_genematrix.main([de_file],gmx_file)
             transform_script = "expression_transform.py"
             if os.path.exists(gmx_file):
-                transform_params = {"output_path":cur_dir, "xfile":gmx_file, "xformat":"tsv",\
+                transform_params = {"output_path":map_args.d, "xfile":gmx_file, "xformat":"tsv",\
                         "xsetup":"gene_matrix", "source_id_type":"patric_id",\
                         "data_type":"Transcriptomics", "experiment_title":"RNA-Seq", "experiment_description":"RNA-Seq",\
                         "organism":job_data.get("genome_id")}
+                diffexp_json["parameters"]=transform_params
                 params_file=os.path.join(cur_dir, "diff_exp_params.json")
-                experiment_path=cur_dir
+                experiment_path=map_args.d
                 with open(params_file, 'w') as params_handle:
                     params_handle.write(json.dumps(transform_params))
                 convert_cmd=[transform_script, "--ufile", params_file, "--sstring", map_args.sstring, "--output_path",experiment_path,"--xfile",gmx_file]
                 print " ".join(convert_cmd)
                 subprocess.check_call(convert_cmd)
+                diffexp_obj_file=os.path.join(os.path.dirname(map_args.d), os.path.basename(map_args.d.lstrip(".")))
+                with open(diffexp_obj_file, 'w') as diffexp_job:
+                    diffexp_job.write(json.dumps(diffexp_json))
+                
             #convert_cmd+=]
             
 
-def main(genome_list, condition_dict, parameters_file, output_dir, gene_matrix=False, contrasts=[], job_data=None, map_args=None):
+def main(genome_list, condition_dict, parameters_file, output_dir, gene_matrix=False, contrasts=[], job_data=None, map_args=None, diffexp_json=None):
     #arguments:
     #list of genomes [{"genome":somefile,"annotation":somefile}]
     #dictionary of library dictionaries structured as {libraryname:{library:libraryname, replicates:[{read1:read1file, read2:read2file}]}}
@@ -199,7 +204,7 @@ def main(genome_list, condition_dict, parameters_file, output_dir, gene_matrix=F
     run_alignment(genome_list, condition_dict, parameters, output_dir)
     run_cufflinks(genome_list, condition_dict, parameters, output_dir)
     if len(condition_dict.keys()) > 1:
-        run_diffexp(genome_list, condition_dict, parameters, output_dir, gene_matrix, contrasts, job_data, map_args)
+        run_diffexp(genome_list, condition_dict, parameters, output_dir, gene_matrix, contrasts, job_data, map_args, diffexp_json)
 
 
 if __name__ == "__main__":
@@ -220,6 +225,7 @@ if __name__ == "__main__":
     #parser.add_argument('-C', help='csv list of comparisons. comparisons are library names separated by percent. ', required=False)
     parser.add_argument('-p', help='JSON formatted parameter list for tuxedo suite keyed to program', required=False)
     parser.add_argument('-o', help='output directory. defaults to current directory.', required=False)
+    parser.add_argument('-d', help='output path / name of file for differential expression job folder where files go', required=False)
     #parser.add_argument('-x', action="store_true", help='run the gene matrix conversion and create a patric expression object', required=False)
     #parser.add_argument('readfiles', nargs='+', help="whitespace sep list of read files. shoudld be \
     #        in corresponding order as library list. ws separates libraries,\
@@ -291,6 +297,77 @@ if __name__ == "__main__":
 
 
         genome_list.append(cur_genome)
-    main(genome_list,condition_dict,map_args.p,output_dir,gene_matrix,contrasts, job_data, map_args)
+
+    #job template for differential expression object
+    json_template = json.loads("""                    {
+                        "app": {
+                            "description": "Parses and transforms users differential expression data",
+                            "id": "DifferentialExpression",
+                            "label": "Transform expression data",
+                            "parameters": [
+                                {
+                                    "default": null,
+                                    "desc": "Comparison values between samples",
+                                    "id": "xfile",
+                                    "label": "Experiment Data File",
+                                    "required": 1,
+                                    "type": "wstype",
+                                    "wstype": "ExpList"
+                                },
+                                {
+                                    "default": null,
+                                    "desc": "Metadata template filled out by the user",
+                                    "id": "mfile",
+                                    "label": "Metadata File",
+                                    "required": 0,
+                                    "type": "wstype",
+                                    "wstype": "ExpMetadata"
+                                },
+                                {
+                                    "default": null,
+                                    "desc": "User information (JSON string)",
+                                    "id": "ustring",
+                                    "label": "User string",
+                                    "required": 1,
+                                    "type": "string"
+                                },
+                                {
+                                    "default": null,
+                                    "desc": "Path to which the output will be written. Defaults to the directory containing the input data. ",
+                                    "id": "output_path",
+                                    "label": "Output Folder",
+                                    "required": 0,
+                                    "type": "folder"
+                                },
+                                {
+                                    "default": null,
+                                    "desc": "Basename for the generated output files. Defaults to the basename of the input data.",
+                                    "id": "output_file",
+                                    "label": "File Basename",
+                                    "required": 0,
+                                    "type": "wsid"
+                                }
+                            ],
+                            "script": "App-DifferentialExpression"
+                        },
+                        "elapsed_time": null,
+                        "end_time": null,
+                        "hostname": "",
+                        "id": "",
+                        "is_folder": 0,
+                        "job_output": "",
+                        "output_files": [
+                        ],
+                        "parameters": {
+                            "mfile": "",
+                            "output_file": "",
+                            "output_path": "",
+                            "ustring": "",
+                            "xfile": ""
+                        },
+                        "start_time": ""
+                    }
+""")
+    main(genome_list,condition_dict,map_args.p,output_dir,gene_matrix,contrasts,job_data,map_args,diffexp_json)
 
 
