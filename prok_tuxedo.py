@@ -226,7 +226,7 @@ if __name__ == "__main__":
     #parser.add_argument('-C', help='csv list of comparisons. comparisons are library names separated by percent. ', required=False)
     parser.add_argument('-p', help='JSON formatted parameter list for tuxedo suite keyed to program', required=False)
     parser.add_argument('-o', help='output directory. defaults to current directory.', required=False)
-    parser.add_argument('-d', help='name of the folder for differential expression job folder where files go', required=True)
+    parser.add_argument('-d', help='name of the folder for differential expression job folder where files go', required=True) 
     #parser.add_argument('-x', action="store_true", help='run the gene matrix conversion and create a patric expression object', required=False)
     #parser.add_argument('readfiles', nargs='+', help="whitespace sep list of read files. shoudld be \
     #        in corresponding order as library list. ws separates libraries,\
@@ -234,7 +234,8 @@ if __name__ == "__main__":
     if len(sys.argv) ==1:
         parser.print_help()
         sys.exit(2)
-    map_args = parser.parse_args()
+    map_args = parsier.parse_args()
+    assert map_args.d.startswith(".") # job object folder name needs a .
     condition_dict={}
     condition_list=[]
     comparison_list=[]
