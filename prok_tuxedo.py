@@ -140,7 +140,7 @@ def run_diffexp(genome_list, condition_dict, parameters, output_dir, gene_matrix
             contrasts_handle.write("condition_A\tcondition_B\n")
             for c in contrasts:
                 contrasts_handle.write(str(c[0])+"\t"+str(c[1])+"\n")
-        diff_cmd+=["--contrast-file",contrasts_file]
+        diff_cmd+=["--contrast-file",contrasts_file,"-o",cur_dir]
 
         #create quant files and add to diff command
         for library in condition_dict:
@@ -160,6 +160,8 @@ def run_diffexp(genome_list, condition_dict, parameters, output_dir, gene_matrix
             diff_cmd.append(",".join(quant_list))
 
         cur_dir=genome["output"]
+        os.chdir(cur_dir)
+        cds_tracking=os.path.join(cur_dir,"cds.fpkm_tracking")
         if not os.path.exists(cds_tracking):
             print " ".join(diff_cmd)
             subprocess.check_call(diff_cmd)
