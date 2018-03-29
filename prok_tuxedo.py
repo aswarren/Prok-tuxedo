@@ -204,7 +204,7 @@ def main(genome_list, condition_dict, parameters_file, output_dir, gene_matrix=F
     	parameters=json.load(open(parameters_file,'r'))
     else:
         parameters=[]
-    run_alignment(genome_list, condition_dict, parameters, output_dir)
+    run_alignment(genome_list, condition_dict, parameters, output_dir, job_data)
     run_cufflinks(genome_list, condition_dict, parameters, output_dir)
     if len(condition_dict.keys()) > 1:
         run_diffexp(genome_list, condition_dict, parameters, output_dir, gene_matrix, contrasts, job_data, map_args, diffexp_json)
