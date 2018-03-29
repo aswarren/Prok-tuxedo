@@ -9,7 +9,7 @@ import tarfile, json
 
 #pretty simple: its for prokaryotes in that parameters will be attuned to give best performance and no tophat
 
-def run_alignment(genome_list, condition_dict, parameters, output_dir): 
+def run_alignment(genome_list, condition_dict, parameters, output_dir, job_data): 
     #modifies condition_dict sub replicates to include 'bowtie' dict recording output files
     for genome in genome_list:
         genome_link=os.path.join(output_dir, os.path.basename(genome["genome"]))
@@ -34,7 +34,7 @@ def run_alignment(genome_list, condition_dict, parameters, output_dir):
         if genome["dir"].endswith('/'):
             genome["dir"]=genome["dir"][:-1]
         genome["dir"]=os.path.abspath(genome["dir"])
-        genome["output"]=os.path.join(output_dir,os.path.basename(genome["dir"]))
+        genome["output"]=os.path.join(output_dir,job_data.get("reference_genome_id"))
         for library in condition_dict:
             rcount=0
             for r in condition_dict[library]["replicates"]:
@@ -178,7 +178,7 @@ def run_diffexp(genome_list, condition_dict, parameters, output_dir, gene_matrix
                 transform_params = {"output_path":experiment_path, "xfile":gmx_file, "xformat":"tsv",\
                         "xsetup":"gene_matrix", "source_id_type":"patric_id",\
                         "data_type":"Transcriptomics", "experiment_title":"RNA-Seq", "experiment_description":"RNA-Seq",\
-                        "organism":job_data.get("genome_id")}
+                        "organism":job_data.get("reference_genome_id")}
                 diffexp_json["parameters"]=transform_params
                 params_file=os.path.join(cur_dir, "diff_exp_params.json")
                 with open(params_file, 'w') as params_handle:
@@ -213,6 +213,7 @@ def main(genome_list, condition_dict, parameters_file, output_dir, gene_matrix=F
 if __name__ == "__main__":
     #modelling input parameters after rockhopper
     parser = argparse.ArgumentParser()
+    #if you want to support multiple genomes for alignment you should make this json payload an nargs+ parameter
     parser.add_argument('--jfile',
             help='json file for job {"reference_genome_id": "1310806.3", "experimental_conditions":\
                     ["c1_control", "c2_treatment"], "output_file": "rnaseq_baumanii_1505311", \
