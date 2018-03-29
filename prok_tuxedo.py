@@ -173,7 +173,7 @@ def run_diffexp(genome_list, condition_dict, parameters, output_dir, gene_matrix
             cuffdiff_to_genematrix.main([de_file],gmx_file)
             transform_script = "expression_transform.py"
             if os.path.exists(gmx_file):
-                experiment_path=os.path.join(output_path, map_args.d)
+                experiment_path=os.path.join(output_dir, map_args.d)
                 subprocess.call(["mkdir","-p",experiment_path])
                 transform_params = {"output_path":experiment_path, "xfile":gmx_file, "xformat":"tsv",\
                         "xsetup":"gene_matrix", "source_id_type":"patric_id",\
