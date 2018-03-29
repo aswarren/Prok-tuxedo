@@ -171,7 +171,7 @@ def run_diffexp(genome_list, condition_dict, parameters, output_dir, gene_matrix
             cuffdiff_to_genematrix.main([de_file],gmx_file)
             transform_script = "expression_transform.py"
             if os.path.exists(gmx_file):
-                experiment_path=os.path.join(map_args.o, map_args.d)
+                experiment_path=os.path.join(output_path, map_args.d)
                 subprocess.call(["mkdir","-p",experiment_path])
                 transform_params = {"output_path":experiment_path, "xfile":gmx_file, "xformat":"tsv",\
                         "xsetup":"gene_matrix", "source_id_type":"patric_id",\
@@ -225,7 +225,7 @@ if __name__ == "__main__":
     #parser.add_argument('-L', help='csv list of library names for comparison', required=False)
     #parser.add_argument('-C', help='csv list of comparisons. comparisons are library names separated by percent. ', required=False)
     parser.add_argument('-p', help='JSON formatted parameter list for tuxedo suite keyed to program', required=False)
-    parser.add_argument('-o', help='output directory. defaults to current directory.', required=False)
+    parser.add_argument('-o', help='output directory. defaults to current directory.', required=False, default=None)
     parser.add_argument('-d', help='name of the folder for differential expression job folder where files go', required=True) 
     #parser.add_argument('-x', action="store_true", help='run the gene matrix conversion and create a patric expression object', required=False)
     #parser.add_argument('readfiles', nargs='+', help="whitespace sep list of read files. shoudld be \
@@ -250,7 +250,7 @@ if __name__ == "__main__":
     condition_list= job_data.get("experimental_conditions",[])
     if not len(condition_list): condition_list.append("results")
     gene_matrix=True
-    if not map_args.o:
+    if map_args.o == None:
         output_dir="./"
     else:
         output_dir=map_args.o
