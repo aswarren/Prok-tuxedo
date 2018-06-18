@@ -6,6 +6,38 @@ import subprocess
 import multiprocessing
 import cuffdiff_to_genematrix
 import tarfile
+import base64
+
+#take genome data structure and library_dict and make directory names. processses "library" aka condition to ensure no special characters, or whitespace
+def make_directory_names(genome, library_dict):
+    if genome["dir"].endswith('/'):
+        genome["dir"]=genome["dir"][:-1]
+    genome["dir"]=os.path.abspath(genome["dir"])
+    genome["output"]=os.path.join(output_dir,os.path.basename(genome["dir"]))
+    for library in library_dict:
+        rcount=0
+        for r in library_dict[library]["replicates"]:
+            cur_cleanup=[]
+            rcount+=1
+            library
+            target_dir=os.path.join(genome["output"], base64.urlsafe_b64encode(library),"replicate"+str(rcount))
+            target_dir=os.path.abspath(target_dir)
+            library_dict[library]["replicates"]["target_dir"]=target_dir
+
+#hisat2 has problems with spaces in filenames
+#prevent spaces in filenames. if one exists link the file to a no-space version.
+def link_space(file_path):
+    result=file_path
+    name=os.path.splitext(os.path.basename(file_path))[0]
+    if " " in name:
+        clean_name=name.replace(" ","")
+        result= file_path.replace(name,clean_name)
+        if not os.path.exists(result):
+            subprocess.check_call(["ln","-s",file_path,result])
+    return result
+
+
+
 
 #pretty simple: its for prokaryotes in that parameters will be attuned to give best performance and no tophat
 
@@ -30,27 +62,23 @@ def run_alignment(genome_list, library_dict, parameters, output_dir):
             cmd=["bowtie2", "-x", genome_link]
         thread_count=multiprocessing.cpu_count()
         cmd+=["-p",str(thread_count)]
-        if genome["dir"].endswith('/'):
-            genome["dir"]=genome["dir"][:-1]
-        genome["dir"]=os.path.abspath(genome["dir"])
-        genome["output"]=os.path.join(output_dir,os.path.basename(genome["dir"]))
+        make_directory_names(genome, library_dict)
         for library in library_dict:
             rcount=0
             for r in library_dict[library]["replicates"]:
                 cur_cleanup=[]
                 rcount+=1
-                target_dir=os.path.join(genome["output"],library,"replicate"+str(rcount))
-                target_dir=os.path.abspath(target_dir)
+                target_dir=r["target_dir"]
                 subprocess.call(["mkdir","-p",target_dir])
                 cur_cmd=list(cmd)
                 if "read2" in r:
-                    cur_cmd+=["-1",r["read1"]," -2",r["read2"]]
-                    name1=os.path.splitext(os.path.basename(r["read1"]))[0]
-                    name2=os.path.splitext(os.path.basename(r["read2"]))[0]
+                    cur_cmd+=["-1",link_space(r["read1"])," -2",link_space(r["read2"])]
+                    name1=os.path.splitext(os.path.basename(r["read1"]))[0].replace(" ","")
+                    name2=os.path.splitext(os.path.basename(r["read2"]))[0].replace(" ","")
                     sam_file=os.path.join(target_dir,name1+"_"+name2+".sam")
                 else:
-                    cur_cmd+=[" -U",r["read1"]]
-                    name1=os.path.splitext(os.path.basename(r["read1"]))[0]
+                    cur_cmd+=[" -U",link_space(r["read1"])]
+                    name1=os.path.splitext(os.path.basename(r["read1"]))[0].replace(" ","")
                     sam_file=os.path.join(target_dir,name1+".sam")
                 cur_cleanup.append(sam_file)
                 bam_file=sam_file[:-4]+".bam"
