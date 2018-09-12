@@ -297,7 +297,8 @@ if __name__ == "__main__":
         if "read" in read:
             read["read1"] = read.pop("read")
         condition_index = int(read.get("condition", count+1))-1 #if no condition return position so everything is diff condition
-        rep_store=condition_dict[condition_list[condition_index]].setdefault("replicates",[]).append(read)
+        condition_id = condition_list[condition_index] if len(condition_list) else condition_index
+        condition_dict[condition_id].setdefault("replicates",[]).append(read)
         count+=1
     genome_dirs=map_args.g.strip().split(',')
     genome_list=[]
