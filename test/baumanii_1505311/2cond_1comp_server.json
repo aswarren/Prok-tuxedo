@@ -1,0 +1,28 @@
+{
+    "output_path": "/anwarren@patricbrc.org/home/test",
+    "output_file": "rnaseq_baumanii_1505311",
+    "recipe": "RNA-Rocket",
+    "reference_genome_id": "1310806.3",
+    "contrasts": [
+        [
+            1,
+            2
+        ]
+    ],
+    "paired_end_libs": [
+        {
+            "condition": 1,
+            "read1": "/anwarren@patricbrc.org/home/rnaseq_test/MHB_R1.fq.gz",
+            "read2": "/anwarren@patricbrc.org/home/rnaseq_test/MHB_R2.fq.gz"
+        },
+        {
+            "condition": 2,
+            "read1": "/anwarren@patricbrc.org/home/rnaseq_test/MERO_75_R1.fq.gz",
+            "read2": "/anwarren@patricbrc.org/home/rnaseq_test/MERO_75_R2.fq.gz"
+        }
+    ],
+    "experimental_conditions": [
+        "c1_control",
+        "c2_treatment"
+    ]
+}

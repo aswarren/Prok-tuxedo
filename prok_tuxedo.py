@@ -5,7 +5,7 @@ import argparse
 import subprocess
 import multiprocessing
 import cuffdiff_to_genematrix
-import tarfile
+import tarfile, json
 import base64
 
 #take genome data structure and library_dict and make directory names. processses "library" aka condition to ensure no special characters, or whitespace
@@ -41,8 +41,8 @@ def link_space(file_path):
 
 #pretty simple: its for prokaryotes in that parameters will be attuned to give best performance and no tophat
 
-def run_alignment(genome_list, library_dict, parameters, output_dir): 
-    #modifies library_dict sub replicates to include 'bowtie' dict recording output files
+def run_alignment(genome_list, condition_dict, parameters, output_dir, job_data): 
+    #modifies condition_dict sub replicates to include 'bowtie' dict recording output files
     for genome in genome_list:
         genome_link=os.path.join(output_dir, os.path.basename(genome["genome"]))
         final_cleanup=[]
@@ -58,17 +58,20 @@ def run_alignment(genome_list, library_dict, parameters, output_dir):
             index_prefix = os.path.join(output_dir, os.path.basename(genome["hisat_index"]).replace(".ht2.tar","")) #somewhat fragile convention. tar prefix is underlying index prefix
             cmd=["hisat2","--dta-cufflinks", "-x", index_prefix] 
         else:
-            subprocess.check_call(["bowtie2-build", genome_link, genome_link])
-            cmd=["bowtie2", "-x", genome_link]
+            subprocess.check_call(["hisat2-build", genome_link, genome_link])
+            cmd=["hisat2","--dta-cufflinks", "-x", genome_link, "--no-spliced-alignment"] 
+            #cmd=["bowtie2", "-x", genome_link]
         thread_count=multiprocessing.cpu_count()
         cmd+=["-p",str(thread_count)]
         make_directory_names(genome, library_dict)
-        for library in library_dict:
+        for library in condition_dict:
             rcount=0
-            for r in library_dict[library]["replicates"]:
+            for r in condition_dict[library]["replicates"]:
                 cur_cleanup=[]
                 rcount+=1
                 target_dir=r["target_dir"]
+                fastqc_cmd=["fastqc","--outdir",target_dir]
+                samstat_cmd=["samstat"]
                 subprocess.call(["mkdir","-p",target_dir])
                 cur_cmd=list(cmd)
                 if "read2" in r:
@@ -76,15 +79,20 @@ def run_alignment(genome_list, library_dict, parameters, output_dir):
                     name1=os.path.splitext(os.path.basename(r["read1"]))[0].replace(" ","")
                     name2=os.path.splitext(os.path.basename(r["read2"]))[0].replace(" ","")
                     sam_file=os.path.join(target_dir,name1+"_"+name2+".sam")
+                    fastqc_cmd+=[r["read1"],r["read2"]]
                 else:
                     cur_cmd+=[" -U",link_space(r["read1"])]
                     name1=os.path.splitext(os.path.basename(r["read1"]))[0].replace(" ","")
                     sam_file=os.path.join(target_dir,name1+".sam")
+                    fastqc_cmd+=[r["read1"]]
                 cur_cleanup.append(sam_file)
                 bam_file=sam_file[:-4]+".bam"
+                samstat_cmd.append(bam_file)
                 r[genome["genome"]]={}
                 r[genome["genome"]]["bam"]=bam_file
                 cur_cmd+=["-S",sam_file]
+                print " ".join(fastqc_cmd)
+                subprocess.check_call(fastqc_cmd)
                 if os.path.exists(bam_file):
                     sys.stderr.write(bam_file+" alignments file already exists. skipping\n")
                 else:
@@ -95,12 +103,37 @@ def run_alignment(genome_list, library_dict, parameters, output_dir):
                     subprocess.check_call("samtools index "+bam_file, shell=True)
                     #subprocess.check_call('samtools view -S -b %s > %s' % (sam_file, bam_file+".tmp"), shell=True)
                     #subprocess.check_call('samtools sort %s %s' % (bam_file+".tmp", bam_file), shell=True)
+                print " ".join(samstat_cmd)
+                subprocess.check_call(samstat_cmd)
+
                 for garbage in cur_cleanup:
                     subprocess.call(["rm", garbage])
         for garbage in final_cleanup:
             subprocess.call(["rm", garbage])
 
-def run_cufflinks(genome_list, library_dict, parameters, output_dir):
+def run_stringtie(genome_list, condition_dict, parameters, output_dir):
+    for genome in genome_list:
+        genome_file=genome["genome"]
+        genome_link=os.path.join(output_dir, os.path.basename(genome["genome"]))
+        if not os.path.exists(genome_link):
+            subprocess.check_call(["ln","-s",genome["genome"],genome_link])
+        cmd=["stringtie","-q","-g",genome["annotation"],"-b",genome_link,"-I","50"]
+        thread_count=multiprocessing.cpu_count()
+        cmd+=["-p",str(thread_count)]
+        for library in condition_dict:
+            for r in condition_dict[library]["replicates"]:
+                cur_dir=os.path.dirname(os.path.realpath(r[genome_file]["bam"]))
+                os.chdir(cur_dir)
+                cur_cmd=list(cmd)
+                r[genome_file]["dir"]=cur_dir
+                cur_cmd+=[r[genome_file]["bam"]]#each replicate has the bam file
+                cuff_gtf=os.path.join(cur_dir,"transcripts.gtf")
+                if not os.path.exists(cuff_gtf):
+                    print " ".join(cur_cmd)
+                    subprocess.check_call(cur_cmd)
+                else:
+                    sys.stderr.write(cuff_gtf+" stringtie file already exists. skipping\n")
+def run_cufflinks(genome_list, condition_dict, parameters, output_dir):
     for genome in genome_list:
         genome_file=genome["genome"]
         genome_link=os.path.join(output_dir, os.path.basename(genome["genome"]))
@@ -109,8 +142,8 @@ def run_cufflinks(genome_list, library_dict, parameters, output_dir):
         cmd=["cufflinks","-q","-g",genome["annotation"],"-b",genome_link,"-I","50"]
         thread_count=multiprocessing.cpu_count()
         cmd+=["-p",str(thread_count)]
-        for library in library_dict:
-            for r in library_dict[library]["replicates"]:
+        for library in condition_dict:
+            for r in condition_dict[library]["replicates"]:
                 cur_dir=os.path.dirname(os.path.realpath(r[genome_file]["bam"]))
                 os.chdir(cur_dir)
                 cur_cmd=list(cmd)
@@ -123,32 +156,46 @@ def run_cufflinks(genome_list, library_dict, parameters, output_dir):
                 else:
                     sys.stderr.write(cuff_gtf+" cufflinks file already exists. skipping\n")
 
-def run_diffexp(genome_list, library_dict, parameters, output_dir, gene_matrix):
+def run_diffexp(genome_list, condition_dict, parameters, output_dir, gene_matrix, contrasts, job_data, map_args, diffexp_json):
     #run cuffquant on every replicate, cuffmerge on all resulting gtf, and cuffdiff on the results. all per genome.
     for genome in genome_list:
         genome_file=genome["genome"]
         genome_link=os.path.join(output_dir, os.path.basename(genome["genome"]))
         if not os.path.exists(genome_link):
             subprocess.check_call(["ln","-s",genome["genome"],genome_link])
-        merge_cmd=["cuffmerge","-g",genome["annotation"]]
+        merge_cmd=["stringtie","-merge","-g",genome["annotation"]]
         merge_manifest=os.path.join(genome["output"],"gtf_manifest.txt")
         merge_folder=os.path.join(genome["output"],"merged_annotation")
         merge_file=os.path.join(merge_folder,"merged.gtf")
         thread_count=multiprocessing.cpu_count()
         merge_cmd+=["-p",str(thread_count),"-o", merge_folder]
-        for library in library_dict:
-            for r in library_dict[library]["replicates"]:
+        for library in condition_dict:
+            for r in condition_dict[library]["replicates"]:
                 with open(merge_manifest, "a") as manifest: manifest.write("\n"+os.path.join(r[genome_file]["dir"],"transcripts.gtf"))
         merge_cmd+=[merge_manifest]
-        diff_cmd=["cuffdiff",merge_file,"-p",str(thread_count),"-b",genome_link,"-L",",".join(library_dict.keys())]
+
         if not os.path.exists(merge_file):
             print " ".join(merge_cmd)
             subprocess.check_call(merge_cmd)
         else:
             sys.stderr.write(merge_file+" cuffmerge file already exists. skipping\n")
-        for library in library_dict:
+
+        #setup diff command
+        cur_dir=genome["output"]
+        diff_cmd=["cuffdiff",merge_file,"-p",str(thread_count),"-b",genome_link,"-L",",".join(condition_dict.keys())]
+        os.chdir(cur_dir)
+        cds_tracking=os.path.join(cur_dir,"cds.fpkm_tracking")
+        contrasts_file = os.path.join(cur_dir, "contrasts.txt")
+        with open(contrasts_file,'w') as contrasts_handle:
+            contrasts_handle.write("condition_A\tcondition_B\n")
+            for c in contrasts:
+                contrasts_handle.write(str(c[0])+"\t"+str(c[1])+"\n")
+        diff_cmd+=["--contrast-file",contrasts_file,"-o",cur_dir]
+
+        #create quant files and add to diff command
+        for library in condition_dict:
             quant_list=[]
-            for r in library_dict[library]["replicates"]:
+            for r in condition_dict[library]["replicates"]:
                 #quant_cmd=["cuffquant",genome["annotation"],r[genome_file]["bam"]]
                 quant_cmd=["cuffquant",merge_file,r[genome_file]["bam"]]
                 cur_dir=r[genome_file]["dir"]#directory for this replicate/genome
@@ -161,6 +208,7 @@ def run_diffexp(genome_list, library_dict, parameters, output_dir, gene_matrix):
                     print " ".join(quant_cmd)
                     sys.stderr.write(quant_file+" cuffquant file already exists. skipping\n")
             diff_cmd.append(",".join(quant_list))
+
         cur_dir=genome["output"]
         os.chdir(cur_dir)
         cds_tracking=os.path.join(cur_dir,"cds.fpkm_tracking")
@@ -173,12 +221,29 @@ def run_diffexp(genome_list, library_dict, parameters, output_dir, gene_matrix):
             de_file=os.path.join(cur_dir,"gene_exp.diff")
             gmx_file=os.path.join(cur_dir,"gene_exp.gmx")
             cuffdiff_to_genematrix.main([de_file],gmx_file)
-            #convert_cmd=[os.path.join(os.path.realpath(__file__),"p3diffexp","expression_transform.py")]
+            transform_script = "expression_transform.py"
+            if os.path.exists(gmx_file):
+                experiment_path=os.path.join(output_dir, map_args.d)
+                subprocess.call(["mkdir","-p",experiment_path])
+                transform_params = {"output_path":experiment_path, "xfile":gmx_file, "xformat":"tsv",\
+                        "xsetup":"gene_matrix", "source_id_type":"patric_id",\
+                        "data_type":"Transcriptomics", "experiment_title":"RNA-Seq", "experiment_description":"RNA-Seq",\
+                        "organism":job_data.get("reference_genome_id")}
+                diffexp_json["parameters"]=transform_params
+                params_file=os.path.join(cur_dir, "diff_exp_params.json")
+                with open(params_file, 'w') as params_handle:
+                    params_handle.write(json.dumps(transform_params))
+                convert_cmd=[transform_script, "--ufile", params_file, "--sstring", map_args.sstring, "--output_path",experiment_path,"--xfile",gmx_file]
+                print " ".join(convert_cmd)
+                subprocess.check_call(convert_cmd)
+                diffexp_obj_file=os.path.join(output_dir, os.path.basename(map_args.d.lstrip(".")))
+                with open(diffexp_obj_file, 'w') as diffexp_job:
+                    diffexp_job.write(json.dumps(diffexp_json))
+                
             #convert_cmd+=]
-            #subprocess.check_call(convert_cmd)
             
 
-def main(genome_list, library_dict, parameters_file, output_dir, gene_matrix=False):
+def main(genome_list, condition_dict, parameters_file, output_dir, gene_matrix=False, contrasts=[], job_data=None, map_args=None, diffexp_json=None):
     #arguments:
     #list of genomes [{"genome":somefile,"annotation":somefile}]
     #dictionary of library dictionaries structured as {libraryname:{library:libraryname, replicates:[{read1:read1file, read2:read2file}]}}
@@ -189,59 +254,74 @@ def main(genome_list, library_dict, parameters_file, output_dir, gene_matrix=Fal
     	parameters=json.load(open(parameters_file,'r'))
     else:
         parameters=[]
-    run_alignment(genome_list, library_dict, parameters, output_dir)
-    run_cufflinks(genome_list, library_dict, parameters, output_dir)
-    if len(library_dict.keys()) > 1:
-        run_diffexp(genome_list, library_dict, parameters, output_dir, gene_matrix)
+    run_alignment(genome_list, condition_dict, parameters, output_dir, job_data)
+    run_stringtie(genome_list, condition_dict, parameters, output_dir)
+    if len(condition_dict.keys()) > 1:
+        run_diffexp(genome_list, condition_dict, parameters, output_dir, gene_matrix, contrasts, job_data, map_args, diffexp_json)
 
 
 if __name__ == "__main__":
     #modelling input parameters after rockhopper
     parser = argparse.ArgumentParser()
+    #if you want to support multiple genomes for alignment you should make this json payload an nargs+ parameter
+    parser.add_argument('--jfile',
+            help='json file for job {"reference_genome_id": "1310806.3", "experimental_conditions":\
+                    ["c1_control", "c2_treatment"], "output_file": "rnaseq_baumanii_1505311", \
+                    "recipe": "RNA-Rocket", "output_path": "/anwarren@patricbrc.org/home/test",\
+                    "paired_end_libs": [{"read1": "/anwarren@patricbrc.org/home/rnaseq_test/MHB_R1.fq.gz",\
+                    "read2": "/anwarren@patricbrc.org/home/rnaseq_test/MHB_R2.fq.gz", "condition": 1},\
+                    {"read1": "/anwarren@patricbrc.org/home/rnaseq_test/MERO_75_R1.fq.gz",\
+                    "read2": "/anwarren@patricbrc.org/home/rnaseq_test/MERO_75_R2.fq.gz", "condition": 2}], "contrasts": [[1, 2]]}', required=True)
+    parser.add_argument('--sstring', help='json server string specifying api {"data_api":"url"}', required=False, default=None)
     parser.add_argument('-g', help='csv list of directories each containing a genome file *.fna and annotation *.gff', required=True)
     parser.add_argument('--index', help='flag for enabling using HISAT2 indices', action='store_true', required=False)
-    parser.add_argument('-L', help='csv list of library names for comparison', required=False)
-    parser.add_argument('-C', help='csv list of comparisons. comparisons are library names separated by percent. ', required=False)
+    #parser.add_argument('-L', help='csv list of library names for comparison', required=False)
+    #parser.add_argument('-C', help='csv list of comparisons. comparisons are library names separated by percent. ', required=False)
     parser.add_argument('-p', help='JSON formatted parameter list for tuxedo suite keyed to program', required=False)
-    parser.add_argument('-o', help='output directory. defaults to current directory.', required=False)
+    parser.add_argument('-o', help='output directory. defaults to current directory.', required=False, default=None)
+    parser.add_argument('-d', help='name of the folder for differential expression job folder where files go', required=True) 
     #parser.add_argument('-x', action="store_true", help='run the gene matrix conversion and create a patric expression object', required=False)
-    parser.add_argument('readfiles', nargs='+', help="whitespace sep list of read files. shoudld be \
-            in corresponding order as library list. ws separates libraries,\
-            a comma separates replicates, and a percent separates pairs.")
+    #parser.add_argument('readfiles', nargs='+', help="whitespace sep list of read files. shoudld be \
+    #        in corresponding order as library list. ws separates libraries,\
+    #        a comma separates replicates, and a percent separates pairs.")
     if len(sys.argv) ==1:
         parser.print_help()
         sys.exit(2)
-    args = parser.parse_args()
-    library_dict={}
-    library_list=[]
+    map_args = parser.parse_args()
+    assert map_args.d.startswith(".") # job object folder name needs a .
+    condition_dict={}
+    condition_list=[]
     comparison_list=[]
-    if args.L:
-        library_list=args.L.strip().split(',')
-    if args.C:
-        comparison_list=[i.split("%") for i in args.C.strip().split(',')]
+    #if map_args.L:
+    #    condition_list=map_args.L.strip().split(',')
+    #if args.C:
+    #    comparison_list=[i.split("%") for i in args.C.strip().split(',')]
         
     #create library dict
-    if not len(library_list): library_list.append("results")
+    with open(map_args.jfile, 'r') as job_handle:
+        job_data = json.load(job_handle)
+    condition_list= job_data.get("experimental_conditions",[])
+    if not len(condition_list): condition_list.append("results")
     gene_matrix=True
-    if not args.o:
+    if map_args.o == None:
         output_dir="./"
     else:
-        output_dir=args.o
-    for lib in library_list:
-        library_dict[lib]={"library":lib}
+        output_dir=map_args.o
+    for cond in condition_list:
+        condition_dict[cond]={"condition":cond}
     count=0
     #add read/replicate structure to library dict
-    for read in args.readfiles:
-        replicates=read.split(',')
-        rep_store=library_dict[library_list[count]]["replicates"]=[]
-        for rep in replicates:
-            pair=rep.split('%')
-            pair_dict={"read1":pair[0]}
-            if len(pair) == 2:
-                pair_dict["read2"]=pair[1]
-            rep_store.append(pair_dict)
+    replicates={}
+    contrasts=[]
+    for c in job_data.get("contrasts",[]):
+        contrasts.append([condition_list[c[0]-1],condition_list[c[1]-1]])
+    for read in job_data.get("paired_end_libs",[])+job_data.get("single_end_libs",[]):
+        if "read" in read:
+            read["read1"] = read.pop("read")
+        condition_index = int(read.get("condition", count+1))-1 #if no condition return position so everything is diff condition
+        rep_store=condition_dict[condition_list[condition_index]].setdefault("replicates",[]).append(read)
         count+=1
-    genome_dirs=args.g.strip().split(',')
+    genome_dirs=map_args.g.strip().split(',')
     genome_list=[]
     for g in genome_dirs:
         cur_genome={"genome":[],"annotation":[],"dir":g,"hisat_index":[]}
@@ -263,7 +343,7 @@ if __name__ == "__main__":
             sys.exit(2)
         else:
             cur_genome["annotation"]=cur_genome["annotation"][0]
-        if args.index:
+        if map_args.index:
             if len(cur_genome["hisat_index"]) != 1:
                 sys.stderr.write("Missing hisat index tar file for "+g+"\n")
                 sys.exit(2)
@@ -272,7 +352,77 @@ if __name__ == "__main__":
 
 
         genome_list.append(cur_genome)
-    
-    main(genome_list,library_dict,args.p,output_dir,gene_matrix)
+
+    #job template for differential expression object
+    diffexp_json = json.loads("""                    {
+                        "app": {
+                            "description": "Parses and transforms users differential expression data",
+                            "id": "DifferentialExpression",
+                            "label": "Transform expression data",
+                            "parameters": [
+                                {
+                                    "default": null,
+                                    "desc": "Comparison values between samples",
+                                    "id": "xfile",
+                                    "label": "Experiment Data File",
+                                    "required": 1,
+                                    "type": "wstype",
+                                    "wstype": "ExpList"
+                                },
+                                {
+                                    "default": null,
+                                    "desc": "Metadata template filled out by the user",
+                                    "id": "mfile",
+                                    "label": "Metadata File",
+                                    "required": 0,
+                                    "type": "wstype",
+                                    "wstype": "ExpMetadata"
+                                },
+                                {
+                                    "default": null,
+                                    "desc": "User information (JSON string)",
+                                    "id": "ustring",
+                                    "label": "User string",
+                                    "required": 1,
+                                    "type": "string"
+                                },
+                                {
+                                    "default": null,
+                                    "desc": "Path to which the output will be written. Defaults to the directory containing the input data. ",
+                                    "id": "output_path",
+                                    "label": "Output Folder",
+                                    "required": 0,
+                                    "type": "folder"
+                                },
+                                {
+                                    "default": null,
+                                    "desc": "Basename for the generated output files. Defaults to the basename of the input data.",
+                                    "id": "output_file",
+                                    "label": "File Basename",
+                                    "required": 0,
+                                    "type": "wsid"
+                                }
+                            ],
+                            "script": "App-DifferentialExpression"
+                        },
+                        "elapsed_time": null,
+                        "end_time": null,
+                        "hostname": "",
+                        "id": "",
+                        "is_folder": 0,
+                        "job_output": "",
+                        "output_files": [
+                        ],
+                        "parameters": {
+                            "mfile": "",
+                            "output_file": "",
+                            "output_path": "",
+                            "ustring": "",
+                            "xfile": ""
+                        },
+                        "start_time": ""
+                    }
+""")
+    main(genome_list,condition_dict,map_args.p,output_dir,gene_matrix,contrasts,job_data,map_args,diffexp_json)
 
 
