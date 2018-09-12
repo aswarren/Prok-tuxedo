@@ -63,8 +63,8 @@ def run_alignment(genome_list, condition_dict, parameters, output_dir, job_data)
             #cmd=["bowtie2", "-x", genome_link]
         thread_count=multiprocessing.cpu_count()
         cmd+=["-p",str(thread_count)]
-        make_directory_names(genome, library_dict)
-        for library in condition_dict:
+        make_directory_names(genome, condition_dict)
+        for library in library_dict:
             rcount=0
             for r in condition_dict[library]["replicates"]:
                 cur_cleanup=[]
