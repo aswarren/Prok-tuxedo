@@ -19,7 +19,7 @@ def make_directory_names(genome, condition_dict):
         for r in condition_dict[condition]["replicates"]:
             cur_cleanup=[]
             rcount+=1
-            target_dir=os.path.join(genome["output"], base64.urlsafe_b64encode(condition),"replicate"+str(rcount))
+            target_dir=os.path.join(genome["output"], condition,"replicate"+str(rcount))
             target_dir=os.path.abspath(target_dir)
             r["target_dir"]=target_dir
 
@@ -320,7 +320,7 @@ if __name__ == "__main__":
             read["read1"] = read.pop("read")
         condition_index = int(read.get("condition", count+1))-1 #if no condition return position so everything is diff condition
         condition_id = condition_list[condition_index] if len(condition_list) else condition_index
-        condition_dict[condition_id].setdefault("replicates",[]).append(read)
+        condition_dict[condition_index].setdefault("replicates",[]).append(read)
         count+=1
     genome_dirs=map_args.g.strip().split(',')
     genome_list=[]
