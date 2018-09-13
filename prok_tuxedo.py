@@ -65,7 +65,7 @@ def run_alignment(genome_list, condition_dict, parameters, output_dir, job_data)
         make_directory_names(genome, condition_dict)
         for condition in condition_dict:
             rcount=0
-            for r in condition_dict[library]["replicates"]:
+            for r in condition_dict[condition]["replicates"]:
                 cur_cleanup=[]
                 rcount+=1
                 target_dir=r["target_dir"]
