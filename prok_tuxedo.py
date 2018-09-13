@@ -116,7 +116,7 @@ def run_stringtie(genome_list, condition_dict, parameters, output_dir):
         genome_link=os.path.join(output_dir, os.path.basename(genome["genome"]))
         if not os.path.exists(genome_link):
             subprocess.check_call(["ln","-s",genome["genome"],genome_link])
-        cmd=["stringtie","-q","-g",genome["annotation"],"-b",genome_link,"-I","50"]
+        cmd=["stringtie","-G",genome["annotation"]]
         thread_count=multiprocessing.cpu_count()
         cmd+=["-p",str(thread_count)]
         for library in condition_dict:
@@ -125,8 +125,9 @@ def run_stringtie(genome_list, condition_dict, parameters, output_dir):
                 os.chdir(cur_dir)
                 cur_cmd=list(cmd)
                 r[genome_file]["dir"]=cur_dir
-                cur_cmd+=[r[genome_file]["bam"]]#each replicate has the bam file
                 cuff_gtf=os.path.join(cur_dir,"transcripts.gtf")
+                cur_cmd+=["-B","-o",cuff_gtf]
+                cur_cmd+=[r[genome_file]["bam"]]#each replicate has the bam file
                 if not os.path.exists(cuff_gtf):
                     print " ".join(cur_cmd)
                     subprocess.check_call(cur_cmd)
