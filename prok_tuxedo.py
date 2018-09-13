@@ -6,7 +6,6 @@ import subprocess
 import multiprocessing
 import cuffdiff_to_genematrix
 import tarfile, json
-import base64
 
 #take genome data structure and condition_dict and make directory names. processses condition to ensure no special characters, or whitespace
 def make_directory_names(genome, condition_dict):
