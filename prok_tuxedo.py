@@ -22,7 +22,7 @@ def make_directory_names(genome, library_dict):
             library
             target_dir=os.path.join(genome["output"], base64.urlsafe_b64encode(library),"replicate"+str(rcount))
             target_dir=os.path.abspath(target_dir)
-            library_dict[library]["replicates"]["target_dir"]=target_dir
+            library_dict[library]["replicates"][r]["target_dir"]=target_dir
 
 #hisat2 has problems with spaces in filenames
 #prevent spaces in filenames. if one exists link the file to a no-space version.
