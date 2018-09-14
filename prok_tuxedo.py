@@ -19,7 +19,7 @@ def make_directory_names(genome, condition_dict):
         for r in condition_dict[condition]["replicates"]:
             cur_cleanup=[]
             rcount+=1
-            target_dir=os.path.join(genome["output"], condition_index,"replicate"+str(rcount))
+            target_dir=os.path.join(genome["output"], str(condition_index),"replicate"+str(rcount))
             target_dir=os.path.abspath(target_dir)
             r["target_dir"]=target_dir
 
