@@ -6,23 +6,22 @@ import subprocess
 import multiprocessing
 import cuffdiff_to_genematrix
 import tarfile, json
-import base64
 
-#take genome data structure and library_dict and make directory names. processses "library" aka condition to ensure no special characters, or whitespace
-def make_directory_names(genome, library_dict):
+#take genome data structure and condition_dict and make directory names. processses condition to ensure no special characters, or whitespace
+def make_directory_names(genome, condition_dict):
     if genome["dir"].endswith('/'):
         genome["dir"]=genome["dir"][:-1]
     genome["dir"]=os.path.abspath(genome["dir"])
     genome["output"]=os.path.join(output_dir,os.path.basename(genome["dir"]))
-    for library in library_dict:
+    for condition in condition_dict:
         rcount=0
-        for r in library_dict[library]["replicates"]:
+        condition_index=condition_dict[condition]["condition_index"]
+        for r in condition_dict[condition]["replicates"]:
             cur_cleanup=[]
             rcount+=1
-            library
-            target_dir=os.path.join(genome["output"], base64.urlsafe_b64encode(library),"replicate"+str(rcount))
+            target_dir=os.path.join(genome["output"], str(condition_index),"replicate"+str(rcount))
             target_dir=os.path.abspath(target_dir)
-            library_dict[library]["replicates"]["target_dir"]=target_dir
+            r["target_dir"]=target_dir
 
 #hisat2 has problems with spaces in filenames
 #prevent spaces in filenames. if one exists link the file to a no-space version.
@@ -64,9 +63,9 @@ def run_alignment(genome_list, condition_dict, parameters, output_dir, job_data)
         thread_count=multiprocessing.cpu_count()
         cmd+=["-p",str(thread_count)]
         make_directory_names(genome, condition_dict)
-        for library in library_dict:
+        for condition in condition_dict:
             rcount=0
-            for r in condition_dict[library]["replicates"]:
+            for r in condition_dict[condition]["replicates"]:
                 cur_cleanup=[]
                 rcount+=1
                 target_dir=r["target_dir"]
@@ -111,6 +110,29 @@ def run_alignment(genome_list, condition_dict, parameters, output_dir, job_data)
         for garbage in final_cleanup:
             subprocess.call(["rm", garbage])
 
+def run_stringtie(genome_list, condition_dict, parameters, output_dir):
+    for genome in genome_list:
+        genome_file=genome["genome"]
+        genome_link=os.path.join(output_dir, os.path.basename(genome["genome"]))
+        if not os.path.exists(genome_link):
+            subprocess.check_call(["ln","-s",genome["genome"],genome_link])
+        cmd=["stringtie","-G",genome["annotation"]]
+        thread_count=multiprocessing.cpu_count()
+        cmd+=["-p",str(thread_count)]
+        for library in condition_dict:
+            for r in condition_dict[library]["replicates"]:
+                cur_dir=os.path.dirname(os.path.realpath(r[genome_file]["bam"]))
+                os.chdir(cur_dir)
+                cur_cmd=list(cmd)
+                r[genome_file]["dir"]=cur_dir
+                cuff_gtf=os.path.join(cur_dir,"transcripts.gtf")
+                cur_cmd+=["-B","-o",cuff_gtf]
+                cur_cmd+=[r[genome_file]["bam"]]#each replicate has the bam file
+                if not os.path.exists(cuff_gtf):
+                    print " ".join(cur_cmd)
+                    subprocess.check_call(cur_cmd)
+                else:
+                    sys.stderr.write(cuff_gtf+" stringtie file already exists. skipping\n")
 def run_cufflinks(genome_list, condition_dict, parameters, output_dir):
     for genome in genome_list:
         genome_file=genome["genome"]
@@ -299,6 +321,7 @@ if __name__ == "__main__":
         condition_index = int(read.get("condition", count+1))-1 #if no condition return position so everything is diff condition
         condition_id = condition_list[condition_index] if len(condition_list) else condition_index
         condition_dict[condition_id].setdefault("replicates",[]).append(read)
+        condition_dict[condition_id].setdefault("condition_index",condition_index)
         count+=1
     genome_dirs=map_args.g.strip().split(',')
     genome_list=[]
