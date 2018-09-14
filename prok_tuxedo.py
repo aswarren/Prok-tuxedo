@@ -301,7 +301,11 @@ if __name__ == "__main__":
     with open(map_args.jfile, 'r') as job_handle:
         job_data = json.load(job_handle)
     condition_list= job_data.get("experimental_conditions",[])
-    if not len(condition_list): condition_list.append("results")
+    got_conditions=False
+    if not len(condition_list):
+        condition_list.append("results")
+    else:
+        got_conditions=True
     gene_matrix=True
     if map_args.o == None:
         output_dir="./"
@@ -319,7 +323,7 @@ if __name__ == "__main__":
         if "read" in read:
             read["read1"] = read.pop("read")
         condition_index = int(read.get("condition", count+1))-1 #if no condition return position so everything is diff condition
-        condition_id = condition_list[condition_index] if len(condition_list) else condition_index
+        condition_id = condition_list[condition_index] if got_conditions else condition_index
         condition_dict[condition_id].setdefault("replicates",[]).append(read)
         condition_dict[condition_id].setdefault("condition_index",condition_index)
         count+=1
