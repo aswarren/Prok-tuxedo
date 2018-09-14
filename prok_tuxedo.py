@@ -323,7 +323,7 @@ if __name__ == "__main__":
         if "read" in read:
             read["read1"] = read.pop("read")
         condition_index = int(read.get("condition", count+1))-1 #if no condition return position so everything is diff condition
-        condition_id = condition_list[condition_index] if got_conditions else condition_index
+        condition_id = condition_list[condition_index] if got_conditions else "results"
         condition_dict[condition_id].setdefault("replicates",[]).append(read)
         condition_dict[condition_id].setdefault("condition_index",condition_index)
         count+=1
