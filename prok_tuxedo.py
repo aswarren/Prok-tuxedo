@@ -163,7 +163,7 @@ def run_diffexp(genome_list, condition_dict, parameters, output_dir, gene_matrix
         genome_link=os.path.join(output_dir, os.path.basename(genome["genome"]))
         if not os.path.exists(genome_link):
             subprocess.check_call(["ln","-s",genome["genome"],genome_link])
-        merge_cmd=["stringtie","-merge","-g",genome["annotation"]]
+        merge_cmd=["stringtie","--merge","-g","0","-G",genome["annotation"]]
         merge_manifest=os.path.join(genome["output"],"gtf_manifest.txt")
         merge_folder=os.path.join(genome["output"],"merged_annotation")
         merge_file=os.path.join(merge_folder,"merged.gtf")
