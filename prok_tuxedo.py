@@ -58,8 +58,8 @@ def run_alignment(genome_list, condition_dict, parameters, output_dir, job_data)
             cmd=["hisat2","--dta-cufflinks", "-x", index_prefix] 
         else:
             subprocess.check_call(["hisat2-build", genome_link, genome_link])
-            cmd=["hisat2","--dta-cufflinks", "-x", genome_link, "--no-spliced-alignment"] 
-            #cmd=["bowtie2", "-x", genome_link]
+            #cmd=["hisat2","--dta-cufflinks", "-x", genome_link, "--no-spliced-alignment"] 
+            cmd=["bowtie2", "-x", genome_link]
         thread_count=multiprocessing.cpu_count()
         cmd+=["-p",str(thread_count)]
         make_directory_names(genome, condition_dict)
