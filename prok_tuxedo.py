@@ -43,10 +43,8 @@ def link_space(file_path):
 def run_alignment(genome_list, condition_dict, parameters, output_dir, job_data): 
     #modifies condition_dict sub replicates to include 'bowtie' dict recording output files
     for genome in genome_list:
-        genome_link=os.path.join(output_dir, os.path.basename(genome["genome"]))
+        genome_link = genome["genome_link"]
         final_cleanup=[]
-        if not os.path.exists(genome_link):
-            subprocess.check_call(["ln","-s",genome["genome"],genome_link])
         if "hisat_index" in genome and genome["hisat_index"]:
             archive = tarfile.open(genome["hisat_index"])
             indices= [os.path.join(output_dir,os.path.basename(x)) for x in archive.getnames()]
@@ -62,7 +60,6 @@ def run_alignment(genome_list, condition_dict, parameters, output_dir, job_data)
             cmd=["bowtie2", "-x", genome_link]
         thread_count=multiprocessing.cpu_count()
         cmd+=["-p",str(thread_count)]
-        make_directory_names(genome, condition_dict)
         for condition in condition_dict:
             rcount=0
             for r in condition_dict[condition]["replicates"]:
@@ -71,7 +68,6 @@ def run_alignment(genome_list, condition_dict, parameters, output_dir, job_data)
                 target_dir=r["target_dir"]
                 fastqc_cmd=["fastqc","--outdir",target_dir]
                 samstat_cmd=["samstat"]
-                subprocess.call(["mkdir","-p",target_dir])
                 cur_cmd=list(cmd)
                 if "read2" in r:
                     cur_cmd+=["-1",link_space(r["read1"])," -2",link_space(r["read2"])]
@@ -113,9 +109,7 @@ def run_alignment(genome_list, condition_dict, parameters, output_dir, job_data)
 def run_stringtie(genome_list, condition_dict, parameters, output_dir):
     for genome in genome_list:
         genome_file=genome["genome"]
-        genome_link=os.path.join(output_dir, os.path.basename(genome["genome"]))
-        if not os.path.exists(genome_link):
-            subprocess.check_call(["ln","-s",genome["genome"],genome_link])
+        genome_link = genome["genome_link"]
         cmd=["stringtie","-G",genome["annotation"]]
         thread_count=multiprocessing.cpu_count()
         cmd+=["-p",str(thread_count)]
@@ -136,9 +130,7 @@ def run_stringtie(genome_list, condition_dict, parameters, output_dir):
 def run_cufflinks(genome_list, condition_dict, parameters, output_dir):
     for genome in genome_list:
         genome_file=genome["genome"]
-        genome_link=os.path.join(output_dir, os.path.basename(genome["genome"]))
-        if not os.path.exists(genome_link):
-            subprocess.check_call(["ln","-s",genome["genome"],genome_link])
+        genome_link = genome["genome_link"]
         cmd=["cufflinks","-q","-g",genome["annotation"],"-b",genome_link,"-I","50"]
         thread_count=multiprocessing.cpu_count()
         cmd+=["-p",str(thread_count)]
@@ -160,9 +152,7 @@ def run_diffexp(genome_list, condition_dict, parameters, output_dir, gene_matrix
     #run cuffquant on every replicate, cuffmerge on all resulting gtf, and cuffdiff on the results. all per genome.
     for genome in genome_list:
         genome_file=genome["genome"]
-        genome_link=os.path.join(output_dir, os.path.basename(genome["genome"]))
-        if not os.path.exists(genome_link):
-            subprocess.check_call(["ln","-s",genome["genome"],genome_link])
+        genome_link = genome["genome_link"]
         merge_cmd=["cuffmerge","-g",genome["annotation"]]
         merge_manifest=os.path.join(genome["output"],"gtf_manifest.txt")
         merge_folder=os.path.join(genome["output"],"merged_annotation")
@@ -242,6 +232,24 @@ def run_diffexp(genome_list, condition_dict, parameters, output_dir, gene_matrix
                 
             #convert_cmd+=]
             
+def setup(genome_list, condition_dict, parameters, output_dir, job_data):
+    for genome in genome_list:
+        genome["genome_link"]=os.path.join(output_dir, os.path.basename(genome["genome"]))
+        if not os.path.exists(genome_link):
+            subprocess.check_call(["ln","-s",genome["genome"],genome_link])
+        make_directory_names(genome, condition_dict)
+        for condition in condition_dict:
+            rcount=0
+            for r in condition_dict[condition]["replicates"]:
+                rcount+=1
+                subprocess.call(["mkdir","-p",target_dir])
+                if "srr_accession" in r:
+                    meta_file = os.path.join(target_dir,srr_id+"_meta.txt")
+                    subprocess.check_call(["p3-sra","--gzip","--out",target_dir,"--metadata-file", meta_file, "--id",srr_id])
+                    with open(meta_file) as f:
+                        job_meta = json.load(f)
+
+
 
 def main(genome_list, condition_dict, parameters_file, output_dir, gene_matrix=False, contrasts=[], job_data=None, map_args=None, diffexp_json=None):
     #arguments:
@@ -254,6 +262,7 @@ def main(genome_list, condition_dict, parameters_file, output_dir, gene_matrix=F
     	parameters=json.load(open(parameters_file,'r'))
     else:
         parameters=[]
+    setup(genome_list, condition_dict, parameters, output_dir, job_data)
     run_alignment(genome_list, condition_dict, parameters, output_dir, job_data)
     run_cufflinks(genome_list, condition_dict, parameters, output_dir)
     if len(condition_dict.keys()) > 1:
@@ -319,12 +328,14 @@ if __name__ == "__main__":
     contrasts=[]
     for c in job_data.get("contrasts",[]):
         contrasts.append([condition_list[c[0]-1],condition_list[c[1]-1]])
-    for read in job_data.get("paired_end_libs",[])+job_data.get("single_end_libs",[]):
+    for read in job_data.get("paired_end_libs",[])+job_data.get("single_end_libs",[])+job_data.get("srr_libs",[]):
         if "read" in read:
             read["read1"] = read.pop("read")
         condition_index = int(read.get("condition", count+1))-1 #if no condition return position so everything is diff condition
         condition_id = condition_list[condition_index] if got_conditions else "results"
+        #organize things by condition/replicate
         condition_dict[condition_id].setdefault("replicates",[]).append(read)
+        #store the condition index if it doesn't exist
         condition_dict[condition_id].setdefault("condition_index",condition_index)
         count+=1
     genome_dirs=map_args.g.strip().split(',')
