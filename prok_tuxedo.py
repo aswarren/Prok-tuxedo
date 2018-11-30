@@ -55,7 +55,7 @@ def run_alignment(genome_list, condition_dict, parameters, output_dir, job_data)
             index_prefix = os.path.join(output_dir, os.path.basename(genome["hisat_index"]).replace(".ht2.tar","")) #somewhat fragile convention. tar prefix is underlying index prefix
             cmd=["hisat2","--dta-cufflinks", "-x", index_prefix] 
         else:
-            subprocess.check_call(["hisat2-build", genome_link, genome_link])
+            subprocess.check_call(["bowtie2-build", genome_link, genome_link])
             #cmd=["hisat2","--dta-cufflinks", "-x", genome_link, "--no-spliced-alignment"] 
             cmd=["bowtie2", "-x", genome_link]
         thread_count=multiprocessing.cpu_count()
@@ -234,16 +234,19 @@ def run_diffexp(genome_list, condition_dict, parameters, output_dir, gene_matrix
             
 def setup(genome_list, condition_dict, parameters, output_dir, job_data):
     for genome in genome_list:
-        genome["genome_link"]=os.path.join(output_dir, os.path.basename(genome["genome"]))
+        genome_link=os.path.join(output_dir, os.path.basename(genome["genome"]))
+        genome["genome_link"]=genome_link
         if not os.path.exists(genome_link):
             subprocess.check_call(["ln","-s",genome["genome"],genome_link])
         make_directory_names(genome, condition_dict)
         for condition in condition_dict:
             rcount=0
             for r in condition_dict[condition]["replicates"]:
+                target_dir=r["target_dir"]
                 rcount+=1
                 subprocess.call(["mkdir","-p",target_dir])
                 if "srr_accession" in r:
+                    srr_id = r["srr_accession"] 
                     meta_file = os.path.join(target_dir,srr_id+"_meta.txt")
                     subprocess.check_call(["p3-sra","--gzip","--out",target_dir,"--metadata-file", meta_file, "--id",srr_id])
                     with open(meta_file) as f:
