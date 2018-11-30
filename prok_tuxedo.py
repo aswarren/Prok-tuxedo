@@ -251,9 +251,10 @@ def setup(genome_list, condition_dict, parameters, output_dir, job_data):
                     subprocess.check_call(["p3-sra","--gzip","--out",target_dir,"--metadata-file", meta_file, "--id",srr_id])
                     with open(meta_file) as f:
                         job_meta = json.load(f)
-                    files = job_meta.get("files",[])
-                    for i,f in enumerate(files):
-                        r["read"+str(i+1)]=os.path.join(target_dir, f)
+                    if len(files) > 0:
+                        files = job_meta[0].get("files",[])
+                        for i,f in enumerate(files):
+                            r["read"+str(i+1)]=os.path.join(target_dir, f)
                     
 
 
