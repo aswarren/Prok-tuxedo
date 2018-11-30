@@ -252,7 +252,7 @@ def setup(genome_list, condition_dict, parameters, output_dir, job_data):
                     with open(meta_file) as f:
                         job_meta = json.load(f)
                         files = job_meta[0].get("files",[])
-                    	if len(files) > 0:
+                        if len(files) > 0:
                             for i,f in enumerate(files):
                                 r["read"+str(i+1)]=os.path.join(target_dir, f)
                     
