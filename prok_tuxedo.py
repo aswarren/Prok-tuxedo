@@ -54,11 +54,14 @@ def run_alignment(genome_list, condition_dict, parameters, output_dir, job_data)
             subprocess.check_call(["tar","-xvf", genome["hisat_index"], "-C", output_dir])
             index_prefix = os.path.join(output_dir, os.path.basename(genome["hisat_index"]).replace(".ht2.tar","")) #somewhat fragile convention. tar prefix is underlying index prefix
             cmd=["hisat2","--dta-cufflinks", "-x", index_prefix] 
+            thread_count= parameters.get("hisat2",{}).get("-p",0)
         else:
             subprocess.check_call(["hisat2-build", genome_link, genome_link])
             #cmd=["hisat2","--dta-cufflinks", "-x", genome_link, "--no-spliced-alignment"] 
             cmd=["bowtie2", "-x", genome_link]
-        thread_count=multiprocessing.cpu_count()
+            thread_count= parameters.get("bowtie2",{}).get("-p",0)
+        if thread_count == 0:
+            thread_count=2 #multiprocessing.cpu_count()
         cmd+=["-p",str(thread_count)]
         for condition in condition_dict:
             rcount=0
@@ -111,7 +114,9 @@ def run_stringtie(genome_list, condition_dict, parameters, output_dir):
         genome_file=genome["genome"]
         genome_link = genome["genome_link"]
         cmd=["stringtie","-G",genome["annotation"]]
-        thread_count=multiprocessing.cpu_count()
+        thread_count= parameters.get("stringtie",{}).get("-p",0)
+        if thread_count == 0:
+            thread_count=2 #multiprocessing.cpu_count()
         cmd+=["-p",str(thread_count)]
         for library in condition_dict:
             for r in condition_dict[library]["replicates"]:
@@ -132,7 +137,9 @@ def run_cufflinks(genome_list, condition_dict, parameters, output_dir):
         genome_file=genome["genome"]
         genome_link = genome["genome_link"]
         cmd=["cufflinks","-q","-g",genome["annotation"],"-b",genome_link,"-I","50"]
-        thread_count=multiprocessing.cpu_count()
+        thread_count= parameters.get("cufflinks",{}).get("-p",0)
+        if thread_count == 0:
+            thread_count=2 #multiprocessing.cpu_count()
         cmd+=["-p",str(thread_count)]
         for library in condition_dict:
             for r in condition_dict[library]["replicates"]:
@@ -157,7 +164,9 @@ def run_diffexp(genome_list, condition_dict, parameters, output_dir, gene_matrix
         merge_manifest=os.path.join(genome["output"],"gtf_manifest.txt")
         merge_folder=os.path.join(genome["output"],"merged_annotation")
         merge_file=os.path.join(merge_folder,"merged.gtf")
-        thread_count=multiprocessing.cpu_count()
+        thread_count= parameters.get("cuffmerge",{}).get("-p",0)
+        if thread_count == 0:
+            thread_count=2 #multiprocessing.cpu_count()
         merge_cmd+=["-p",str(thread_count),"-o", merge_folder]
         for library in condition_dict:
             for r in condition_dict[library]["replicates"]:
@@ -172,6 +181,9 @@ def run_diffexp(genome_list, condition_dict, parameters, output_dir, gene_matrix
 
         #setup diff command
         cur_dir=genome["output"]
+        thread_count= parameters.get("cuffdiff",{}).get("-p",0)
+        if thread_count == 0:
+            thread_count=2
         diff_cmd=["cuffdiff",merge_file,"-p",str(thread_count),"-b",genome_link,"-L",",".join(condition_dict.keys())]
         os.chdir(cur_dir)
         cds_tracking=os.path.join(cur_dir,"cds.fpkm_tracking")
