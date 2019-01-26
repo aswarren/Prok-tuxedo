@@ -274,17 +274,14 @@ def setup(genome_list, condition_dict, parameters, output_dir, job_data):
 
 
 
-def main(genome_list, condition_dict, parameters_file, output_dir, gene_matrix=False, contrasts=[], job_data=None, map_args=None, diffexp_json=None):
+def main(genome_list, condition_dict, parameters_str, output_dir, gene_matrix=False, contrasts=[], job_data=None, map_args=None, diffexp_json=None):
     #arguments:
     #list of genomes [{"genome":somefile,"annotation":somefile}]
     #dictionary of library dictionaries structured as {libraryname:{library:libraryname, replicates:[{read1:read1file, read2:read2file}]}}
     #parametrs_file is json parameters list keyed as bowtie, cufflinks, cuffdiff.
     output_dir=os.path.abspath(output_dir)
     subprocess.call(["mkdir","-p",output_dir])
-    if parameters_file and os.path.exists(parameters_file):
-    	parameters=json.load(open(parameters_file,'r'))
-    else:
-        parameters=[]
+    parameters=json.loads(parameters_str)
     setup(genome_list, condition_dict, parameters, output_dir, job_data)
     run_alignment(genome_list, condition_dict, parameters, output_dir, job_data)
     run_cufflinks(genome_list, condition_dict, parameters, output_dir)
