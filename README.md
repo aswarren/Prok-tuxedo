@@ -16,4 +16,4 @@ optional arguments:
 
 An example run (small pair against itself):
 
-python ./prok_tuxedo.py -L lib1,lib2 -g /home/anwarren/mcclelland/reference/14028s_test /home/anwarren/mcclelland/test/READ1_SHORT.fastq%/home/anwarren/mcclelland/test/READ2_SHORT.fastq /home/anwarren/mcclelland/test/READ1_SHORT.fastq%/home/anwarren/mcclelland/test/READ2_SHORT.fastq
+python prok_tuxedo.py -o ./rnaseq_test/ -g ./test/baumanii_1505311/ -d rnaseq_baumanii_1505311_diffexp --jfile ./test/baumanii_1505311/2cond_1comp_local.json --sstring {"data_api":"url_base_data_api"}
