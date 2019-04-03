@@ -141,10 +141,17 @@ def run_cufflinks(genome_list, condition_dict, parameters, output_dir):
     for genome in genome_list:
         genome_file=genome["genome"]
         genome_link = genome["genome_link"]
-        cmd=["cufflinks","-q","-g",genome["annotation"],"-b",genome_link,"-I","50"]
+        annotation_only =  int(parameters.get("cufflinks",{}).get("annotation_only",0))
+        if annotation_only:
+            use_annotation="-G"
+        else:
+            use_annotation="-g"
+        
+        cmd=["cufflinks","-q","-G",genome["annotation"],"-b",genome_link,"-I","50"]
         thread_count= parameters.get("cufflinks",{}).get("-p",0)
         if thread_count == 0:
             thread_count=2 #multiprocessing.cpu_count()
+
         cmd+=["-p",str(thread_count)]
         for library in condition_dict:
             for r in condition_dict[library]["replicates"]:
@@ -363,7 +370,7 @@ if __name__ == "__main__":
     parser.add_argument('--index', help='flag for enabling using HISAT2 indices', action='store_true', required=False)
     #parser.add_argument('-L', help='csv list of library names for comparison', required=False)
     #parser.add_argument('-C', help='csv list of comparisons. comparisons are library names separated by percent. ', required=False)
-    parser.add_argument('-p', help='JSON formatted parameter list for tuxedo suite keyed to program', required=False)
+    parser.add_argument('-p', help='JSON formatted parameter list for tuxedo suite keyed to program', default="{}", required=False)
     parser.add_argument('-o', help='output directory. defaults to current directory.', required=False, default=None)
     parser.add_argument('-d', help='name of the folder for differential expression job folder where files go', required=True) 
     #parser.add_argument('-x', action="store_true", help='run the gene matrix conversion and create a patric expression object', required=False)
