@@ -6,6 +6,7 @@ import subprocess
 import multiprocessing
 import cuffdiff_to_genematrix
 import tarfile, json
+import shutil
 
 #take genome data structure and condition_dict and make directory names. processses condition to ensure no special characters, or whitespace
 def make_directory_names(genome, condition_dict):
@@ -56,7 +57,11 @@ def run_alignment(genome_list, condition_dict, parameters, output_dir, job_data)
             cmd=["hisat2","--dta-cufflinks", "-x", index_prefix] 
             thread_count= parameters.get("hisat2",{}).get("-p",0)
         else:
-            subprocess.check_call(["bowtie2-build", genome_link, genome_link])
+            try:
+                subprocess.check_call(["bowtie2-build", genome_link, genome_link])
+            except Exception as err:
+                sys.stderr.write("bowtie build failed: %s %s\n" % (err, genome_link))
+                os.exit(1)
             #cmd=["hisat2","--dta-cufflinks", "-x", genome_link, "--no-spliced-alignment"] 
             cmd=["bowtie2", "-x", genome_link]
             thread_count= parameters.get("bowtie2",{}).get("-p",0)
@@ -154,13 +159,60 @@ def run_cufflinks(genome_list, condition_dict, parameters, output_dir):
                 os.chdir(cur_dir)
                 cur_cmd=list(cmd)
                 r[genome_file]["dir"]=cur_dir
-                cur_cmd+=[r[genome_file]["bam"]]#each replicate has the bam file
+                bam_file = r[genome_file]["bam"]
+                #
+                # Attempt to copy to /dev/shm. cufflinks seeks a lot in the file.
+                # If that fails, try tmp.
+                #
+                bam_to_use = None
+                
+                try:
+                    bam_tmp = os.tempnam("/dev/shm", "CUFFL")
+                    shutil.copy(bam_file, bam_tmp)
+                    print "Copy succeeded to %s" % (bam_tmp)
+                    bam_to_use = bam_tmp
+                    
+                except IOError as err:
+                    os.unlink(bam_tmp)
+                    bam_to_use = None
+		    bam_tmp = None
+                    sys.stderr.write("Can't copy %s to %s: %s\n" % (bam_file, bam_tmp, err))
+
+                if bam_to_use == None:
+                    try:
+                        bam_tmp = os.tempnam(None, "CUFFL")
+                        shutil.copy(bam_file, bam_tmp)
+                        bam_to_use = bam_tmp
+
+                    except IOError as err:
+                        os.unlink(bam_tmp)
+                        bam_to_use = None
+			bam_tmp = None
+                        sys.stderr.write("Can't copy %s to %s: %s\n" % (bam_file, bam_tmp, err))
+                    
+                if bam_to_use == None:
+                    sys.stderr.write("Can't copy %s to tmp space\n" % (bam_file))
+                    bam_to_use = bam_file
+		    bam_tmp = None
+                
+                cur_cmd += [bam_to_use]
                 cuff_gtf=os.path.join(cur_dir,"transcripts.gtf")
                 if not os.path.exists(cuff_gtf):
                     print " ".join(cur_cmd)
-                    subprocess.check_call(cur_cmd)
+		    try:
+                        sys.stderr.write("Invoke cufflinks: %s\n" % (cur_cmd))
+			subprocess.check_call(cur_cmd)
+		    except Exception as e:
+		    	if bam_tmp != None:
+			    sys.stderr.write("remove temp %s in exception handler\n" % (bam_tmp))
+			    os.unlink(bam_tm)
+                        sys.stderr.write("Cufflinks error: %s\n" % (e))
+			raise
                 else:
                     sys.stderr.write(cuff_gtf+" cufflinks file already exists. skipping\n")
+		if bam_tmp != None:
+		    sys.stderr.write("remove temp %s\n" % (bam_tmp))
+		    os.unlink(bam_tmp)
 
 def run_diffexp(genome_list, condition_dict, parameters, output_dir, gene_matrix, contrasts, job_data, map_args, diffexp_json):
     #run cuffquant on every replicate, cuffmerge on all resulting gtf, and cuffdiff on the results. all per genome.
@@ -292,7 +344,12 @@ def main(genome_list, condition_dict, parameters_str, output_dir, gene_matrix=Fa
     #parametrs_file is json parameters list keyed as bowtie, cufflinks, cuffdiff.
     output_dir=os.path.abspath(output_dir)
     subprocess.call(["mkdir","-p",output_dir])
-    parameters=json.loads(parameters_str)
+
+    if parameters_str != None :
+        parameters=json.loads(parameters_str)
+    else:
+        parameters = {}
+        
     setup(genome_list, condition_dict, parameters, output_dir, job_data)
     run_alignment(genome_list, condition_dict, parameters, output_dir, job_data)
     run_cufflinks(genome_list, condition_dict, parameters, output_dir)
