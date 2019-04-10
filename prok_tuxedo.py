@@ -271,9 +271,13 @@ def setup(genome_list, condition_dict, parameters, output_dir, job_data):
                     with open(meta_file) as f:
                         job_meta = json.load(f)
                         files = job_meta[0].get("files",[])
-                        if len(files) > 0:
-                            for i,f in enumerate(files):
-                                r["read"+str(i+1)]=os.path.join(target_dir, f)
+                        for i,f in enumerate(files):
+                            if f.endswith("_2.fastq.gz"):
+                                r["read2"]=os.path.join(target_dir, f)
+                            if f.endswith("_1.fastq.gz"):
+                                r["read1"]=os.path.join(target_dir, f)
+                            if f.endswith("fastqc.html"):
+                                r["fastqc"].append(os.path.join(target_dir, f))
                     
 
 
