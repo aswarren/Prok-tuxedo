@@ -13,7 +13,7 @@ def make_directory_names(genome, condition_dict):
     if genome["dir"].endswith('/'):
         genome["dir"]=genome["dir"][:-1]
     genome["dir"]=os.path.abspath(genome["dir"])
-    genome["output"]=os.path.join(output_dir,os.path.basename(genome["dir"]))
+    genome["output"]=os.path.join(os.path.abspath(output_dir),os.path.basename(genome["dir"]))
     for condition in condition_dict:
         rcount=0
         condition_index=condition_dict[condition]["condition_index"]
@@ -116,6 +116,8 @@ def run_alignment(genome_list, condition_dict, parameters, output_dir, job_data)
 
 def run_stringtie(genome_list, condition_dict, parameters, output_dir):
     for genome in genome_list:
+        if not genome.get("host",False):
+            continue
         genome_file=genome["genome"]
         genome_link = genome["genome_link"]
         cmd=["stringtie","-G",genome["annotation"]]
@@ -139,6 +141,8 @@ def run_stringtie(genome_list, condition_dict, parameters, output_dir):
                     sys.stderr.write(cuff_gtf+" stringtie file already exists. skipping\n")
 def run_cufflinks(genome_list, condition_dict, parameters, output_dir):
     for genome in genome_list:
+        if genome.get("host",False):
+            continue
         genome_file=genome["genome"]
         genome_link = genome["genome_link"]
         annotation_only =  int(parameters.get("cufflinks",{}).get("annotation_only",0))
@@ -219,17 +223,24 @@ def run_diffexp(genome_list, condition_dict, parameters, output_dir, gene_matrix
     for genome in genome_list:
         genome_file=genome["genome"]
         genome_link = genome["genome_link"]
-        merge_cmd=["cuffmerge","-g",genome["annotation"]]
+        is_host=genome.get("host",False)
         merge_manifest=os.path.join(genome["output"],"gtf_manifest.txt")
         merge_folder=os.path.join(genome["output"],"merged_annotation")
+    	subprocess.call(["mkdir","-p",merge_folder])
         merge_file=os.path.join(merge_folder,"merged.gtf")
-        thread_count= parameters.get("cuffmerge",{}).get("-p",0)
+        if is_host:
+            merge_cmd=["stringtie","--merge","-g","0","-G",genome["annotation"],"-o", merge_file]
+            thread_count= parameters.get("stringtie",{}).get("-p",0)
+        else:
+            merge_cmd=["cuffmerge","-g",genome["annotation"],"-o", merge_folder]
+            thread_count= parameters.get("cuffmerge",{}).get("-p",0)
         if thread_count == 0:
             thread_count=2 #multiprocessing.cpu_count()
-        merge_cmd+=["-p",str(thread_count),"-o", merge_folder]
-        for library in condition_dict:
-            for r in condition_dict[library]["replicates"]:
-                with open(merge_manifest, "a") as manifest: manifest.write("\n"+os.path.join(r[genome_file]["dir"],"transcripts.gtf"))
+        merge_cmd+=["-p",str(thread_count)]
+        with open(merge_manifest, "w") as manifest: 
+            for library in condition_dict:
+                for r in condition_dict[library]["replicates"]:
+                    manifest.write("\n"+os.path.join(r[genome_file]["dir"],"transcripts.gtf"))
         merge_cmd+=[merge_manifest]
 
         if not os.path.exists(merge_file):
@@ -295,6 +306,8 @@ def run_diffexp(genome_list, condition_dict, parameters, output_dir, gene_matrix
                 with open(params_file, 'w') as params_handle:
                     params_handle.write(json.dumps(transform_params))
                 convert_cmd=[transform_script, "--ufile", params_file, "--sstring", map_args.sstring, "--output_path",experiment_path,"--xfile",gmx_file]
+                if is_host:
+                    convert_cmd.append("--host")   
                 print " ".join(convert_cmd)
                 try:
                     subprocess.check_call(convert_cmd)
@@ -312,6 +325,7 @@ def setup(genome_list, condition_dict, parameters, output_dir, job_data):
     for genome in genome_list:
         genome_link=os.path.join(output_dir, os.path.basename(genome["genome"]))
         genome["genome_link"]=genome_link
+        genome["host"] = ("hisat_index" in genome and genome["hisat_index"])
         if not os.path.exists(genome_link):
             subprocess.check_call(["ln","-s",genome["genome"],genome_link])
         make_directory_names(genome, condition_dict)
@@ -357,6 +371,8 @@ def main(genome_list, condition_dict, parameters_str, output_dir, gene_matrix=Fa
         
     setup(genome_list, condition_dict, parameters, output_dir, job_data)
     run_alignment(genome_list, condition_dict, parameters, output_dir, job_data)
+    #given setup, right now stringtie only runs for host and cufflinks only for bacteria. stringtie requires transcript annotation model in -G option
+    run_stringtie(genome_list, condition_dict, parameters, output_dir)
     run_cufflinks(genome_list, condition_dict, parameters, output_dir)
     if len(condition_dict.keys()) > 1:
         run_diffexp(genome_list, condition_dict, parameters, output_dir, gene_matrix, contrasts, job_data, map_args, diffexp_json)
