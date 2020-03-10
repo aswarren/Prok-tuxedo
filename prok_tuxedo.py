@@ -209,7 +209,7 @@ def run_cufflinks(genome_list, condition_dict, parameters, output_dir):
 		    except Exception as e:
 		    	if bam_tmp != None:
 			    sys.stderr.write("remove temp %s in exception handler\n" % (bam_tmp))
-			    os.unlink(bam_tm)
+			    os.unlink(bam_tmp)
                         sys.stderr.write("Cufflinks error: %s\n" % (e))
 			raise
                 else:
