@@ -38,7 +38,7 @@ while [[ $# -gt 0 ]]
 			gunzip -c $fna_gz > $fna_file
 		fi
 		if [[ ! -e $gff_gz ]] && [[ ! -e $gff_file ]]; then
-			echo $reference | awk 'BEGIN{OFS=FS="/"}{print $0,$NF"_genomic.gff.gz"}' | xargs -n1 wget $O $gff_gz
+			echo $reference | awk 'BEGIN{OFS=FS="/"}{print $0,$NF"_genomic.gff.gz"}' | xargs -n1 wget -O $gff_gz
 			gunzip -c $gff_gz > $gff_file
 		fi
 		hisat_files=( ./$base_file*.ht2 )
