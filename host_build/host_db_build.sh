@@ -3,12 +3,15 @@
 shopt -s nullglob
 
 
+host_table="assembly_summary_refseq.txt"
+patric_table="patric_host_summary.txt"
+echo "creating patric table"
+grep '^#' $host_table > $patric_table
+
 while [[ $# -gt 0 ]]
    do
 
 	TAXID="$1"
-	host_table="assembly_summary_refseq.txt"
-	patric_table="patric_host_summary.txt"
 	if [[ -z "$TAXID" ]]; then
 		echo "Usage: build_host_genomes.sh NcbiTaxId"
 		exit
@@ -17,18 +20,30 @@ while [[ $# -gt 0 ]]
 			echo "downloading table"
 			wget ftp://ftp.ncbi.nlm.nih.gov/genomes/refseq/assembly_summary_refseq.txt
 		fi
-		echo "creating patric table"
-		grep '^#' $host_table > $patric_table
 		awk -v TAXID="$TAXID" \
 			'BEGIN{FS="\t"}{if($6==TAXID){print $0; exit}}' \
 			$host_table >> $patric_table
 		reference=$(awk -v TAXID="$TAXID" \
 			'BEGIN{FS="\t"}{if($6==TAXID){print $20; exit}}' \
 			$host_table)
+		release_id=$(awk -v TAXID="$TAXID" \
+			'BEGIN{FS="\t"}{if($6==TAXID){print $16; exit}}' \
+			$host_table)
 		base_url=$( printf '%s' "$reference" | awk 'BEGIN{OFS=FS="/"}{print $0,$NF"_genomic"}' )
-		mkdir -p $TAXID
+        base_dir="${TAXID}/${release_id}"
+		mkdir -p $base_dir
 		base_file=$( echo $base_url | sed 's|.*/||')
-		base_file="${TAXID}/${base_file}"
+        parent_file="${TAXID}/${base_file}"
+		base_file="${base_dir}/${base_file}"
+		
+        orphan_files=( $parent_file*)
+		if [[ ${#orphan_files[@]} > 1 ]]; then
+			for i in "${orphan_files[@]}";
+            do
+                mv $i $base_dir
+            done
+		fi
+
 		fna_gz="${base_file}.fna.gz"
 		fna_file="${base_file}.fna"
 		gff_file="${base_file}.gff"
