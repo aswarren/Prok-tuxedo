@@ -53,7 +53,7 @@ while [[ $# -gt 0 ]]
 		    cur_file=$( echo $cur_url | sed 's|.*/||')
 		    cur_file="${base_dir}/${cur_file}"
 		    if [[ ! -e $cur_file ]]; then
-			    echo $cur_url | xargs -n1 wget -O $fna_gz
+			    echo $cur_url | xargs -n1 wget -O $cur_file
             fi
         done
 		fna_gz="${base_file}.fna.gz"
@@ -76,6 +76,7 @@ while [[ $# -gt 0 ]]
 		hisat_files=( ./$base_file*.ht2 )
 		if [[ ! -e $base_file.ht2.tar ]] && [[ ${#hisat_files[@]} > 0 ]]; then
             ht2_files=$(printf " %s" "${PROFILES[@]}")
+            echo $ht2_files
             tar -cvf $base_file.ht2.tar $ht2_files
         fi
 
