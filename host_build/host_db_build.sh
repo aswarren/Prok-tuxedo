@@ -73,6 +73,12 @@ while [[ $# -gt 0 ]]
 			echo "building hisat2 files for ${TAXID}"
 			hisat2-build $fna_file $base_file
 		fi
+		hisat_files=( ./$base_file*.ht2 )
+		if [[ ! -e $base_file.ht2.tar ]] && [[ ${#hisat_files[@]} > 0 ]]; then
+            ht2_files=$(printf " %s" "${PROFILES[@]}")
+            tar -cvf $base_file.ht2.tar $ht2_files
+        fi
+
 	fi
 
 shift
