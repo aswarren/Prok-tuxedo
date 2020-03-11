@@ -75,8 +75,9 @@ while [[ $# -gt 0 ]]
 		fi
 		hisat_files=( ./$base_file*.ht2 )
 		if [[ ! -e $base_file.ht2.tar ]] && [[ ${#hisat_files[@]} > 0 ]]; then
-            ht2_files=$(printf " %s" "${PROFILES[@]}")
-            echo $ht2_files
+            separator=" "
+            ht2_files="$( printf "${separator}%s" "${hisat_files[@]}" )"
+            ht2_files="${ht2_files:${#separator}}" # remove leading separator
             tar -cvf $base_file.ht2.tar $ht2_files
         fi
 
