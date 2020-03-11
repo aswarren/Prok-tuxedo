@@ -25,16 +25,14 @@ while [[ $# -gt 0 ]]
 		reference=$(awk -v TAXID="$TAXID" \
 			'BEGIN{FS="\t"}{if($6==TAXID){print $20; exit}}' \
 			$host_table)
-		echo $reference
 		base_url=$( printf '%s' "$reference" | awk 'BEGIN{OFS=FS="/"}{print $0,$NF"_genomic"}' )
 		mkdir -p $TAXID
-		echo "hello"
 		base_file=$( echo $base_url | sed 's|.*/||')
 		base_file="${TAXID}/${base_file}"
-		fna_gz="${base_file}_genomic.fna.gz"
-		fna_file="${base_file}_genomic.fna"
-		gff_file="${base_file}_genomic.gff"
-		gff_gz="${base_file}_genomic.gff.gz"
+		fna_gz="${base_file}.fna.gz"
+		fna_file="${base_file}.fna"
+		gff_file="${base_file}.gff"
+		gff_gz="${base_file}.gff.gz"
 		if [[ ! -e $fna_gz ]] && [[ ! -e $fna_file ]]; then
 			echo $reference | awk 'BEGIN{OFS=FS="/"}{print $0,$NF"_genomic.fna.gz"}' | xargs -n1 wget -O $fna_gz
 			gunzip -c $fna_gz > $fna_file
