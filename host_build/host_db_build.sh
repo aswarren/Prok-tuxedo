@@ -1,6 +1,6 @@
 #!/bin/bash
 # based on https://www.biostars.org/p/306380/
-shopt -s globstar
+shopt -s nullglob
 
 
 while [[ $# -gt 0 ]]
