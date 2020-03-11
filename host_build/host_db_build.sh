@@ -29,7 +29,7 @@ while [[ $# -gt 0 ]]
 		release_id=$(awk -v TAXID="$TAXID" \
 			'BEGIN{FS="\t"}{if($6==TAXID){print $16; exit}}' \
 			$host_table)
-        release_id= "${release_id// /$'_'}"
+        release_id="${release_id// /_}"
         echo $release_id
 		base_url=$( printf '%s' "$reference" | awk 'BEGIN{OFS=FS="/"}{print $0,$NF"_genomic"}' )
         base_dir="${TAXID}/${release_id}"
