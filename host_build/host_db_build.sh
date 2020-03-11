@@ -31,6 +31,7 @@ while [[ $# -gt 0 ]]
 			$host_table)
         release_id="${release_id// /_}"
         echo $release_id
+        prefix_url=$( printf '%s' "$reference" | awk 'BEGIN{OFS=FS="/"}{print $0,$NF""}' )
 		base_url=$( printf '%s' "$reference" | awk 'BEGIN{OFS=FS="/"}{print $0,$NF"_genomic"}' )
         base_dir="${TAXID}/${release_id}"
 		mkdir -p $base_dir
@@ -45,7 +46,16 @@ while [[ $# -gt 0 ]]
                 mv $i $base_dir
             done
 		fi
-
+        other_files=(_protein.faa.gz _cds_from_genomic.fna.gz _translated_cds.faa.gz _rna_from_genomic.fna.gz _genomic.gbff.gz)
+        for i in "${other_files[@]}";
+        do
+            cur_url="${prefix_url}${i}"
+		    cur_file=$( echo $cur_url | sed 's|.*/||')
+		    cur_file="${base_dir}/${cur_file}"
+		    if [[ ! -e $cur_file ]]; then
+			    echo $cur_url | xargs -n1 wget -O $fna_gz
+            fi
+        done
 		fna_gz="${base_file}.fna.gz"
 		fna_file="${base_file}.fna"
 		gff_file="${base_file}.gff"
