@@ -5,6 +5,7 @@ shopt -s nullglob
 
 host_table="assembly_summary_refseq.txt"
 patric_table="patric_host_summary.txt"
+patric_json="patric_host_summary.json"
 echo "creating patric table"
 grep '^#' $host_table > $patric_table
 
@@ -85,3 +86,4 @@ while [[ $# -gt 0 ]]
 
 shift
 done
+python make_json.py --host_table $patric_table > $patric_json
