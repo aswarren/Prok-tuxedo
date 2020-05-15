@@ -5,7 +5,6 @@ import argparse
 import subprocess
 import multiprocessing
 import cuffdiff_to_genematrix
-import glob
 import tarfile, json
 import shutil
 
@@ -41,33 +40,21 @@ def link_space(file_path):
 
 
 #pretty simple: its for prokaryotes in that parameters will be attuned to give best performance and no tophat
-#TODO: don't forget to uncomment skipped steps for testing
+
 def run_alignment(genome_list, condition_dict, parameters, output_dir, job_data): 
     #modifies condition_dict sub replicates to include 'bowtie' dict recording output files
     for genome in genome_list:
         genome_link = genome["genome_link"]
         final_cleanup=[]
         if "hisat_index" in genome and genome["hisat_index"]:
-            if genome["hisat_index"].endswith("ht2.tar"):
-                archive = tarfile.open(genome["hisat_index"])
-                indices= [os.path.join(output_dir,os.path.basename(x)) for x in archive.getnames()]
-                final_cleanup+=indices
-                #archive.extractall(path=output_dir)
-                archive.close()
-            #Check if hisat2 index files exist by checking for first file, genome.1.ht2. Otherwise, untar indeces
-            #Assuming index_prefix is same name as genome, and that the files aren't in another directory (./*ht2) 
-            if not os.path.exists(os.path.join(genome["dir"],os.path.basename(genome["output"])+".1.ht2")): 
-                subprocess.check_call(["tar","-xvf", genome["hisat_index"], "-C", output_dir])
-                index_prefix = os.path.join(output_dir, os.path.basename(genome["hisat_index"]).replace(".ht2.tar","")) 
-            else:
-                for index in glob.glob(os.path.join(genome["dir"],os.path.basename(genome["output"])+".*.ht2")): #for each hisat index file in the genome directory
-                    copy_index = os.path.join(genome["output"],os.path.basename(index))
-                    if not os.path.exists(copy_index): #if it doesn't exist in the genome output directory
-                        shutil.copy(index,os.path.join(genome["output"],os.path.basename(index))) #copy it over
-                    final_cleanup+=[copy_index]
-                index_prefix = os.path.join(genome["output"],os.path.basename(genome["output"]))
+            archive = tarfile.open(genome["hisat_index"])
+            indices= [os.path.join(output_dir,os.path.basename(x)) for x in archive.getnames()]
+            final_cleanup+=indices
+            #archive.extractall(path=output_dir)
+            archive.close()
+            subprocess.check_call(["tar","-xvf", genome["hisat_index"], "-C", output_dir])
+            index_prefix = os.path.join(output_dir, os.path.basename(genome["hisat_index"]).replace(".ht2.tar","")) #somewhat fragile convention. tar prefix is underlying index prefix
             cmd=["hisat2","--dta-cufflinks", "-x", index_prefix] 
-            #cmd=["hisat2","--dta-cufflinks", "-x", index_prefix,"--no-spliced-alignment"] 
             thread_count= parameters.get("hisat2",{}).get("-p",0)
         else:
             try:
@@ -108,98 +95,50 @@ def run_alignment(genome_list, condition_dict, parameters, output_dir, job_data)
                 r[genome["genome"]]["bam"]=bam_file
                 cur_cmd+=["-S",sam_file]
                 print " ".join(fastqc_cmd)
-                #TODO: Uncomment
-                #subprocess.check_call(fastqc_cmd)
+                subprocess.check_call(fastqc_cmd)
                 if os.path.exists(bam_file):
                     sys.stderr.write(bam_file+" alignments file already exists. skipping\n")
                 else:
                     print cur_cmd
-                    subprocess.check_call(cur_cmd) #call bowtie2 or hisat2
+                    subprocess.check_call(cur_cmd) #call bowtie2
                 if not os.path.exists(bam_file):
-                    sort_threads = parameters.get("samtools",{}).get("-@",1)
-                    subprocess.check_call("samtools view -Su "+sam_file+" | samtools sort -o - - -@ "+str(sort_threads)+" > "+bam_file, shell=True)#convert to bam
+                    subprocess.check_call("samtools view -Su "+sam_file+" | samtools sort -o - - > "+bam_file, shell=True)#convert to bam
                     subprocess.check_call("samtools index "+bam_file, shell=True)
                     #subprocess.check_call('samtools view -S -b %s > %s' % (sam_file, bam_file+".tmp"), shell=True)
                     #subprocess.check_call('samtools sort %s %s' % (bam_file+".tmp", bam_file), shell=True)
                 print " ".join(samstat_cmd)
-                #TODO: Uncomment
-                #subprocess.check_call(samstat_cmd)
+                subprocess.check_call(samstat_cmd)
 
                 for garbage in cur_cleanup:
                     subprocess.call(["rm", garbage])
         for garbage in final_cleanup:
             subprocess.call(["rm", garbage])
 
-#Run the feature count program specified in json input, or run htseq-count by default
-def run_featurecount(genome_list, condition_dict, parameters, output_dir, job_data):
-    #check parameters for stringtie option. Assuming htseq2
-    program = job_data.get("feature_count","htseq")
-    if program == "htseq":
-        runHtseqCount(genome_list, condition_dict, parameters, job_data, output_dir)
-    elif program == "stringtie":
-        run_stringtie(genome_list, condition_dict, parameters, job_data, output_dir)
-    else: #not a valid program
-        sys.stderr.write("Invalid feature count program: htseq or stringtie only\n")
-        os.exit(1)
-
-#Always set default parameter behavior when updating functions
-def run_stringtie(genome_list, condition_dict, parameters, job_data, output_dir):
-    thread_count= parameters.get("stringtie",{}).get("-p",0)
-    #defaults to not searching for novel features, adds -e flag
-    #TODO:check assumption
-    find_novel_features = job_data.get("novel_features",False) 
-    if thread_count == 0:
-        thread_count=2 #multiprocessing.cpu_count()
+def run_stringtie(genome_list, condition_dict, parameters, output_dir):
     for genome in genome_list:
+        if not genome.get("host",False):
+            continue
         genome_file=genome["genome"]
         genome_link = genome["genome_link"]
-        #transcriptome assembly
-        gtf_list = []
+        cmd=["stringtie","-G",genome["annotation"]]
+        thread_count= parameters.get("stringtie",{}).get("-p",0)
+        if thread_count == 0:
+            thread_count=2 #multiprocessing.cpu_count()
+        cmd+=["-p",str(thread_count)]
         for library in condition_dict:
             for r in condition_dict[library]["replicates"]:
                 cur_dir=os.path.dirname(os.path.realpath(r[genome_file]["bam"]))
                 os.chdir(cur_dir)
+                cur_cmd=list(cmd)
                 r[genome_file]["dir"]=cur_dir
                 cuff_gtf=os.path.join(cur_dir,"transcripts.gtf")
-                stringtie_cmd = ["stringtie",r[genome_file]["bam"],"-p",str(thread_count)]
-                #check if novel features is turned off: add -e flag
-                if not find_novel_features:
-                    stringtie_cmd = stringtie_cmd + ["-e"]
-                stringtie_cmd = stringtie_cmd + ["-G",genome["annotation"],"-o",cuff_gtf]
-                r[genome_file]["gtf"] = cuff_gtf
-                gtf_list.append(cuff_gtf)
+                cur_cmd+=["-B","-o",cuff_gtf]
+                cur_cmd+=[r[genome_file]["bam"]]#each replicate has the bam file
                 if not os.path.exists(cuff_gtf):
-                    print " ".join(stringtie_cmd)
-                    subprocess.check_call(stringtie_cmd)
+                    print " ".join(cur_cmd)
+                    subprocess.check_call(cur_cmd)
                 else:
-                    print (" ".join(stringtie_cmd))
                     sys.stderr.write(cuff_gtf+" stringtie file already exists. skipping\n")
-        #merge reconstructed transcriptomes
-        ##stringtie --merge -G <reference annotation> -o <merged annotation> <gtf list>
-        os.chdir(genome["output"])
-        #os.mkdir("merged_annotation")
-        merge_file = os.path.join(genome["output"],"merged_annotation","merged.gtf")
-        if not os.path.exists(merge_file):
-            merge_cmd = ["stringtie","--merge","-G",genome["annotation"],"-o",merge_file]+gtf_list
-            print(" ".join(merge_cmd))
-            subprocess.check_call(merge_cmd)
-        genome["merged_annotation"] = merge_file 
-        #requantify transcriptome results with merged annotation
-        for library in condition_dict:
-            for r in condition_dict[library]["replicates"]:
-                cur_dir=os.path.dirname(os.path.realpath(r[genome_file]["bam"]))
-                os.chdir(cur_dir)
-                merge_gtf = os.path.join(cur_dir,"transcripts_merged.gtf")
-                stringtie_cmd = ["stringtie",r[genome_file]["bam"],"-p",str(thread_count),"-e","-G",genome["merged_annotation"],"-o",merge_gtf]
-                r[genome_file]["merged_gtf"] = merge_gtf
-                if not os.path.exists(merge_gtf):
-                    print (" ".join(stringtie_cmd))
-                    subprocess.check_call(stringtie_cmd)
-                else:
-                    sys.stderr.write(merge_gtf+" stringtie file already exists. skipping\n")
-
-#TODO: anticipating removing clufflinks in place of stringtie
-#TODO: smallRNA estimation in a future release
 def run_cufflinks(genome_list, condition_dict, parameters, output_dir):
     for genome in genome_list:
         if genome.get("host",False):
@@ -225,7 +164,7 @@ def run_cufflinks(genome_list, condition_dict, parameters, output_dir):
                 cur_cmd=list(cmd)
                 r[genome_file]["dir"]=cur_dir
                 bam_file = r[genome_file]["bam"]
-                # Review: Memory mapped location on each system
+                #
                 # Attempt to copy to /dev/shm. cufflinks seeks a lot in the file.
                 # If that fails, try tmp.
                 #
@@ -279,7 +218,6 @@ def run_cufflinks(genome_list, condition_dict, parameters, output_dir):
 		    sys.stderr.write("remove temp %s\n" % (bam_tmp))
 		    os.unlink(bam_tmp)
 
-#Differential expression pipeline using the cufflinks protocol 
 def run_diffexp(genome_list, condition_dict, parameters, output_dir, gene_matrix, contrasts, job_data, map_args, diffexp_json):
     #run cuffquant on every replicate, cuffmerge on all resulting gtf, and cuffdiff on the results. all per genome.
     for genome in genome_list:
@@ -351,246 +289,38 @@ def run_diffexp(genome_list, condition_dict, parameters, output_dir, gene_matrix
             subprocess.check_call(diff_cmd)
         else:
             sys.stderr.write(cds_tracking+" cuffdiff file already exists. skipping\n")
-
-#Runs the differential expression import protocol 
-def runDiffExpImport(genome_list, condition_dict, parameters, output_dir, contrasts, job_data, map_args, diffexp_json):
-    for genome in genome_list:
-        cur_dir = genome["output"]
-        is_host=genome.get("host",False)
-        de_file=os.path.join(cur_dir,"gene_exp.diff")
-        gmx_file=os.path.join(cur_dir,"gene_exp.gmx")
-        if os.path.exists(de_file) and not os.path.exists(gmx_file):
+        if gene_matrix:
+            de_file=os.path.join(cur_dir,"gene_exp.diff")
+            gmx_file=os.path.join(cur_dir,"gene_exp.gmx")
             cuffdiff_to_genematrix.main([de_file],gmx_file)
-        transform_script = "expression_transform.py"
-        if os.path.exists(gmx_file):
-            experiment_path=os.path.join(output_dir, map_args.d)
-            subprocess.call(["mkdir","-p",experiment_path])
-            transform_params = {"output_path":experiment_path, "xfile":gmx_file, "xformat":"tsv",\
-                    "xsetup":"gene_matrix", "source_id_type":"patric_id",\
-                    "data_type":"Transcriptomics", "experiment_title":"RNA-Seq", "experiment_description":"RNA-Seq",\
-                    "organism":job_data.get("reference_genome_id")}
-            diffexp_json["parameters"]=transform_params
-            params_file=os.path.join(cur_dir, "diff_exp_params.json")
-            with open(params_file, 'w') as params_handle:
-                params_handle.write(json.dumps(transform_params))
-            convert_cmd=[transform_script, "--ufile", params_file, "--sstring", map_args.sstring, "--output_path",experiment_path,"--xfile",gmx_file]
-            #if is_host:
-            #    convert_cmd.append("--host")   
-            print " ".join(convert_cmd)
-            try:
-               subprocess.check_call(convert_cmd)
-            except(subprocess.CalledProcessError):
-               sys.stderr.write("Running differential expression import failed.\n")
-               subprocess.call(["rm","-rf",experiment_path])
-               return
-            diffexp_obj_file=os.path.join(output_dir, os.path.basename(map_args.d.lstrip(".")))
-            with open(diffexp_obj_file, 'w') as diffexp_job:
-                diffexp_job.write(json.dumps(diffexp_json))
-
-#TODO: remove counts files after table
-# -s: (yes,no,reverse) 
-# -i: feature to look for in annotation file (final column)
-# -t: featur type to be used, all others ignored. default = exon
-def runHtseqCount(genome_list, condition_dict, parameters, job_data, output_dir):
-    strand = job_data.get("htseq",{}).get("-s","no")
-    feature = job_data.get("htseq",{}).get("-i","gene")
-    feature_type = job_data.get("htseq",{}).get("-t","gene")
-    for genome in genome_list:
-        genome_file = genome["genome"]
-        genome_annotation = genome["annotation"]
-        for condition in condition_dict:
-            for replicate in condition_dict[condition]["replicates"]:
-                cur_dir = os.path.dirname(os.path.realpath(replicate[genome_file]["bam"]))
-                os.chdir(cur_dir)
-                replicate[genome_file]["dir"] = cur_dir
-                counts_file = os.path.basename(replicate[genome_file]["bam"]).replace(".bam",".counts")
-                counts_file_path = os.path.join(cur_dir,counts_file) 
-                #Add counts file to replicate entry
-                replicate[genome_file]["counts"] = counts_file_path
-                #htseq-count prints to stdout, so redirect stdout to a count file
-                if os.path.exists(counts_file):
-                    sys.stderr.write("%s exists for genome file %s: skipping htseq-count\n"%(counts_file,genome_file))
-                    continue
-                print("running htseq-count and writing to %s"%counts_file)
-                htseq_cmd = ["htseq-count","-r","pos","-t",feature_type,"-f","bam","-s",strand,"-i",feature,replicate[genome_file]["bam"],genome_annotation]
-                print(" ".join(htseq_cmd))
-                #prints to stdout, so redirect output to file
-                with open(counts_file,"w") as cf:
-                    subprocess.check_call(htseq_cmd,stdout=cf)
- 
-#Merges the counts file generated for each replicate from htseq-count for each genome. Outputs file to genome directory
-#Names file according to genome identifier
-#Parameters:
-# - genome: The current genome dictionary object from genome_list
-# - condition_dict: complete condition dictionary object
-def createCountsTable(genome_list,condition_dict):
-    #Remove the last 5 lines from htseq-count output
-    omit_list = ["__no_feature","__ambiguous","__too_low_aQual","__not_aligned","__alignment_not_unique"]
-    for genome in genome_list:
-        genome_file = genome["genome"]
-        genome_annotation = genome["annotation"]
-        genome_dir = genome["output"]
-        #change to genome directory
-        os.chdir(genome_dir)
-        feature_set = set()
-        replicate_list = []
-        counts_dict = {}
-        #load counts file information into memory
-        for condition in condition_dict: 
-            for replicate in condition_dict[condition]["replicates"]:
-                counts_file = replicate[genome["genome"]]["counts"]
-                replicate_id = os.path.basename(counts_file).replace(".counts","")
-                replicate_list.append(replicate_id)
-                counts_dict[replicate_id] = {}
-                with open(counts_file,"r") as cf:
-                    for line in cf:
-                        feature,count = line.rstrip().split("\t")
-                        #skip the last five lines in counts file
-                        if feature not in omit_list:
-                            feature_set.add(feature)
-                            counts_dict[replicate_id][feature] = count
-        #output counts table
-        genome_id = os.path.basename(genome_dir)
-        genome_counts_mtx = genome_id + "_gene_count_matrix.txt"
-        with open(genome_counts_mtx,"w") as gcm:
-            #write headers
-            gcm.write("Feature")
-            for replicate_id in replicate_list:
-                gcm.write("\t%s"%replicate_id)
-            gcm.write("\n")
-            #write feature info 
-            for feature in feature_set:
-                gcm.write(feature)
-                for replicate_id in replicate_list:
-                    if feature in counts_dict[replicate_id]:
-                        gcm.write("\t%s"%counts_dict[replicate_id][feature])
-                    else:
-                        gcm.write("\t0")
-                gcm.write("\n")
-        genome["counts_matrix"] = os.path.join(genome["output"],genome_counts_mtx)
-
-#Put a metadata file in each genome directory
-#Subsetting the data on current conditions can be done in R
-def createDESeqMetadata(genome_list,condition_dict,output_dir):
-    #From genome list, get any genome key to get a replicate identifier  
-    genome_key = genome_list[0]["genome"]
-    #stores conditions as keys and replicate list as value
-    info_dict = {}
-    for condition in condition_dict:
-        info_dict[condition] = [] 
-        for replicate in condition_dict[condition]["replicates"]:
-            replicate_id = os.path.basename(replicate[genome_key]["bam"]).replace(".bam","")
-            info_dict[condition].append(replicate_id)
-    #write metadata file: column 1 == replicate ids and column 2 == condition
-    #Print file to top level output directory, only 1 metadat file is needed
-    #Get the top level output directory
-    metadata_file = os.path.join(output_dir,"DESeq_Metadata.txt")
-    with open(metadata_file,"w") as mf:
-        mf.write("Sample\tCondition\n")
-        for condition in info_dict:
-            for replicate in info_dict[condition]:
-                mf.write("%s\t%s\n"%(replicate,condition))
-    #Add metadata file to each genome in genome_list
-    for genome in genome_list:
-        genome["deseq_metadata"] = metadata_file
-
-#Writes the input file for prepDE.py, a prerequisite for running the Stringtie -> DESEq2 pipeline
-#Contents: <Sample> <Path/To/GTF>
-def writeGTFList(genome_list,condition_dict):
-     for genome in genome_list:
-        genome_file = genome["genome"]
-        genome_annotation = genome["annotation"]
-        genome_dir = genome["output"]
-        #change to genome directory
-        os.chdir(genome_dir)
-        rep_gtf_list = []
-        for condition in condition_dict:
-            for replicate in condition_dict[condition]["replicates"]:
-                replicate_id = os.path.basename(replicate[genome_file]["bam"]).replace(".bam","")
-                rep_gtf_file = replicate[genome_file]["merged_gtf"]
-                rep_gtf_list.append((replicate_id,rep_gtf_file))
-        gtf_path_filename = genome_dir+"_GTF_Sample_Paths.txt"                 
-        with open(gtf_path_filename,"w") as gpf:
-            for rep_gtf in rep_gtf_list:
-                gpf.write("%s\n"%("\t".join(rep_gtf)))
-        genome["prepDE_input"] = gtf_path_filename
-
-#Calls the prepDE.py script that transforms stringtie output into a format usable by DESeq2
-def prepStringtieDiffexp(genome_list,condition_dict):
-    for genome in genome_list:
-        genome_file = genome["genome"]
-        genome_dir = genome["output"]
-        genome_id = os.path.basename(genome_dir)
-        os.chdir(genome_dir)
-        genome_counts_mtx = genome_id+"_gene_count_matrix.csv" 
-        genome["counts_matrix"] = os.path.join(genome["output"],genome_counts_mtx)
-        if not os.path.exists(genome_counts_mtx):
-            prep_cmd = ["prepDE.py","-i",genome["prepDE_input"],"-g",genome_counts_mtx]
-            print(" ".join(prep_cmd))
-            subprocess.check_call(prep_cmd)
-
-#Gets the lists of contrasts and runs DESeq2
-#Runs once for each genome
-def run_deseq2(genome_list,contrasts):
-    #Get list of contrasts to pass into deseq2 R script
-    contrast_cmd = []
-    for pair in contrasts:
-        #remove any commas in names if present
-        pair = [x.replace(",","_") for x in pair]
-        contrast_cmd.append(",".join(pair))  
-
-    #For each genome, run the deseq2 R script passing in the genome counts matrix, metadata file, and all contrasts
-    #changes directory to the top genome directory for each genome
-    #invoking RunDESeq2.R: RunDESeq2.R <counts_file.txt> <metadata_file.txt> <output_prefix> <contrast_1> <contrast_2> ... <contrast_n>
-    for genome in genome_list:
-        os.chdir(genome["output"])
-        genome_prefix = os.path.basename(genome["output"])
-        counts_file = genome["counts_matrix"]  
-        metadata_file = genome["deseq_metadata"] 
-        if not os.path.exists(counts_file):
-            print("%s: file doesn't exist"%counts_file)
-        if not os.path.exists(metadata_file):
-            print("%s: file doesn't exist"%metadata_file)
-        diffexp_cmd = ["RunDESeq2.R",counts_file,metadata_file,genome_prefix]+contrast_cmd
-        print("%s\n"%" ".join(diffexp_cmd))
-        subprocess.check_call(diffexp_cmd)
-        genome["diff_exp_contrasts"] = []
-        for pair in contrasts:
-            pair = [x.replace(",","_") for x in pair]
-            pair = "_vs_".join(pair) 
-            diffexp_file = genome_prefix + "_" + pair + ".txt"
-            genome["diff_exp_contrasts"].append(os.path.join(genome["output"],diffexp_file))
-         
-#Writes the gene_exp.gmx file used in expression_transform.py from DESeq2 output
-def writeGMXFile(genome_list):
-    gene_set = set()
-    gene_count_dict = {}
-    contrast_list = []
-    for genome in genome_list:
-        os.chdir(genome["output"])
-        contrast_file_list = genome["diff_exp_contrasts"]
-        for contrast_file in contrast_file_list:
-            contrast_name = contrast_file.split("_")[1].replace(".txt","")
-            contrast_list.append(contrast_name)
-            gene_count_dict[contrast_name] = {}
-            with open(contrast_file,"r") as cf:
-                next(cf)
-                for line in cf:
-                    gene,baseMean,log2FC,lfcSE,stat,pvalue,padj = line.strip().split("\t")
-                    gene_set.add(gene)
-                    gene_count_dict[contrast_name][gene] = log2FC
-
-        with open("gene_exp.gmx","w") as o:
-            o.write("Gene_ID\t%s\n"%"\t".join(contrast_list))
-            for gene in gene_set:
-                o.write(gene.replace("gene","").replace("_",""))
-                for contrast in contrast_list:
-                    if gene in gene_count_dict[contrast]:
-                        o.write("\t%s"%gene_count_dict[contrast][gene])
-                    else:
-                        o.write("\t0")
-                o.write("\n")
-
+            transform_script = "expression_transform.py"
+            if os.path.exists(gmx_file):
+                experiment_path=os.path.join(output_dir, map_args.d)
+                subprocess.call(["mkdir","-p",experiment_path])
+                transform_params = {"output_path":experiment_path, "xfile":gmx_file, "xformat":"tsv",\
+                        "xsetup":"gene_matrix", "source_id_type":"patric_id",\
+                        "data_type":"Transcriptomics", "experiment_title":"RNA-Seq", "experiment_description":"RNA-Seq",\
+                        "organism":job_data.get("reference_genome_id")}
+                diffexp_json["parameters"]=transform_params
+                params_file=os.path.join(cur_dir, "diff_exp_params.json")
+                with open(params_file, 'w') as params_handle:
+                    params_handle.write(json.dumps(transform_params))
+                convert_cmd=[transform_script, "--ufile", params_file, "--sstring", map_args.sstring, "--output_path",experiment_path,"--xfile",gmx_file]
+                if is_host:
+                    convert_cmd.append("--host")   
+                print " ".join(convert_cmd)
+                try:
+                    subprocess.check_call(convert_cmd)
+                except(subprocess.CalledProcessError):
+                   sys.stderr.write("Running differential expression import failed.\n")
+                   subprocess.call(["rm","-rf",experiment_path])
+                   return
+                diffexp_obj_file=os.path.join(output_dir, os.path.basename(map_args.d.lstrip(".")))
+                with open(diffexp_obj_file, 'w') as diffexp_job:
+                    diffexp_job.write(json.dumps(diffexp_json))
+                
+            #convert_cmd+=]
+            
 def setup(genome_list, condition_dict, parameters, output_dir, job_data):
     for genome in genome_list:
         genome_link=os.path.join(output_dir, os.path.basename(genome["genome"]))
@@ -608,13 +338,11 @@ def setup(genome_list, condition_dict, parameters, output_dir, job_data):
                 if "srr_accession" in r:
                     srr_id = r["srr_accession"] 
                     meta_file = os.path.join(target_dir,srr_id+"_meta.txt")
-                    #TODO: remove fastq files at the very end of pipeline, only during SRA import: assuming script above this is copying fastq files to tmp directory
-                    subprocess.check_call(["p3-sra","--out",target_dir,"--metadata-file", meta_file, "--id",srr_id])
+                    subprocess.check_call(["p3-sra","--gzip","--out",target_dir,"--metadata-file", meta_file, "--id",srr_id])
                     with open(meta_file) as f:
                         job_meta = json.load(f)
                         files = job_meta[0].get("files",[])
                         for i,f in enumerate(files):
-                           #TODO:remove .gz endswith()??
                             if f.endswith("_2.fastq.gz"):
                                 r["read2"]=os.path.join(target_dir, f)
                             if f.endswith("_1.fastq.gz"):
@@ -635,33 +363,20 @@ def main(genome_list, condition_dict, parameters_str, output_dir, gene_matrix=Fa
     #parametrs_file is json parameters list keyed as bowtie, cufflinks, cuffdiff.
     output_dir=os.path.abspath(output_dir)
     subprocess.call(["mkdir","-p",output_dir])
-    
-    #TODO: Read objects(?) that know their read parameters:
-    #TODO: fastq utils to replace certain functionality?
+
     if parameters_str != None :
         parameters=json.loads(parameters_str)
     else:
         parameters = {}
+        
     setup(genome_list, condition_dict, parameters, output_dir, job_data)
-
     run_alignment(genome_list, condition_dict, parameters, output_dir, job_data)
-    run_featurecount(genome_list, condition_dict, parameters, output_dir, job_data)
-    #run_stringtie(genome_list, condition_dict, parameters, output_dir)
-    #run_cufflinks(genome_list, condition_dict, parameters, output_dir)
-    #cannot run DESeq2 with novel features turned on
-    if len(condition_dict.keys()) > 1 and not job_data.get("novel_features",False):
-        #Create deseq2 metadata file. Ordering the matrix correctly will be done in R script 
-        createDESeqMetadata(genome_list,condition_dict,output_dir)
-        #run prepDE.py to create counts files if using stringtie
-        if job_data.get("feature_count","htseq") == "stringtie":
-            writeGTFList(genome_list,condition_dict) #function that writes the input for prepDE.py, which is a list of samples and paths to their gtf files. Do this for each genome
-            prepStringtieDiffexp(genome_list,condition_dict)   
-        else:
-            createCountsTable(genome_list,condition_dict)
-        run_deseq2(genome_list,contrasts)
-        writeGMXFile(genome_list)
-        runDiffExpImport(genome_list, condition_dict, parameters, output_dir, contrasts, job_data, map_args, diffexp_json)
-        #run_diffexp(genome_list, condition_dict, parameters, output_dir, gene_matrix, contrasts, job_data, map_args, diffexp_json)
+    #given setup, right now stringtie only runs for host and cufflinks only for bacteria. stringtie requires transcript annotation model in -G option
+    run_stringtie(genome_list, condition_dict, parameters, output_dir)
+    run_cufflinks(genome_list, condition_dict, parameters, output_dir)
+    if len(condition_dict.keys()) > 1:
+        run_diffexp(genome_list, condition_dict, parameters, output_dir, gene_matrix, contrasts, job_data, map_args, diffexp_json)
+
 
 if __name__ == "__main__":
     #modelling input parameters after rockhopper
@@ -741,10 +456,7 @@ if __name__ == "__main__":
                 cur_genome["genome"].append(os.path.abspath(os.path.join(g,f)))
             elif f.endswith(".gff"):
                 cur_genome["annotation"].append(os.path.abspath(os.path.join(g,f)))
-            #Change to check for ht2 files instead of just the tar file
-            elif f.endswith(".ht2.tar") and "hisat_index" not in cur_genome: 
-                cur_genome["hisat_index"].append(os.path.abspath(os.path.join(g,f)))
-            elif f.endswith(".1.ht2"):
+            elif f.endswith(".ht2.tar"):
                 cur_genome["hisat_index"].append(os.path.abspath(os.path.join(g,f)))
 
         if len(cur_genome["genome"]) != 1:
