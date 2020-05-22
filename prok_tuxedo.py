@@ -524,6 +524,7 @@ def prepStringtieDiffexp(genome_list,condition_dict):
         os.chdir(genome_dir)
         genome_counts_mtx = genome_id+"_gene_count_matrix.csv" 
         genome["counts_matrix"] = os.path.join(genome["output"],genome_counts_mtx)
+        genome["transcript_matrix"] = os.path.join(genome["output"],"transcript_count_matrix.csv")
         if not os.path.exists(genome_counts_mtx):
             prep_cmd = ["prepDE.py","-i",genome["prepDE_input"],"-g",genome_counts_mtx]
             print(" ".join(prep_cmd))
@@ -531,7 +532,7 @@ def prepStringtieDiffexp(genome_list,condition_dict):
 
 #Gets the lists of contrasts and runs DESeq2
 #Runs once for each genome
-def run_deseq2(genome_list,contrasts):
+def run_deseq2(genome_list,contrasts,job_data):
     #Get list of contrasts to pass into deseq2 R script
     contrast_cmd = []
     for pair in contrasts:
@@ -545,7 +546,10 @@ def run_deseq2(genome_list,contrasts):
     for genome in genome_list:
         os.chdir(genome["output"])
         genome_prefix = os.path.basename(genome["output"])
-        counts_file = genome["counts_matrix"]  
+        if job_data.get("feature_count","htseq") == "stringtie":
+            counts_file = genome["transcript_matrix"]
+        else: #htseq
+            counts_file = genome["counts_matrix"]  
         metadata_file = genome["deseq_metadata"] 
         if not os.path.exists(counts_file):
             print("%s: file doesn't exist"%counts_file)
@@ -570,7 +574,7 @@ def writeGMXFile(genome_list):
         os.chdir(genome["output"])
         contrast_file_list = genome["diff_exp_contrasts"]
         for contrast_file in contrast_file_list:
-            contrast_name = contrast_file.split("_")[1].replace(".txt","")
+            contrast_name = os.path.basename(contrast_file).replace(".txt","")
             contrast_list.append(contrast_name)
             gene_count_dict[contrast_name] = {}
             with open(contrast_file,"r") as cf:
@@ -658,7 +662,7 @@ def main(genome_list, condition_dict, parameters_str, output_dir, gene_matrix=Fa
             prepStringtieDiffexp(genome_list,condition_dict)   
         else:
             createCountsTable(genome_list,condition_dict)
-        run_deseq2(genome_list,contrasts)
+        run_deseq2(genome_list,contrasts,job_data)
         writeGMXFile(genome_list)
         runDiffExpImport(genome_list, condition_dict, parameters, output_dir, contrasts, job_data, map_args, diffexp_json)
         #run_diffexp(genome_list, condition_dict, parameters, output_dir, gene_matrix, contrasts, job_data, map_args, diffexp_json)
