@@ -108,8 +108,7 @@ def run_alignment(genome_list, condition_dict, parameters, output_dir, job_data)
                 r[genome["genome"]]["bam"]=bam_file
                 cur_cmd+=["-S",sam_file]
                 print " ".join(fastqc_cmd)
-                #TODO: Uncomment
-                #subprocess.check_call(fastqc_cmd)
+                subprocess.check_call(fastqc_cmd)
                 if os.path.exists(bam_file):
                     sys.stderr.write(bam_file+" alignments file already exists. skipping\n")
                 else:
@@ -122,8 +121,7 @@ def run_alignment(genome_list, condition_dict, parameters, output_dir, job_data)
                     #subprocess.check_call('samtools view -S -b %s > %s' % (sam_file, bam_file+".tmp"), shell=True)
                     #subprocess.check_call('samtools sort %s %s' % (bam_file+".tmp", bam_file), shell=True)
                 print " ".join(samstat_cmd)
-                #TODO: Uncomment
-                #subprocess.check_call(samstat_cmd)
+                subprocess.check_call(samstat_cmd)
 
                 for garbage in cur_cleanup:
                     subprocess.call(["rm", garbage])
@@ -161,7 +159,7 @@ def run_stringtie(genome_list, condition_dict, parameters, job_data, output_dir)
                 os.chdir(cur_dir)
                 r[genome_file]["dir"]=cur_dir
                 cuff_gtf=os.path.join(cur_dir,"transcripts.gtf")
-                stringtie_cmd = ["stringtie",r[genome_file]["bam"],"-p",str(thread_count)]
+                stringtie_cmd = ["stringtie",r[genome_file]["bam"],"-p",str(thread_count),"-A","gene_abund.tab"]
                 #check if novel features is turned off: add -e flag
                 if not find_novel_features:
                     stringtie_cmd = stringtie_cmd + ["-e"]
@@ -190,7 +188,7 @@ def run_stringtie(genome_list, condition_dict, parameters, job_data, output_dir)
                 cur_dir=os.path.dirname(os.path.realpath(r[genome_file]["bam"]))
                 os.chdir(cur_dir)
                 merge_gtf = os.path.join(cur_dir,"transcripts_merged.gtf")
-                stringtie_cmd = ["stringtie",r[genome_file]["bam"],"-p",str(thread_count),"-e","-G",genome["merged_annotation"],"-o",merge_gtf]
+                stringtie_cmd = ["stringtie",r[genome_file]["bam"],"-p",str(thread_count),"-A","merged_abund.tab","-e","-G",genome["merged_annotation"],"-o",merge_gtf]
                 r[genome_file]["merged_gtf"] = merge_gtf
                 if not os.path.exists(merge_gtf):
                     print (" ".join(stringtie_cmd))
@@ -394,7 +392,7 @@ def runDiffExpImport(genome_list, condition_dict, parameters, output_dir, contra
 def runHtseqCount(genome_list, condition_dict, parameters, job_data, output_dir):
     strand = job_data.get("htseq",{}).get("-s","no")
     feature = job_data.get("htseq",{}).get("-i","gene")
-    feature_type = job_data.get("htseq",{}).get("-t","gene")
+    feature_type = job_data.get("htseq",{}).get("-t","exon")
     for genome in genome_list:
         genome_file = genome["genome"]
         genome_annotation = genome["annotation"]
@@ -587,7 +585,8 @@ def writeGMXFile(genome_list):
         with open("gene_exp.gmx","w") as o:
             o.write("Gene_ID\t%s\n"%"\t".join(contrast_list))
             for gene in gene_set:
-                o.write(gene.replace("gene","").replace("_",""))
+                #o.write(gene.replace("gene","").replace("_",""))
+                o.write(gene.replace("gene-",""))
                 for contrast in contrast_list:
                     if gene in gene_count_dict[contrast]:
                         o.write("\t%s"%gene_count_dict[contrast][gene])

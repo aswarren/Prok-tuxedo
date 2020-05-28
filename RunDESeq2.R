@@ -33,11 +33,11 @@ if (file_ext(metadata.file) == "csv") {
 }
 #Load counts table and metadata table and replace invalid characters
 count.mtx <- read.table(counts.file,sep=count_sep,header=T,row.names=1,stringsAsFactors=FALSE)
-rownames(count.mtx) = gsub("-","_",rownames(count.mtx))
-colnames(count.mtx) = gsub("-","_",colnames(count.mtx))
+rownames(count.mtx) = gsub("-","___",rownames(count.mtx))
+colnames(count.mtx) = gsub("-","___",colnames(count.mtx))
 metadata <- read.table(metadata.file,sep=meta_sep,header=T,row.names=1,stringsAsFactors=FALSE)
-metadata$Condition = gsub("-","_",metadata$Condition)
-rownames(metadata) = gsub("-","_",rownames(metadata))
+metadata$Condition = gsub("-","___",metadata$Condition)
+rownames(metadata) = gsub("-","___",rownames(metadata))
 
 #Reorder columns of counts table to match row order of metadata 
 #Note: May be able to omit this line
@@ -63,6 +63,8 @@ for (i in 4:length(args))
     dds <- DESeqDataSetFromMatrix(countData = curr.count.mtx, colData = curr.metadata, design = ~Condition)
     dds <- DESeq(dds)
     res <- results(dds,contrast=c("Condition",curr_contrast[1],curr_contrast[2]))
+    rownames(res) = gsub("___","-",rownames(res))
+    colnames(res) = gsub("___","-",colnames(res))
     #store information for gmx frame
     #res = res[rownames(gmx_frame),]
     #gmx_frame = cbind(gmx_frame,res)
