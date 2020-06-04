@@ -57,7 +57,7 @@ for (i in 4:length(args))
     curr.metadata = subset(metadata,(subset=Condition==curr_contrast[1])|(subset=Condition==curr_contrast[2]))
     curr.count.mtx = count.mtx[,rownames(curr.metadata)] 
     #Remove all zero rows and add pseudocount to genes
-    curr.count.mtx = curr.count.mtx[rowSums(curr.count.mtx>0) != 0,]
+    curr.count.mtx = curr.count.mtx[rowSums(curr.count.mtx) != 0,]
     curr.count.mtx = curr.count.mtx + 1
     #Run standard DESeq2 pipeline
     dds <- DESeqDataSetFromMatrix(countData = curr.count.mtx, colData = curr.metadata, design = ~Condition)

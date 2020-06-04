@@ -391,7 +391,7 @@ def runDiffExpImport(genome_list, condition_dict, parameters, output_dir, contra
 # -t: featur type to be used, all others ignored. default = exon
 def runHtseqCount(genome_list, condition_dict, parameters, job_data, output_dir):
     strand = job_data.get("htseq",{}).get("-s","no")
-    feature = job_data.get("htseq",{}).get("-i","gene")
+    feature = job_data.get("htseq",{}).get("-i","ID")
     feature_type = job_data.get("htseq",{}).get("-t","exon")
     for genome in genome_list:
         genome_file = genome["genome"]
@@ -410,7 +410,7 @@ def runHtseqCount(genome_list, condition_dict, parameters, job_data, output_dir)
                     sys.stderr.write("%s exists for genome file %s: skipping htseq-count\n"%(counts_file,genome_file))
                     continue
                 print("running htseq-count and writing to %s"%counts_file)
-                htseq_cmd = ["htseq-count","-r","pos","-t",feature_type,"-f","bam","-s",strand,"-i",feature,replicate[genome_file]["bam"],genome_annotation]
+                htseq_cmd = ["htseq-count","-t",feature_type,"-f","bam","-s",strand,"-i",feature,replicate[genome_file]["bam"],genome_annotation]
                 print(" ".join(htseq_cmd))
                 #prints to stdout, so redirect output to file
                 with open(counts_file,"w") as cf:
