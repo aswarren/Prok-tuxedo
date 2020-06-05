@@ -585,8 +585,6 @@ def writeGMXFile(genome_list):
         with open("gene_exp.gmx","w") as o:
             o.write("Gene_ID\t%s\n"%"\t".join(contrast_list))
             for gene in gene_set:
-                #o.write(gene.replace("gene","").replace("_",""))
-                o.write(gene.replace("gene-",""))
                 for contrast in contrast_list:
                     if gene in gene_count_dict[contrast]:
                         o.write("\t%s"%gene_count_dict[contrast][gene])
