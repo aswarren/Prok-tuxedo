@@ -8,10 +8,12 @@ args = commandArgs(trailingOnly=TRUE)
 numContrasts = length(args) - 3
 
 if (numContrasts < 1) {
-    stop("Not enough parameters: Rscript RunDESeq2.R <counts_file.txt> <metadata_file.txt> <output_prefix> <contrast 1> ... <contrast n>")
+    stop("Not enough parameters: RunDESeq2.R <counts_file.txt> <metadata_file.txt> <output_prefix> <contrast 1> ... <contrast n>")
 }
 
+#Differential expression library
 library(DESeq2)
+#For file_ext function
 library(tools)
 
 counts.file = args[1]
@@ -43,12 +45,8 @@ rownames(metadata) = gsub("-","___",rownames(metadata))
 #Note: May be able to omit this line
 count.mtx = count.mtx[,rownames(metadata)]
 
-#create a list, size of number of comparisons, that will hold the diff_exp data
-#diff_exp_list <- rep(0,numContrasts)
-#contrast_list <- rep(0,numContrasts)
-#gmx_frame = data.frame(matrix(ncol=0,nrow=length(rownames(count.mtx))))
-#rownames(gmx_frame) <- rownames(count.mtx)
 #iterate over contrasts
+#index 4 in args is where the contrasts currently start
 for (i in 4:length(args)) 
 {
     #Subset data on current contrast
@@ -63,18 +61,11 @@ for (i in 4:length(args))
     dds <- DESeqDataSetFromMatrix(countData = curr.count.mtx, colData = curr.metadata, design = ~Condition)
     dds <- DESeq(dds)
     res <- results(dds,contrast=c("Condition",curr_contrast[1],curr_contrast[2]))
+    #If invalid characters were present, put them back
     rownames(res) = gsub("___","-",rownames(res))
     colnames(res) = gsub("___","-",colnames(res))
-    #store information for gmx frame
-    #res = res[rownames(gmx_frame),]
-    #gmx_frame = cbind(gmx_frame,res)
-    #contrast_list[i-3] = paste(curr_contrast[1],curr_contrast[2],sep="_vs_")
     #write to output file
-    results_file = paste(out_prefix,"_",curr_contrast[1],"_vs_",curr_contrast[2],".txt",sep="")     
+    #results_file = paste(out_prefix,"_",curr_contrast[1],"_vs_",curr_contrast[2],".txt",sep="")     
+    results_file = paste(curr_contrast[1],"_vs_",curr_contrast[2],".txt",sep="")     
     write.table(res,file=results_file,sep="\t",quote=FALSE)
 } 
-
-#Write out gmx file: genes as rownames, comparisons as colnames, logfoldchange as values
-#gmx_file = "gene_exp.gmx"
-#colnames(gmx_frame) <- contrast_list
-#write.table(gmx_frame,file=gmx_file,sep="\t",quote=FALSE)

@@ -196,7 +196,6 @@ def run_stringtie(genome_list, condition_dict, parameters, job_data, output_dir)
                 else:
                     sys.stderr.write(merge_gtf+" stringtie file already exists. skipping\n")
 
-#TODO: anticipating removing clufflinks in place of stringtie
 #TODO: smallRNA estimation in a future release
 def run_cufflinks(genome_list, condition_dict, parameters, output_dir):
     for genome in genome_list:
@@ -278,7 +277,7 @@ def run_cufflinks(genome_list, condition_dict, parameters, output_dir):
 		    os.unlink(bam_tmp)
 
 #Differential expression pipeline using the cufflinks protocol 
-def run_diffexp(genome_list, condition_dict, parameters, output_dir, gene_matrix, contrasts, job_data, map_args, diffexp_json):
+def run_cuffdiff(genome_list, condition_dict, parameters, output_dir, gene_matrix, contrasts, job_data, map_args, diffexp_json):
     #run cuffquant on every replicate, cuffmerge on all resulting gtf, and cuffdiff on the results. all per genome.
     for genome in genome_list:
         genome_file=genome["genome"]
@@ -321,7 +320,8 @@ def run_diffexp(genome_list, condition_dict, parameters, output_dir, gene_matrix
         with open(contrasts_file,'w') as contrasts_handle:
             contrasts_handle.write("condition_A\tcondition_B\n")
             for c in contrasts:
-                contrasts_handle.write(str(c[0])+"\t"+str(c[1])+"\n")
+                #contrasts_handle.write(str(c[0])+"\t"+str(c[1])+"\n")
+                contrasts_handle.write(str(c[1])+"\t"+str(c[0])+"\n")
         diff_cmd+=["--contrast-file",contrasts_file,"-o",cur_dir]
 
         #create quant files and add to diff command
@@ -349,16 +349,17 @@ def run_diffexp(genome_list, condition_dict, parameters, output_dir, gene_matrix
             subprocess.check_call(diff_cmd)
         else:
             sys.stderr.write(cds_tracking+" cuffdiff file already exists. skipping\n")
+        #write gene_gmx file now for cuffdiff pipeline
+        de_file=os.path.join(cur_dir,"gene_exp.diff")
+        gmx_file=os.path.join(cur_dir,"gene_exp.gmx")
+        if os.path.exists(de_file) and not os.path.exists(gmx_file):
+            cuffdiff_to_genematrix.main([de_file],gmx_file)
 
 #Runs the differential expression import protocol 
 def runDiffExpImport(genome_list, condition_dict, parameters, output_dir, contrasts, job_data, map_args, diffexp_json):
     for genome in genome_list:
         cur_dir = genome["output"]
-        is_host=genome.get("host",False)
-        de_file=os.path.join(cur_dir,"gene_exp.diff")
         gmx_file=os.path.join(cur_dir,"gene_exp.gmx")
-        if os.path.exists(de_file) and not os.path.exists(gmx_file):
-            cuffdiff_to_genematrix.main([de_file],gmx_file)
         transform_script = "expression_transform.py"
         if os.path.exists(gmx_file):
             experiment_path=os.path.join(output_dir, map_args.d)
@@ -372,8 +373,6 @@ def runDiffExpImport(genome_list, condition_dict, parameters, output_dir, contra
             with open(params_file, 'w') as params_handle:
                 params_handle.write(json.dumps(transform_params))
             convert_cmd=[transform_script, "--ufile", params_file, "--sstring", map_args.sstring, "--output_path",experiment_path,"--xfile",gmx_file]
-            #if is_host:
-            #    convert_cmd.append("--host")   
             print " ".join(convert_cmd)
             try:
                subprocess.check_call(convert_cmd)
@@ -392,7 +391,7 @@ def runDiffExpImport(genome_list, condition_dict, parameters, output_dir, contra
 def runHtseqCount(genome_list, condition_dict, parameters, job_data, output_dir):
     strand = job_data.get("htseq",{}).get("-s","no")
     feature = job_data.get("htseq",{}).get("-i","ID")
-    feature_type = job_data.get("htseq",{}).get("-t","exon")
+    feature_type = job_data.get("htseq",{}).get("-t","gene")
     for genome in genome_list:
         genome_file = genome["genome"]
         genome_annotation = genome["annotation"]
@@ -560,7 +559,8 @@ def run_deseq2(genome_list,contrasts,job_data):
         for pair in contrasts:
             pair = [x.replace(",","_") for x in pair]
             pair = "_vs_".join(pair) 
-            diffexp_file = genome_prefix + "_" + pair + ".txt"
+            #diffexp_file = genome_prefix + "_" + pair + ".txt"
+            diffexp_file = pair + ".txt"
             genome["diff_exp_contrasts"].append(os.path.join(genome["output"],diffexp_file))
          
 #Writes the gene_exp.gmx file used in expression_transform.py from DESeq2 output
@@ -585,6 +585,7 @@ def writeGMXFile(genome_list):
         with open("gene_exp.gmx","w") as o:
             o.write("Gene_ID\t%s\n"%"\t".join(contrast_list))
             for gene in gene_set:
+                o.write(gene)
                 for contrast in contrast_list:
                     if gene in gene_count_dict[contrast]:
                         o.write("\t%s"%gene_count_dict[contrast][gene])
@@ -645,12 +646,23 @@ def main(genome_list, condition_dict, parameters_str, output_dir, gene_matrix=Fa
         parameters = {}
     setup(genome_list, condition_dict, parameters, output_dir, job_data)
 
+    #TRUE: runs cufflinks then cuffdiff if differential expression is turned on
+    #FALSE: runs either htseq-count or stringtie
+    #run_cuffdiff_pipeline = True
+    run_cuffdiff_pipeline = False
+
     run_alignment(genome_list, condition_dict, parameters, output_dir, job_data)
-    run_featurecount(genome_list, condition_dict, parameters, output_dir, job_data)
-    #run_stringtie(genome_list, condition_dict, parameters, output_dir)
-    #run_cufflinks(genome_list, condition_dict, parameters, output_dir)
+    if run_cuffdiff_pipeline:
+        run_cufflinks(genome_list, condition_dict, parameters, output_dir)
+    else:
+        run_featurecount(genome_list, condition_dict, parameters, output_dir, job_data)
     #cannot run DESeq2 with novel features turned on
     if len(condition_dict.keys()) > 1 and not job_data.get("novel_features",False):
+        #If running cuffdiff pipeline, terminated after running expression import
+        if run_cuffdiff_pipeline:
+            run_cuffdiff(genome_list, condition_dict, parameters, output_dir, gene_matrix, contrasts, job_data, map_args, diffexp_json)
+            runDiffExpImport(genome_list, condition_dict, parameters, output_dir, contrasts, job_data, map_args, diffexp_json)
+            sys.exit(0)
         #Create deseq2 metadata file. Ordering the matrix correctly will be done in R script 
         createDESeqMetadata(genome_list,condition_dict,output_dir)
         #run prepDE.py to create counts files if using stringtie
@@ -662,7 +674,6 @@ def main(genome_list, condition_dict, parameters_str, output_dir, gene_matrix=Fa
         run_deseq2(genome_list,contrasts,job_data)
         writeGMXFile(genome_list)
         runDiffExpImport(genome_list, condition_dict, parameters, output_dir, contrasts, job_data, map_args, diffexp_json)
-        #run_diffexp(genome_list, condition_dict, parameters, output_dir, gene_matrix, contrasts, job_data, map_args, diffexp_json)
 
 if __name__ == "__main__":
     #modelling input parameters after rockhopper
