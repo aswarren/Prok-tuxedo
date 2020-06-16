@@ -11,28 +11,30 @@ if (numContrasts < 1) {
     stop("Not enough parameters: RunDESeq2.R <counts_file.txt> <metadata_file.txt> <output_prefix> <contrast 1> ... <contrast n>")
 }
 
-#Differential expression library
-library(DESeq2)
-#For file_ext function
-library(tools)
-
 counts.file = args[1]
 metadata.file = args[2]
 out_prefix = args[3]
 
 #Check file extensions
-if (file_ext(counts.file) == "txt") {
+if (grepl("gene_counts",counts.file)) {
     count_sep = "\t"
+} else if (grepl("transcript_counts",counts.file)) {
+    count_sep = "," 
+} else { 
+    print("Error in RunDESeq2.R: unsupported file extension")
+    print(counts.file)
+    stop() 
 }
-if (file_ext(counts.file) == "csv") { 
-    count_sep = ","
-}
-if (file_ext(metadata.file) == "txt") {
+if (grepl("txt",metadata.file)) {
     meta_sep = "\t"
 }
-if (file_ext(metadata.file) == "csv") { 
+if (grepl("csv",metadata.file)) { 
     meta_sep = ","
 }
+
+#Differential expression library
+library(DESeq2,quietly=TRUE)
+
 #Load counts table and metadata table and replace invalid characters
 count.mtx <- read.table(counts.file,sep=count_sep,header=T,row.names=1,stringsAsFactors=FALSE)
 rownames(count.mtx) = gsub("-","___",rownames(count.mtx))
@@ -42,7 +44,7 @@ metadata$Condition = gsub("-","___",metadata$Condition)
 rownames(metadata) = gsub("-","___",rownames(metadata))
 
 #Reorder columns of counts table to match row order of metadata 
-#Note: May be able to omit this line
+#TODO: May be able to omit this line
 count.mtx = count.mtx[,rownames(metadata)]
 
 #iterate over contrasts
@@ -66,6 +68,6 @@ for (i in 4:length(args))
     colnames(res) = gsub("___","-",colnames(res))
     #write to output file
     #results_file = paste(out_prefix,"_",curr_contrast[1],"_vs_",curr_contrast[2],".txt",sep="")     
-    results_file = paste(curr_contrast[1],"_vs_",curr_contrast[2],".txt",sep="")     
+    results_file = paste(curr_contrast[1],"_vs_",curr_contrast[2],".deseq2",sep="")     
     write.table(res,file=results_file,sep="\t",quote=FALSE)
 } 

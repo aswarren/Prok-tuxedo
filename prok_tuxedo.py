@@ -46,6 +46,8 @@ def run_alignment(genome_list, condition_dict, parameters, output_dir, job_data)
     #modifies condition_dict sub replicates to include 'bowtie' dict recording output files
     for genome in genome_list:
         genome_link = genome["genome_link"]
+        #TODO: REMOBVE
+        genome["annotation"] = "/scratch/cc8dm/Genomes/208964.12/208964.12.gff"
         final_cleanup=[]
         if "hisat_index" in genome and genome["hisat_index"]:
             if genome["hisat_index"].endswith("ht2.tar"):
@@ -151,6 +153,7 @@ def run_stringtie(genome_list, condition_dict, parameters, job_data, output_dir)
     for genome in genome_list:
         genome_file=genome["genome"]
         genome_link = genome["genome_link"]
+        #genome["annotation"] = "/scratch/cc8dm/Genomes/208964.12/208964.12.gff" 
         #transcriptome assembly
         gtf_list = []
         for library in condition_dict:
@@ -172,6 +175,12 @@ def run_stringtie(genome_list, condition_dict, parameters, job_data, output_dir)
                 else:
                     print (" ".join(stringtie_cmd))
                     sys.stderr.write(cuff_gtf+" stringtie file already exists. skipping\n")
+        #True: Skip merged annotation pipeline
+        #False: Run merged annotation pipeline
+        #TODO: set as based on a run condition
+        skip_merged_annotation = True
+        if skip_merged_annotation:
+            return
         #merge reconstructed transcriptomes
         ##stringtie --merge -G <reference annotation> -o <merged annotation> <gtf list>
         os.chdir(genome["output"])
@@ -448,21 +457,22 @@ def createCountsTable(genome_list,condition_dict):
                             counts_dict[replicate_id][feature] = count
         #output counts table
         genome_id = os.path.basename(genome_dir)
-        genome_counts_mtx = genome_id + "_gene_count_matrix.txt"
+        #Delimeter: , (csv files)
+        genome_counts_mtx = genome_id+".gene_counts"
         with open(genome_counts_mtx,"w") as gcm:
             #write headers
             gcm.write("Feature")
             for replicate_id in replicate_list:
-                gcm.write("\t%s"%replicate_id)
+                gcm.write(",%s"%replicate_id)
             gcm.write("\n")
             #write feature info 
             for feature in feature_set:
                 gcm.write(feature)
                 for replicate_id in replicate_list:
                     if feature in counts_dict[replicate_id]:
-                        gcm.write("\t%s"%counts_dict[replicate_id][feature])
+                        gcm.write(",%s"%counts_dict[replicate_id][feature])
                     else:
-                        gcm.write("\t0")
+                        gcm.write(",0")
                 gcm.write("\n")
         genome["counts_matrix"] = os.path.join(genome["output"],genome_counts_mtx)
 
@@ -504,7 +514,13 @@ def writeGTFList(genome_list,condition_dict):
         for condition in condition_dict:
             for replicate in condition_dict[condition]["replicates"]:
                 replicate_id = os.path.basename(replicate[genome_file]["bam"]).replace(".bam","")
-                rep_gtf_file = replicate[genome_file]["merged_gtf"]
+                #TODO: set as based on a run condition
+                #Set to false if the stringtie --merge command was run
+                skip_merged_annotation = True
+                if skip_merged_annotation:
+                    rep_gtf_file = replicate[genome_file]["gtf"]
+                else:
+                    rep_gtf_file = replicate[genome_file]["merged_gtf"]
                 rep_gtf_list.append((replicate_id,rep_gtf_file))
         gtf_path_filename = genome_dir+"_GTF_Sample_Paths.txt"                 
         with open(gtf_path_filename,"w") as gpf:
@@ -519,11 +535,12 @@ def prepStringtieDiffexp(genome_list,condition_dict):
         genome_dir = genome["output"]
         genome_id = os.path.basename(genome_dir)
         os.chdir(genome_dir)
-        genome_counts_mtx = genome_id+"_gene_count_matrix.csv" 
+        genome_counts_mtx = genome_id+".gene_counts" 
+        transcript_counts_mtx = genome_id+".transcript_counts"
         genome["counts_matrix"] = os.path.join(genome["output"],genome_counts_mtx)
-        genome["transcript_matrix"] = os.path.join(genome["output"],"transcript_count_matrix.csv")
+        genome["transcript_matrix"] = os.path.join(genome["output"],transcript_counts_mtx)
         if not os.path.exists(genome_counts_mtx):
-            prep_cmd = ["prepDE.py","-i",genome["prepDE_input"],"-g",genome_counts_mtx]
+            prep_cmd = ["prepDE.py","-i",genome["prepDE_input"],"-g",genome_counts_mtx,"-t",transcript_counts_mtx]
             print(" ".join(prep_cmd))
             subprocess.check_call(prep_cmd)
 
@@ -650,7 +667,6 @@ def main(genome_list, condition_dict, parameters_str, output_dir, gene_matrix=Fa
     #FALSE: runs either htseq-count or stringtie
     #run_cuffdiff_pipeline = True
     run_cuffdiff_pipeline = False
-
     run_alignment(genome_list, condition_dict, parameters, output_dir, job_data)
     if run_cuffdiff_pipeline:
         run_cufflinks(genome_list, condition_dict, parameters, output_dir)
@@ -775,8 +791,7 @@ if __name__ == "__main__":
                 sys.exit(2)
             else:
                 cur_genome["hisat_index"]=cur_genome["hisat_index"][0]
-
-
+        
         genome_list.append(cur_genome)
 
     #job template for differential expression object
