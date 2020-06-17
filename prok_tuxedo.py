@@ -577,7 +577,7 @@ def run_deseq2(genome_list,contrasts,job_data):
             pair = [x.replace(",","_") for x in pair]
             pair = "_vs_".join(pair) 
             #diffexp_file = genome_prefix + "_" + pair + ".txt"
-            diffexp_file = pair + ".txt"
+            diffexp_file = pair + ".deseq2"
             genome["diff_exp_contrasts"].append(os.path.join(genome["output"],diffexp_file))
          
 #Writes the gene_exp.gmx file used in expression_transform.py from DESeq2 output
@@ -651,7 +651,7 @@ def main(genome_list, condition_dict, parameters_str, output_dir, gene_matrix=Fa
     #arguments:
     #list of genomes [{"genome":somefile,"annotation":somefile}]
     #dictionary of library dictionaries structured as {libraryname:{library:libraryname, replicates:[{read1:read1file, read2:read2file}]}}
-    #parametrs_file is json parameters list keyed as bowtie, cufflinks, cuffdiff.
+    #parametrs_str is json parameters list keyed as bowtie, cufflinks, cuffdiff.
     output_dir=os.path.abspath(output_dir)
     subprocess.call(["mkdir","-p",output_dir])
     
@@ -731,6 +731,10 @@ if __name__ == "__main__":
     #create library dict
     with open(map_args.jfile, 'r') as job_handle:
         job_data = json.load(job_handle)
+
+    import pdb
+    pdb.set_trace()
+
     condition_list= job_data.get("experimental_conditions",[])
     got_conditions=False
     if not len(condition_list):
