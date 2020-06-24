@@ -48,3 +48,6 @@ Summary: The main update is the replacement of the current differential expressi
 - TODO:
     - parallelize htseq-count
     - review RockHopper for snRNA and other RNA quantification support
+    - record changes for App-RNASeq.pl and RNASeq.json
+    - develop a "Report" for the RNA-Seq pipeline
+    - include volcano plots in the RNA-Seq report: see R package "EnhancedVolcano"
