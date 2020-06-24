@@ -46,8 +46,6 @@ def run_alignment(genome_list, condition_dict, parameters, output_dir, job_data)
     #modifies condition_dict sub replicates to include 'bowtie' dict recording output files
     for genome in genome_list:
         genome_link = genome["genome_link"]
-        #TODO: REMOBVE
-        genome["annotation"] = "/scratch/cc8dm/Genomes/208964.12/208964.12.gff"
         final_cleanup=[]
         if "hisat_index" in genome and genome["hisat_index"]:
             if genome["hisat_index"].endswith("ht2.tar"):
@@ -146,14 +144,12 @@ def run_featurecount(genome_list, condition_dict, parameters, output_dir, job_da
 def run_stringtie(genome_list, condition_dict, parameters, job_data, output_dir):
     thread_count= parameters.get("stringtie",{}).get("-p",0)
     #defaults to not searching for novel features, adds -e flag
-    #TODO:check assumption
     find_novel_features = job_data.get("novel_features",False) 
     if thread_count == 0:
         thread_count=2 #multiprocessing.cpu_count()
     for genome in genome_list:
         genome_file=genome["genome"]
         genome_link = genome["genome_link"]
-        #genome["annotation"] = "/scratch/cc8dm/Genomes/208964.12/208964.12.gff" 
         #transcriptome assembly
         gtf_list = []
         for library in condition_dict:
@@ -396,7 +392,7 @@ def runDiffExpImport(genome_list, condition_dict, parameters, output_dir, contra
 #TODO: remove counts files after table
 # -s: (yes,no,reverse) 
 # -i: feature to look for in annotation file (final column)
-# -t: featur type to be used, all others ignored. default = exon
+# -t: feature type to be used (3rd column), all others ignored. default = gene
 def runHtseqCount(genome_list, condition_dict, parameters, job_data, output_dir):
     strand = job_data.get("htseq",{}).get("-s","no")
     feature = job_data.get("htseq",{}).get("-i","ID")
@@ -458,21 +454,22 @@ def createCountsTable(genome_list,condition_dict):
         #output counts table
         genome_id = os.path.basename(genome_dir)
         #Delimeter: , (csv files)
+        delim = "\t"
         genome_counts_mtx = genome_id+".gene_counts"
         with open(genome_counts_mtx,"w") as gcm:
             #write headers
             gcm.write("Feature")
             for replicate_id in replicate_list:
-                gcm.write(",%s"%replicate_id)
+                gcm.write("%s%s"%(delim,replicate_id))
             gcm.write("\n")
             #write feature info 
             for feature in feature_set:
                 gcm.write(feature)
                 for replicate_id in replicate_list:
                     if feature in counts_dict[replicate_id]:
-                        gcm.write(",%s"%counts_dict[replicate_id][feature])
+                        gcm.write("%s%s"%(delim,counts_dict[replicate_id][feature]))
                     else:
-                        gcm.write(",0")
+                        gcm.write("%s0"%delim)
                 gcm.write("\n")
         genome["counts_matrix"] = os.path.join(genome["output"],genome_counts_mtx)
 
@@ -731,9 +728,6 @@ if __name__ == "__main__":
     #create library dict
     with open(map_args.jfile, 'r') as job_handle:
         job_data = json.load(job_handle)
-
-    import pdb
-    pdb.set_trace()
 
     condition_list= job_data.get("experimental_conditions",[])
     got_conditions=False

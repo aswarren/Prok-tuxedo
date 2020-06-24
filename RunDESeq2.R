@@ -8,7 +8,7 @@ args = commandArgs(trailingOnly=TRUE)
 numContrasts = length(args) - 3
 
 if (numContrasts < 1) {
-    stop("Not enough parameters: RunDESeq2.R <counts_file.txt> <metadata_file.txt> <output_prefix> <contrast 1> ... <contrast n>")
+    stop("Not enough parameters: RunDESeq2.R <counts_file> <metadata_file> <output_prefix> <contrast 1> ... <contrast n>")
 }
 
 counts.file = args[1]
@@ -56,7 +56,7 @@ for (i in 4:length(args))
     curr_contrast = gsub("-","_",curr_contrast)
     curr.metadata = subset(metadata,(subset=Condition==curr_contrast[1])|(subset=Condition==curr_contrast[2]))
     curr.count.mtx = count.mtx[,rownames(curr.metadata)] 
-    #Remove all zero rows and add pseudocount to genes
+    #Remove all zero rows and add pseudocount to genes: Will not work for some samples otherwise
     curr.count.mtx = curr.count.mtx[rowSums(curr.count.mtx) != 0,]
     curr.count.mtx = curr.count.mtx + 1
     #Run standard DESeq2 pipeline
