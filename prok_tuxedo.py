@@ -8,6 +8,7 @@ import cuffdiff_to_genematrix
 import glob
 import tarfile, json
 import shutil
+import math
 
 #take genome data structure and condition_dict and make directory names. processses condition to ensure no special characters, or whitespace
 def make_directory_names(genome, condition_dict):
@@ -389,6 +390,55 @@ def runDiffExpImport(genome_list, condition_dict, parameters, output_dir, contra
             with open(diffexp_obj_file, 'w') as diffexp_job:
                 diffexp_job.write(json.dumps(diffexp_json))
 
+def run_htseq_parallel(genome_annotation,replicate_bam,counts_file,strand,feature,feature_type,threads):
+    #count number of reads in bam file
+    count_cmd = subprocess.Popen(["samtools","view","-c","--threads",threads,replicate_bam],stdout=subprocess.PIPE)
+    num_lines,err = count_cmd.communicate()
+    num_lines = float(num_lines.strip())
+
+    #number of lines per file
+    num_lines_per_file = int(math.floor(num_lines/float(threads)))
+
+    #Get header from bam file: htseq won't work without the header
+    header_cmd = ["samtools","view","-H",replicate_bam]
+    header_output = subprocess.Popen(header_cmd,stdout=subprocess.PIPE)
+    header,err = header_output.communicate()
+
+    #separate bam file into multiple bam files
+    view_cmd = ["samtools","view","--threads",threads,replicate_bam]
+    split_cmd = ["split","-l",str(num_lines_per_file)]
+    os.mkdir("Split_Bams")
+    bam_var = subprocess.Popen(view_cmd,stdout=subprocess.PIPE)
+    os.chdir("Split_Bams")
+    subprocess.check_call(split_cmd,stdin=bam_var.stdout)
+
+    #run htseq-count
+    htseq_cmd = ["htseq-count","-t",feature_type,"-f","sam","-s",strand,"-i",feature,"-n",threads]
+    for sam in glob.glob("*"): #iterate through all split files and format
+        new_sam = sam+".sam"
+        with open(new_sam,"w") as ns:
+            ns.write(header)
+            with open(sam,"r") as s:
+                for line in s:
+                    ns.write(line)
+        htseq_cmd.append(new_sam)
+        os.remove(sam)
+    htseq_cmd.append(genome_annotation)
+    print(" ".join(htseq_cmd))
+    with open("Output.txt","w") as o:
+        subprocess.check_call(htseq_cmd,stdout=o)
+
+    os.chdir("..")
+    #Combine output into counts file and delete Split_Bams directory
+    with open("Split_Bams/Output.txt","r") as split_counts:
+        with open(counts_file,"w") as cf:
+            for line in split_counts:
+                line = line.strip().split()
+                gene = line[0]
+                counts = [int(x) for x in line[1:]]
+                cf.write("%s\t%s\n"%(gene,sum(counts))) 
+    shutil.rmtree("Split_Bams") 
+
 # -s: (yes,no,reverse) 
 # -i: feature to look for in annotation file (final column)
 # -t: feature type to be used (3rd column), all others ignored. default = gene
@@ -413,12 +463,15 @@ def runHtseqCount(genome_list, condition_dict, parameters, job_data, output_dir)
                 if os.path.exists(counts_file):
                     sys.stderr.write("%s exists for genome file %s: skipping htseq-count\n"%(counts_file,genome_file))
                     continue
-                print("running htseq-count and writing to %s"%counts_file)
-                htseq_cmd = ["htseq-count","-t",feature_type,"-f","bam","-s",strand,"-i",feature,replicate[genome_file]["bam"],genome_annotation]
-                print(" ".join(htseq_cmd))
-                #prints to stdout, so redirect output to file
-                with open(counts_file,"w") as cf:
-                    subprocess.check_call(htseq_cmd,stdout=cf)
+                if int(threads) > 1:
+                    run_htseq_parallel(genome_annotation,replicate[genome_file]["bam"],counts_file,strand,feature,feature_type,threads)
+                else:
+                    print("running htseq-count and writing to %s"%counts_file)
+                    htseq_cmd = ["htseq-count","-t",feature_type,"-f","bam","-s",strand,"-i",feature,replicate[genome_file]["bam"],genome_annotation]
+                    print(" ".join(htseq_cmd))
+                    #prints to stdout, so redirect output to file
+                    with open(counts_file,"w") as cf:
+                        subprocess.check_call(htseq_cmd,stdout=cf)
  
 #Merges the counts file generated for each replicate from htseq-count for each genome. Outputs file to genome directory
 #Names file according to genome identifier
