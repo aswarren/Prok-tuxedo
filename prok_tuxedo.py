@@ -389,7 +389,6 @@ def runDiffExpImport(genome_list, condition_dict, parameters, output_dir, contra
             with open(diffexp_obj_file, 'w') as diffexp_job:
                 diffexp_job.write(json.dumps(diffexp_json))
 
-#TODO: remove counts files after table
 # -s: (yes,no,reverse) 
 # -i: feature to look for in annotation file (final column)
 # -t: feature type to be used (3rd column), all others ignored. default = gene
@@ -397,6 +396,7 @@ def runHtseqCount(genome_list, condition_dict, parameters, job_data, output_dir)
     strand = job_data.get("htseq",{}).get("-s","no")
     feature = job_data.get("htseq",{}).get("-i","ID")
     feature_type = job_data.get("htseq",{}).get("-t","gene")
+    threads = parameters.get("htseq",{}).get("-n","1")
     for genome in genome_list:
         genome_file = genome["genome"]
         genome_annotation = genome["annotation"]
@@ -542,7 +542,7 @@ def prepStringtieDiffexp(genome_list,condition_dict):
             subprocess.check_call(prep_cmd)
 
 #Gets the lists of contrasts and runs DESeq2
-#Runs once for each genome
+#Runs DESeq2 once for each genome
 def run_deseq2(genome_list,contrasts,job_data):
     #Get list of contrasts to pass into deseq2 R script
     contrast_cmd = []
@@ -564,8 +564,10 @@ def run_deseq2(genome_list,contrasts,job_data):
         metadata_file = genome["deseq_metadata"] 
         if not os.path.exists(counts_file):
             print("%s: file doesn't exist"%counts_file)
+            continue
         if not os.path.exists(metadata_file):
             print("%s: file doesn't exist"%metadata_file)
+            continue
         diffexp_cmd = ["RunDESeq2.R",counts_file,metadata_file,genome_prefix]+contrast_cmd
         print("%s\n"%" ".join(diffexp_cmd))
         subprocess.check_call(diffexp_cmd)

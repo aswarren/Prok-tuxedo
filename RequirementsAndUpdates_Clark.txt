@@ -9,7 +9,7 @@ Summary: The main update is the replacement of the current differential expressi
     - Notes: Takes the bam file from the alignment step as input as well as the organism annotation file. Outputs an annotation file for the particular sample as well as a gene abundance file. In the annotation file, the feature type (3rd column) must be "CDS" or "exon", does not accept "gene" as a valid identifier. For compatability with DESeq2, the prepDE.py script is used to transform the inidividual sample annotation files into a single count matrix file.  
 
 - Htseq-count
-    - version: 0.11.2 
+    - version: 0.12.4 
     - Notes: Takes the bam file from the alignment step as input as well as the organism annotation file. Outputs a count matrix based on the feature specified in the input. Currently, this program is a time sink as it can only run with one thread in the current implementation. Parallelizing it is on the todo list.
 
 - R
