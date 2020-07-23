@@ -55,18 +55,16 @@ def run_alignment(genome_list, condition_dict, parameters, output_dir, job_data)
                 final_cleanup+=indices
                 #archive.extractall(path=output_dir)
                 archive.close()
-            #Check if hisat2 index files exist by checking for first file, genome.1.ht2. Otherwise, untar indeces
-            #Assuming index_prefix is same name as genome, and that the files aren't in another directory (./*ht2) 
-            if not os.path.exists(os.path.join(genome["dir"],os.path.basename(genome["output"])+".1.ht2")): 
+                #Assuming that the files aren't in another directory (./*ht2) 
                 subprocess.check_call(["tar","-xvf", genome["hisat_index"], "-C", output_dir])
                 index_prefix = os.path.join(output_dir, os.path.basename(genome["hisat_index"]).replace(".ht2.tar","")) 
             else:
-                for index in glob.glob(os.path.join(genome["dir"],os.path.basename(genome["output"])+".*.ht2")): #for each hisat index file in the genome directory
+                for index in glob.glob(os.path.join(genome["dir"],"*.ht2")): #for each hisat index file in the genome directory
                     copy_index = os.path.join(genome["output"],os.path.basename(index))
                     if not os.path.exists(copy_index): #if it doesn't exist in the genome output directory
                         shutil.copy(index,os.path.join(genome["output"],os.path.basename(index))) #copy it over
                     final_cleanup+=[copy_index]
-                index_prefix = os.path.join(genome["output"],os.path.basename(genome["output"]))
+                index_prefix = os.path.join(genome["output"],".".join(os.path.basename(genome["hisat_index"]).split(".")[:-2]))
             cmd=["hisat2","--dta-cufflinks", "-x", index_prefix] 
             #cmd=["hisat2","--dta-cufflinks", "-x", index_prefix,"--no-spliced-alignment"] 
             thread_count= parameters.get("hisat2",{}).get("-p",0)
@@ -109,7 +107,8 @@ def run_alignment(genome_list, condition_dict, parameters, output_dir, job_data)
                 r[genome["genome"]]["bam"]=bam_file
                 cur_cmd+=["-S",sam_file]
                 print " ".join(fastqc_cmd)
-                subprocess.check_call(fastqc_cmd)
+                #TODO: uncomment
+                #subprocess.check_call(fastqc_cmd)
                 if os.path.exists(bam_file):
                     sys.stderr.write(bam_file+" alignments file already exists. skipping\n")
                 else:
@@ -122,7 +121,8 @@ def run_alignment(genome_list, condition_dict, parameters, output_dir, job_data)
                     #subprocess.check_call('samtools view -S -b %s > %s' % (sam_file, bam_file+".tmp"), shell=True)
                     #subprocess.check_call('samtools sort %s %s' % (bam_file+".tmp", bam_file), shell=True)
                 print " ".join(samstat_cmd)
-                subprocess.check_call(samstat_cmd)
+                #TODO: uncomment
+                #subprocess.check_call(samstat_cmd)
 
                 for garbage in cur_cleanup:
                     subprocess.call(["rm", garbage])
@@ -392,7 +392,7 @@ def runDiffExpImport(genome_list, condition_dict, parameters, output_dir, contra
 
 def run_htseq_parallel(genome_annotation,replicate_bam,counts_file,strand,feature,feature_type,threads):
     #count number of reads in bam file
-    count_cmd = subprocess.Popen(["samtools","view","-c","--threads",threads,replicate_bam],stdout=subprocess.PIPE)
+    count_cmd = subprocess.Popen(["samtools","view","-c","--threads",str(threads),replicate_bam],stdout=subprocess.PIPE)
     num_lines,err = count_cmd.communicate()
     num_lines = float(num_lines.strip())
 
@@ -405,7 +405,7 @@ def run_htseq_parallel(genome_annotation,replicate_bam,counts_file,strand,featur
     header,err = header_output.communicate()
 
     #separate bam file into multiple bam files
-    view_cmd = ["samtools","view","--threads",threads,replicate_bam]
+    view_cmd = ["samtools","view","--threads",str(threads),replicate_bam]
     split_cmd = ["split","-l",str(num_lines_per_file)]
     os.mkdir("Split_Bams")
     bam_var = subprocess.Popen(view_cmd,stdout=subprocess.PIPE)
@@ -413,7 +413,7 @@ def run_htseq_parallel(genome_annotation,replicate_bam,counts_file,strand,featur
     subprocess.check_call(split_cmd,stdin=bam_var.stdout)
 
     #run htseq-count
-    htseq_cmd = ["htseq-count","-t",feature_type,"-f","sam","-s",strand,"-i",feature,"-n",threads]
+    htseq_cmd = ["htseq-count","-t",feature_type,"-f","sam","-s",strand,"-i",feature,"-n",str(threads)]
     for sam in glob.glob("*"): #iterate through all split files and format
         new_sam = sam+".sam"
         with open(new_sam,"w") as ns:
@@ -443,10 +443,13 @@ def run_htseq_parallel(genome_annotation,replicate_bam,counts_file,strand,featur
 # -i: feature to look for in annotation file (final column)
 # -t: feature type to be used (3rd column), all others ignored. default = gene
 def runHtseqCount(genome_list, condition_dict, parameters, job_data, output_dir):
+    #TODO: check for host recipe and adjust parameters
     strand = job_data.get("htseq",{}).get("-s","no")
     feature = job_data.get("htseq",{}).get("-i","ID")
     feature_type = job_data.get("htseq",{}).get("-t","gene")
-    threads = parameters.get("htseq",{}).get("-n","1")
+    #recipe to check for host
+    recipe = job_data.get("recipe","RNA-Rocket")
+    threads = parameters.get("htseq",{}).get("-p","1")
     for genome in genome_list:
         genome_file = genome["genome"]
         genome_annotation = genome["annotation"]
@@ -457,6 +460,7 @@ def runHtseqCount(genome_list, condition_dict, parameters, job_data, output_dir)
                 replicate[genome_file]["dir"] = cur_dir
                 counts_file = os.path.basename(replicate[genome_file]["bam"]).replace(".bam",".counts")
                 counts_file_path = os.path.join(cur_dir,counts_file) 
+                #TODO: If host, run htseq twice, once for genes once for transcripts
                 #Add counts file to replicate entry
                 replicate[genome_file]["counts"] = counts_file_path
                 #htseq-count prints to stdout, so redirect stdout to a count file
@@ -724,7 +728,7 @@ def main(genome_list, condition_dict, parameters_str, output_dir, gene_matrix=Fa
         run_cufflinks(genome_list, condition_dict, parameters, output_dir)
     else:
         run_featurecount(genome_list, condition_dict, parameters, output_dir, job_data)
-    #cannot run DESeq2 with novel features turned on
+    #TODO: change novel_features condition when isoform differential expression is implemented
     if len(condition_dict.keys()) > 1 and not job_data.get("novel_features",False):
         #If running cuffdiff pipeline, terminated after running expression import
         if run_cuffdiff_pipeline:
@@ -823,7 +827,7 @@ if __name__ == "__main__":
             elif f.endswith(".gff"):
                 cur_genome["annotation"].append(os.path.abspath(os.path.join(g,f)))
             #Change to check for ht2 files instead of just the tar file
-            elif f.endswith(".ht2.tar") and "hisat_index" not in cur_genome: 
+            elif f.endswith(".ht2.tar") and len(cur_genome["hisat_index"]) == 0: 
                 cur_genome["hisat_index"].append(os.path.abspath(os.path.join(g,f)))
             elif f.endswith(".1.ht2"):
                 cur_genome["hisat_index"].append(os.path.abspath(os.path.join(g,f)))
@@ -844,7 +848,6 @@ if __name__ == "__main__":
                 sys.exit(2)
             else:
                 cur_genome["hisat_index"]=cur_genome["hisat_index"][0]
-        
         genome_list.append(cur_genome)
 
     #job template for differential expression object
