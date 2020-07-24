@@ -338,16 +338,18 @@ def setup(genome_list, condition_dict, parameters, output_dir, job_data):
                 if "srr_accession" in r:
                     srr_id = r["srr_accession"] 
                     meta_file = os.path.join(target_dir,srr_id+"_meta.txt")
-                    subprocess.check_call(["p3-sra","--gzip","--out",target_dir,"--metadata-file", meta_file, "--id",srr_id])
+                    subprocess.check_call(["p3-sra","--out",target_dir,"--metadata-file", meta_file, "--id",srr_id])
                     with open(meta_file) as f:
                         job_meta = json.load(f)
                         files = job_meta[0].get("files",[])
                         for i,f in enumerate(files):
-                            if f.endswith("_2.fastq.gz"):
+                            if f.endswith("_2.fastq"):
                                 r["read2"]=os.path.join(target_dir, f)
-                            if f.endswith("_1.fastq.gz"):
+                            elif f.endswith("_1.fastq"):
                                 r["read1"]=os.path.join(target_dir, f)
-                            if f.endswith("fastqc.html"):
+                            elif f.endswith(".fastq"):
+                                r["read1"]=os.path.join(target_dir, f)
+                            elif f.endswith("fastqc.html"):
                                 r["fastqc"].append(os.path.join(target_dir, f))
                     
 
