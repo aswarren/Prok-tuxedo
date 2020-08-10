@@ -134,7 +134,7 @@ def run_featurecount(genome_list, condition_dict, parameters, output_dir, job_da
     #check parameters for stringtie option. Assuming htseq2
     program = job_data.get("feature_count","htseq")
     if program == "htseq":
-        runHtseqCount(genome_list, condition_dict, parameters, job_data, output_dir)
+        run_htseq_count(genome_list, condition_dict, parameters, job_data, output_dir)
     elif program == "stringtie":
         run_stringtie(genome_list, condition_dict, parameters, job_data, output_dir)
     else: #not a valid program
@@ -163,7 +163,7 @@ def run_stringtie(genome_list, condition_dict, parameters, job_data, output_dir)
                 #check if novel features is turned off: add -e flag
                 if not find_novel_features:
                     stringtie_cmd = stringtie_cmd + ["-e"]
-                stringtie_cmd = stringtie_cmd + ["-G",genome["annotation"],"-o",cuff_gtf]
+                stringtie_cmd = stringtie_cmd + ["-u","-G",genome["annotation"],"-o",cuff_gtf]
                 r[genome_file]["gtf"] = cuff_gtf
                 gtf_list.append(cuff_gtf)
                 if not os.path.exists(cuff_gtf):
@@ -390,64 +390,79 @@ def runDiffExpImport(genome_list, condition_dict, parameters, output_dir, contra
             with open(diffexp_obj_file, 'w') as diffexp_job:
                 diffexp_job.write(json.dumps(diffexp_json))
 
-def run_htseq_parallel(genome_annotation,replicate_bam,counts_file,strand,feature,feature_type,threads):
+def split_bam_file(replicate_bam,threads):
+    #print("Splitting %s into %s files for parallel htseq-count"%(replicate_bam,str(threads)))
     #count number of reads in bam file
-    count_cmd = subprocess.Popen(["samtools","view","-c","--threads",str(threads),replicate_bam],stdout=subprocess.PIPE)
+    count_cmd_list = ["samtools","view","-c","--threads",str(threads),replicate_bam]
+    print(" ".join(count_cmd_list))
+    count_cmd = subprocess.Popen(count_cmd_list,stdout=subprocess.PIPE)
     num_lines,err = count_cmd.communicate()
     num_lines = float(num_lines.strip())
-
     #number of lines per file
     num_lines_per_file = int(math.floor(num_lines/float(threads)))
-
     #Get header from bam file: htseq won't work without the header
     header_cmd = ["samtools","view","-H",replicate_bam]
+    print(" ".join(header_cmd))
     header_output = subprocess.Popen(header_cmd,stdout=subprocess.PIPE)
     header,err = header_output.communicate()
-
     #separate bam file into multiple bam files
     view_cmd = ["samtools","view","--threads",str(threads),replicate_bam]
     split_cmd = ["split","-l",str(num_lines_per_file)]
-    os.mkdir("Split_Bams")
+    if os.path.exists("Split_Bams"):
+        #if directory wasn't deleted for some reason, remove before running
+        shutil.rmtree("Split_Bams") 
+    print(" ".join(view_cmd))
     bam_var = subprocess.Popen(view_cmd,stdout=subprocess.PIPE)
+    os.mkdir("Split_Bams")
     os.chdir("Split_Bams")
+    print(" ".join(split_cmd))
     subprocess.check_call(split_cmd,stdin=bam_var.stdout)
-
-    #run htseq-count
-    htseq_cmd = ["htseq-count","-t",feature_type,"-f","sam","-s",strand,"-i",feature,"-n",str(threads)]
+    sys.stdout.flush()
     for sam in glob.glob("*"): #iterate through all split files and format
         new_sam = sam+".sam"
         with open(new_sam,"w") as ns:
             ns.write(header)
-            with open(sam,"r") as s:
-                for line in s:
-                    ns.write(line)
-        htseq_cmd.append(new_sam)
+            sam_file = open(sam,"r")
+            sam_lines = sam_file.readlines()
+            ns.write("".join(sam_lines))
+            sam_file.close()
         os.remove(sam)
+    os.chdir("..")
+
+def run_htseq_parallel(genome_annotation,replicate_bam,counts_file,strand,feature,feature_type,threads):
+    #run htseq-count
+    htseq_cmd = ["htseq-count","-t",feature_type,"-m","intersection-nonempty","--nonunique=all","-f","sam","-s",strand,"-i",feature,"-n",str(threads)]
+    for sam in glob.glob("Split_Bams/*"): #iterate through all split files and format
+        htseq_cmd.append(sam)
     htseq_cmd.append(genome_annotation)
     print(" ".join(htseq_cmd))
+    #htseq_stdout = subprocess.Popen(htseq_cmd,stdout=subprocess.PIPE,shell=True)
+    htseq_stdout = subprocess.Popen(htseq_cmd,stdout=subprocess.PIPE)
+    print("running htseq-parallel: communicate()")
+    htseq_output,htseq_err = htseq_stdout.communicate()
+    sys.stdout.flush()
+    print("finished communicate(), writing to Output.txt")
     with open("Output.txt","w") as o:
-        subprocess.check_call(htseq_cmd,stdout=o)
-
-    os.chdir("..")
+        o.write(htseq_output)
+    #    subprocess.check_call(htseq_cmd,stdout=o)
     #Combine output into counts file and delete Split_Bams directory
-    with open("Split_Bams/Output.txt","r") as split_counts:
+    with open("Output.txt","r") as split_counts:
         with open(counts_file,"w") as cf:
             for line in split_counts:
                 line = line.strip().split()
                 gene = line[0]
                 counts = [int(x) for x in line[1:]]
                 cf.write("%s\t%s\n"%(gene,sum(counts))) 
-    shutil.rmtree("Split_Bams") 
+    os.remove("Output.txt")
 
 # -s: (yes,no,reverse) 
 # -i: feature to look for in annotation file (final column)
 # -t: feature type to be used (3rd column), all others ignored. default = gene
-def runHtseqCount(genome_list, condition_dict, parameters, job_data, output_dir):
-    #TODO: check for host recipe and adjust parameters
+def run_htseq_count(genome_list, condition_dict, parameters, job_data, output_dir):
     strand = job_data.get("htseq",{}).get("-s","no")
     feature = job_data.get("htseq",{}).get("-i","ID")
     feature_type = job_data.get("htseq",{}).get("-t","gene")
-    #recipe to check for host
+    #recipe to check for host and change parameters
     recipe = job_data.get("recipe","RNA-Rocket")
     threads = parameters.get("htseq",{}).get("-p","1")
     for genome in genome_list:
@@ -460,30 +475,152 @@ def runHtseqCount(genome_list, condition_dict, parameters, job_data, output_dir)
                 replicate[genome_file]["dir"] = cur_dir
                 counts_file = os.path.basename(replicate[genome_file]["bam"]).replace(".bam",".counts")
                 counts_file_path = os.path.join(cur_dir,counts_file) 
-                #TODO: If host, run htseq twice, once for genes once for transcripts
                 #Add counts file to replicate entry
-                replicate[genome_file]["counts"] = counts_file_path
-                #htseq-count prints to stdout, so redirect stdout to a count file
-                if os.path.exists(counts_file):
-                    sys.stderr.write("%s exists for genome file %s: skipping htseq-count\n"%(counts_file,genome_file))
-                    continue
-                if int(threads) > 1:
-                    run_htseq_parallel(genome_annotation,replicate[genome_file]["bam"],counts_file,strand,feature,feature_type,threads)
+                if recipe == "Host":
+                    replicate[genome_file]["gene_counts"] = counts_file_path.replace(".counts",".gene.counts") 
+                    replicate[genome_file]["transcript_counts"] = counts_file_path.replace(".counts",".transcript.counts") 
                 else:
+                    replicate[genome_file]["counts"] = counts_file_path
+                if int(threads) > 1:
+                    if recipe == "Host":
+                        #Split the bam file
+                        if not os.path.exists(replicate[genome_file]["gene_counts"]) or not os.path.exists(replicate[genome_file]["transcript_counts"]):
+                            split_bam_file(replicate[genome_file]["bam"],threads)
+                        if os.path.exists(replicate[genome_file]["gene_counts"]):
+                            sys.stderr.write("%s exists for genome file %s: skipping htseq-count for genes\n"%(replicate[genome_file]["gene_counts"],genome_file))
+                        else:
+                            #Run gene_count matrix parameters
+                            #Create two counts files and append them together
+                            genes_file = os.path.basename(replicate[genome_file]["gene_counts"])
+                            genes_file_1 = genes_file+".1" 
+                            run_htseq_parallel(genome_annotation,replicate[genome_file]["bam"],genes_file,strand,"ID","gene",threads)
+                            run_htseq_parallel(genome_annotation,replicate[genome_file]["bam"],genes_file_1,strand,"ID","pseudogene",threads)
+                            cf_open = open(counts_file,"a")
+                            cf1_open = open(genes_file_1,"r")
+                            cf1_lines = cf1_open.readlines()
+                            cf1_open.close()
+                            cf_open.write("".join(cf1_lines))
+                            cf_open.close()
+                            os.remove(genes_file_1)
+                        if os.path.exists(replicate[genome_file]["transcript_counts"]):
+                            sys.stderr.write("%s exists for genome file %s: skipping htseq-count for transcripts\n"%(replicate[genome_file]["transcript_counts"],genome_file))
+                        else:
+                            #Run transcript_count matrix parameters
+                            #First run one feature, then iterate through and append results to output transcripts file 
+                            transcript_file = os.path.basename(replicate[genome_file]["transcript_counts"])
+                            run_htseq_parallel(genome_annotation,replicate[genome_file]["bam"],transcript_file,strand,"ID","mRNA",threads)
+                            #feature_list = ["mRNA","pseudogene","lnc_RNA","transcript","snRNA","V_gene_segment"]
+                            feature_list = ["mRNA","pseudogene","lnc_RNA","transcript","snRNA","V_gene_segment","snoRNA","enhancer","biological_region","primary_transcript","miRNA","C_gene_segment","rRNA","tRNA"]
+                            for f in feature_list:
+                                transcript_file_tmp = transcript_file+".tmp" 
+                                run_htseq_parallel(genome_annotation,replicate[genome_file]["bam"],transcript_file_tmp,strand,"ID",f,threads)
+                                tf_open = open(transcript_file,"a")
+                                tf1_open = open(transcript_file_tmp,"r") 
+                                tf1_lines = tf1_open.readlines()
+                                tf1_open.close()
+                                tf_open.write("".join(tf1_lines))
+                                tf_open.close()
+                                os.remove(transcript_file_tmp)
+                    else: #bacterial pipeline
+                        if os.path.exists(counts_file):
+                            sys.stderr.write("%s exists for genome file %s: skipping htseq-count\n"%(counts_file,genome_file))
+                        else:
+                            run_htseq_parallel(genome_annotation,replicate[genome_file]["bam"],counts_file,strand,feature,feature_type,threads)
+                    if os.path.exists("Split_Bams"):
+                        shutil.rmtree("Split_Bams")
+                else:
+                    #TODO: add support for host pipeline 
+                    if recipe == "Host":
+                        print("Host htseq pipeline not enabled for 1 thread, will take too long")
+                        sys.exit(1)
                     print("running htseq-count and writing to %s"%counts_file)
+                    #TODO: update this command
                     htseq_cmd = ["htseq-count","-t",feature_type,"-f","bam","-s",strand,"-i",feature,replicate[genome_file]["bam"],genome_annotation]
                     print(" ".join(htseq_cmd))
                     #prints to stdout, so redirect output to file
                     with open(counts_file,"w") as cf:
                         subprocess.check_call(htseq_cmd,stdout=cf)
  
+def create_counts_table_host(genome_list,condition_dict,job_data):
+    #Remove the last 5 lines from htseq-count output
+    omit_list = ["__no_feature","__ambiguous","__too_low_aQual","__not_aligned","__alignment_not_unique"]
+    for genome in genome_list:
+        genome_file = genome["genome"]
+        genome_annotation = genome["annotation"]
+        genome_dir = genome["output"]
+        #change to genome directory
+        os.chdir(genome_dir)
+        gene_set = set()
+        transcript_set = set()
+        replicate_list = []
+        gc_dict = {}
+        tc_dict = {}
+        for condition in condition_dict:
+            for replicate in condition_dict[condition]["replicates"]:
+                gc_file = replicate[genome["genome"]]["gene_counts"]
+                tc_file = replicate[genome["genome"]]["transcript_counts"]
+                replicate_id = os.path.basename(gc_file).replace(".gene.counts","")
+                replicate_list.append(replicate_id)
+                gc_dict[replicate_id] = {}
+                tc_dict[replicate_id] = {}
+                with open(gc_file,"r") as gf:
+                    for line in gf:
+                        feature,count = line.strip().split("\t")
+                        if feature not in omit_list:
+                            gene_set.add(feature)
+                            gc_dict[replicate_id][feature] = count
+                with open(tc_file,"r") as tf:
+                    for line in tf:
+                        feature,count = line.strip().split("\t")
+                        if feature not in omit_list:
+                            transcript_set.add(feature)
+                            tc_dict[replicate_id][feature] = count
+        #output counts table
+        genome_id = os.path.basename(genome_dir)
+        #Delimeter: , (csv files)
+        delim = "\t"
+        gene_counts_mtx = genome_id+".gene_counts"
+        transcript_counts_mtx = genome_id+".transcript_counts"
+        with open(gene_counts_mtx,"w") as gcm:
+            #write headers
+            gcm.write("Feature")
+            for replicate_id in replicate_list:
+                gcm.write("%s%s"%(delim,replicate_id))
+            gcm.write("\n")
+            #write gene info 
+            for gene in gene_set:
+                gcm.write(gene)
+                for replicate_id in replicate_list:
+                    if gene in gc_dict[replicate_id]:
+                        gcm.write("%s%s"%(delim,gc_dict[replicate_id][gene]))
+                    else:
+                        gcm.write("%s0"%delim)
+                gcm.write("\n")
+        genome["gene_matrix"] = os.path.join(genome["output"],gene_counts_mtx)
+        with open(transcript_counts_mtx,"w") as tcm:
+            #write headers
+            tcm.write("Feature")
+            for replicate_id in replicate_list:
+                tcm.write("%s%s"%(delim,replicate_id))
+            tcm.write("\n")
+            for transcript in transcript_set:
+                tcm.write(transcript)
+                for replicate_id in replicate_list:
+                    if transcript in tc_dict[replicate_id]:
+                        tcm.write("%s%s"%(delim,tc_dict[replicate_id][transcript]))
+                    else:
+                        tcm.write("%s0"%delim)
+                tcm.write("\n")
+        genome["transcript_matrix"] = os.path.join(genome["output"],transcript_counts_mtx)
+
 #Merges the counts file generated for each replicate from htseq-count for each genome. Outputs file to genome directory
 #Names file according to genome identifier
 #Parameters:
 # - genome: The current genome dictionary object from genome_list
 # - condition_dict: complete condition dictionary object
-def createCountsTable(genome_list,condition_dict):
+def create_counts_table(genome_list,condition_dict,job_data):
     #Remove the last 5 lines from htseq-count output
+    #TODO: HERE: Need to write transcript counts matrix, not doing that currently
     omit_list = ["__no_feature","__ambiguous","__too_low_aQual","__not_aligned","__alignment_not_unique"]
     for genome in genome_list:
         genome_file = genome["genome"]
@@ -503,7 +640,7 @@ def createCountsTable(genome_list,condition_dict):
                 counts_dict[replicate_id] = {}
                 with open(counts_file,"r") as cf:
                     for line in cf:
-                        feature,count = line.rstrip().split("\t")
+                        feature,count = line.strip().split("\t")
                         #skip the last five lines in counts file
                         if feature not in omit_list:
                             feature_set.add(feature)
@@ -528,7 +665,7 @@ def createCountsTable(genome_list,condition_dict):
                     else:
                         gcm.write("%s0"%delim)
                 gcm.write("\n")
-        genome["counts_matrix"] = os.path.join(genome["output"],genome_counts_mtx)
+        genome["gene_matrix"] = os.path.join(genome["output"],genome_counts_mtx)
 
 #Put a metadata file in each genome directory
 #Subsetting the data on current conditions can be done in R
@@ -591,7 +728,7 @@ def prepStringtieDiffexp(genome_list,condition_dict):
         os.chdir(genome_dir)
         genome_counts_mtx = genome_id+".gene_counts" 
         transcript_counts_mtx = genome_id+".transcript_counts"
-        genome["counts_matrix"] = os.path.join(genome["output"],genome_counts_mtx)
+        genome["gene_matrix"] = os.path.join(genome["output"],genome_counts_mtx)
         genome["transcript_matrix"] = os.path.join(genome["output"],transcript_counts_mtx)
         if not os.path.exists(genome_counts_mtx):
             prep_cmd = ["prepDE.py","-i",genome["prepDE_input"],"-g",genome_counts_mtx,"-t",transcript_counts_mtx]
@@ -614,27 +751,36 @@ def run_deseq2(genome_list,contrasts,job_data):
     for genome in genome_list:
         os.chdir(genome["output"])
         genome_prefix = os.path.basename(genome["output"])
-        if job_data.get("feature_count","htseq") == "stringtie":
-            counts_file = genome["transcript_matrix"]
-        else: #htseq
-            counts_file = genome["counts_matrix"]  
+        #TODO: modify to run both gene and transcripts counts matrices
+        gene_counts_file = genome["gene_matrix"]
+        transcript_counts_file = genome["transcript_matrix"]  
         metadata_file = genome["deseq_metadata"] 
-        if not os.path.exists(counts_file):
-            print("%s: file doesn't exist"%counts_file)
+        if not os.path.exists(gene_counts_file):
+            print("%s: file doesn't exist"%gene_counts_file)
+            continue
+        if not os.path.exists(transcript_counts_file):
+            print("%s: file doesn't exist"%transcript_counts_file)
             continue
         if not os.path.exists(metadata_file):
             print("%s: file doesn't exist"%metadata_file)
             continue
-        diffexp_cmd = ["RunDESeq2.R",counts_file,metadata_file,genome_prefix]+contrast_cmd
-        print("%s\n"%" ".join(diffexp_cmd))
-        subprocess.check_call(diffexp_cmd)
+        #diffexp_cmd_gene = ["RunDESeq2.R",gene_counts_file,metadata_file,genome_prefix+".genes"]+contrast_cmd
+        #diffexp_cmd_transcript = ["RunDESeq2.R",transcript_counts_file,metadata_file,genome_prefix+".transcripts"]+contrast_cmd
+        diffexp_cmd_gene = ["RunDESeq2.R",gene_counts_file,metadata_file,"genes"]+contrast_cmd
+        diffexp_cmd_transcript = ["RunDESeq2.R",transcript_counts_file,metadata_file,"transcripts"]+contrast_cmd
+        print("%s\n"%" ".join(diffexp_cmd_gene))
+        subprocess.check_call(diffexp_cmd_gene)
+        print("%s\n"%" ".join(diffexp_cmd_transcript))
+        subprocess.check_call(diffexp_cmd_transcript)
         genome["diff_exp_contrasts"] = []
         for pair in contrasts:
             pair = [x.replace(",","_") for x in pair]
             pair = "_vs_".join(pair) 
             #diffexp_file = genome_prefix + "_" + pair + ".txt"
-            diffexp_file = pair + ".deseq2"
-            genome["diff_exp_contrasts"].append(os.path.join(genome["output"],diffexp_file))
+            diffexp_gene = pair + ".genes.deseq2"
+            diffexp_transcript = pair + ".transcripts.deseq2"
+            genome["diff_exp_contrasts"].append(os.path.join(genome["output"],diffexp_gene))
+            genome["diff_exp_contrasts"].append(os.path.join(genome["output"],diffexp_transcript))
          
 #Writes the gene_exp.gmx file used in expression_transform.py from DESeq2 output
 def writeGMXFile(genome_list):
@@ -742,10 +888,15 @@ def main(genome_list, condition_dict, parameters_str, output_dir, gene_matrix=Fa
             writeGTFList(genome_list,condition_dict) #function that writes the input for prepDE.py, which is a list of samples and paths to their gtf files. Do this for each genome
             prepStringtieDiffexp(genome_list,condition_dict)   
         else:
-            createCountsTable(genome_list,condition_dict)
+            if job_data.get("recipe","RNA-Rocket") == "Host":
+                create_counts_table_host(genome_list,condition_dict,job_data)
+            else:
+                create_counts_table(genome_list,condition_dict,job_data)
         run_deseq2(genome_list,contrasts,job_data)
         writeGMXFile(genome_list)
-        runDiffExpImport(genome_list, condition_dict, parameters, output_dir, contrasts, job_data, map_args, diffexp_json)
+        #differential expression import will fail for host
+        if not job_data.get("recipe","RNA-Rocket") == "Host":
+            runDiffExpImport(genome_list, condition_dict, parameters, output_dir, contrasts, job_data, map_args, diffexp_json)
 
 if __name__ == "__main__":
     #modelling input parameters after rockhopper

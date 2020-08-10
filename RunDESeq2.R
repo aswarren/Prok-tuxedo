@@ -25,6 +25,10 @@ if (grepl("gene_counts",counts.file)) {
     print(counts.file)
     stop() 
 }
+###TODO Remove
+#Probably have to go and edit the prepDE.py script to use tsv instead of csv
+count_sep = ","
+###
 if (grepl("txt",metadata.file)) {
     meta_sep = "\t"
 }
@@ -32,8 +36,8 @@ if (grepl("csv",metadata.file)) {
     meta_sep = ","
 }
 
-#Differential expression library
-library(DESeq2,quietly=TRUE)
+#Differential expression library, load quietly so it doesn't completely fill the log output
+suppressMessages(library(DESeq2,quietly=TRUE))
 
 #Load counts table and metadata table and replace invalid characters
 count.mtx <- read.table(counts.file,sep=count_sep,header=T,row.names=1,stringsAsFactors=FALSE)
@@ -68,6 +72,6 @@ for (i in 4:length(args))
     colnames(res) = gsub("___","-",colnames(res))
     #write to output file
     #results_file = paste(out_prefix,"_",curr_contrast[1],"_vs_",curr_contrast[2],".txt",sep="")     
-    results_file = paste(curr_contrast[1],"_vs_",curr_contrast[2],".deseq2",sep="")     
+    results_file = paste(curr_contrast[1],"_vs_",curr_contrast[2],".",out_prefix,".deseq2",sep="")     
     write.table(res,file=results_file,sep="\t",quote=FALSE)
 } 
