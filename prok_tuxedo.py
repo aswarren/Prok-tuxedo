@@ -163,7 +163,7 @@ def run_stringtie(genome_list, condition_dict, parameters, job_data, output_dir)
                 #check if novel features is turned off: add -e flag
                 if not find_novel_features:
                     stringtie_cmd = stringtie_cmd + ["-e"]
-                stringtie_cmd = stringtie_cmd + ["-u","-G",genome["annotation"],"-o",cuff_gtf]
+                stringtie_cmd = stringtie_cmd + ["-G",genome["annotation"],"-o",cuff_gtf]
                 r[genome_file]["gtf"] = cuff_gtf
                 gtf_list.append(cuff_gtf)
                 if not os.path.exists(cuff_gtf):
@@ -362,7 +362,7 @@ def run_cuffdiff(genome_list, condition_dict, parameters, output_dir, gene_matri
             cuffdiff_to_genematrix.main([de_file],gmx_file)
 
 #Runs the differential expression import protocol 
-def runDiffExpImport(genome_list, condition_dict, parameters, output_dir, contrasts, job_data, map_args, diffexp_json):
+def run_diff_exp_import(genome_list, condition_dict, parameters, output_dir, contrasts, job_data, map_args, diffexp_json):
     for genome in genome_list:
         cur_dir = genome["output"]
         gmx_file=os.path.join(cur_dir,"gene_exp.gmx")
@@ -417,7 +417,7 @@ def split_bam_file(replicate_bam,threads):
     os.chdir("Split_Bams")
     print(" ".join(split_cmd))
     subprocess.check_call(split_cmd,stdin=bam_var.stdout)
-    sys.stdout.flush()
+    sys.stdout.flush() #Get warnings if buffer isn't flushed for some reason, buffer overflow? seems unlikely
     for sam in glob.glob("*"): #iterate through all split files and format
         new_sam = sam+".sam"
         with open(new_sam,"w") as ns:
@@ -508,7 +508,7 @@ def run_htseq_count(genome_list, condition_dict, parameters, job_data, output_di
                             #Run transcript_count matrix parameters
                             #First run one feature, then iterate through and append results to output transcripts file 
                             transcript_file = os.path.basename(replicate[genome_file]["transcript_counts"])
-                            run_htseq_parallel(genome_annotation,replicate[genome_file]["bam"],transcript_file,strand,"ID","mRNA",threads)
+                            #run_htseq_parallel(genome_annotation,replicate[genome_file]["bam"],transcript_file,strand,"ID","mRNA",threads)
                             #feature_list = ["mRNA","pseudogene","lnc_RNA","transcript","snRNA","V_gene_segment"]
                             feature_list = ["mRNA","pseudogene","lnc_RNA","transcript","snRNA","V_gene_segment","snoRNA","enhancer","biological_region","primary_transcript","miRNA","C_gene_segment","rRNA","tRNA"]
                             for f in feature_list:
@@ -522,6 +522,7 @@ def run_htseq_count(genome_list, condition_dict, parameters, job_data, output_di
                                 tf_open.close()
                                 os.remove(transcript_file_tmp)
                     else: #bacterial pipeline
+                        split_bam_file(replicate[genome_file]["bam"],threads)
                         if os.path.exists(counts_file):
                             sys.stderr.write("%s exists for genome file %s: skipping htseq-count\n"%(counts_file,genome_file))
                         else:
@@ -548,6 +549,7 @@ def create_counts_table_host(genome_list,condition_dict,job_data):
         genome_file = genome["genome"]
         genome_annotation = genome["annotation"]
         genome_dir = genome["output"]
+        feature_count = job_data.get("feature_count","htseq")
         #change to genome directory
         os.chdir(genome_dir)
         gene_set = set()
@@ -579,8 +581,8 @@ def create_counts_table_host(genome_list,condition_dict,job_data):
         genome_id = os.path.basename(genome_dir)
         #Delimeter: , (csv files)
         delim = "\t"
-        gene_counts_mtx = genome_id+".gene_counts"
-        transcript_counts_mtx = genome_id+".transcript_counts"
+        gene_counts_mtx = genome_id+"."+feature_count+".gene_counts"
+        transcript_counts_mtx = genome_id+"."+feature_count+".transcript_counts"
         with open(gene_counts_mtx,"w") as gcm:
             #write headers
             gcm.write("Feature")
@@ -620,12 +622,13 @@ def create_counts_table_host(genome_list,condition_dict,job_data):
 # - condition_dict: complete condition dictionary object
 def create_counts_table(genome_list,condition_dict,job_data):
     #Remove the last 5 lines from htseq-count output
-    #TODO: HERE: Need to write transcript counts matrix, not doing that currently
     omit_list = ["__no_feature","__ambiguous","__too_low_aQual","__not_aligned","__alignment_not_unique"]
     for genome in genome_list:
         genome_file = genome["genome"]
         genome_annotation = genome["annotation"]
         genome_dir = genome["output"]
+        feature_count = job_data.get("feature_count","htseq")
+        #change to genome directory
         #change to genome directory
         os.chdir(genome_dir)
         feature_set = set()
@@ -649,7 +652,7 @@ def create_counts_table(genome_list,condition_dict,job_data):
         genome_id = os.path.basename(genome_dir)
         #Delimeter: , (csv files)
         delim = "\t"
-        genome_counts_mtx = genome_id+".gene_counts"
+        genome_counts_mtx = genome_id+"."+feature_count+".gene_counts"
         with open(genome_counts_mtx,"w") as gcm:
             #write headers
             gcm.write("Feature")
@@ -669,7 +672,7 @@ def create_counts_table(genome_list,condition_dict,job_data):
 
 #Put a metadata file in each genome directory
 #Subsetting the data on current conditions can be done in R
-def createDESeqMetadata(genome_list,condition_dict,output_dir):
+def create_deseq_metadata(genome_list,condition_dict,output_dir):
     #From genome list, get any genome key to get a replicate identifier  
     genome_key = genome_list[0]["genome"]
     #stores conditions as keys and replicate list as value
@@ -694,7 +697,7 @@ def createDESeqMetadata(genome_list,condition_dict,output_dir):
 
 #Writes the input file for prepDE.py, a prerequisite for running the Stringtie -> DESEq2 pipeline
 #Contents: <Sample> <Path/To/GTF>
-def writeGTFList(genome_list,condition_dict):
+def write_gtf_list(genome_list,condition_dict):
      for genome in genome_list:
         genome_file = genome["genome"]
         genome_annotation = genome["annotation"]
@@ -720,14 +723,14 @@ def writeGTFList(genome_list,condition_dict):
         genome["prepDE_input"] = gtf_path_filename
 
 #Calls the prepDE.py script that transforms stringtie output into a format usable by DESeq2
-def prepStringtieDiffexp(genome_list,condition_dict):
+def prep_stringtie_diffexp(genome_list,condition_dict):
     for genome in genome_list:
         genome_file = genome["genome"]
         genome_dir = genome["output"]
         genome_id = os.path.basename(genome_dir)
         os.chdir(genome_dir)
-        genome_counts_mtx = genome_id+".gene_counts" 
-        transcript_counts_mtx = genome_id+".transcript_counts"
+        genome_counts_mtx = genome_id+".stringtie.gene_counts" 
+        transcript_counts_mtx = genome_id+".stringtie.transcript_counts"
         genome["gene_matrix"] = os.path.join(genome["output"],genome_counts_mtx)
         genome["transcript_matrix"] = os.path.join(genome["output"],transcript_counts_mtx)
         if not os.path.exists(genome_counts_mtx):
@@ -747,43 +750,41 @@ def run_deseq2(genome_list,contrasts,job_data):
 
     #For each genome, run the deseq2 R script passing in the genome counts matrix, metadata file, and all contrasts
     #changes directory to the top genome directory for each genome
-    #invoking RunDESeq2.R: RunDESeq2.R <counts_file.txt> <metadata_file.txt> <output_prefix> <contrast_1> <contrast_2> ... <contrast_n>
+    #invoking RunDESeq2.R: RunDESeq2.R <counts_file.txt> <metadata_file.txt> <output_prefix> <feature_count> <contrast_1> <contrast_2> ... <contrast_n>
     for genome in genome_list:
         os.chdir(genome["output"])
         genome_prefix = os.path.basename(genome["output"])
-        #TODO: modify to run both gene and transcripts counts matrices
-        gene_counts_file = genome["gene_matrix"]
-        transcript_counts_file = genome["transcript_matrix"]  
+        diffexp_list = [] #list of files to run differential expression on 
+        diffexp_list.append((genome["gene_matrix"],"genes",job_data.get("feature_count","htseq")))
+        #transcript_matrix doesn't exist for bacterial pipeline
+        if "transcript_matrix" in genome:
+            diffexp_list.append((genome["transcript_matrix"],"transcripts",job_data.get("feature_count","htseq")))
         metadata_file = genome["deseq_metadata"] 
-        if not os.path.exists(gene_counts_file):
-            print("%s: file doesn't exist"%gene_counts_file)
+        if not os.path.exists(genome["gene_matrix"]):
+            print("%s: file doesn't exist"%genome["gene_matrix"])
             continue
-        if not os.path.exists(transcript_counts_file):
-            print("%s: file doesn't exist"%transcript_counts_file)
+        if "transcript_matrix" in genome and not os.path.exists(genome["transcript_matrix"]):
+            print("%s: file doesn't exist"%genome["transcript_matrix"])
             continue
         if not os.path.exists(metadata_file):
             print("%s: file doesn't exist"%metadata_file)
             continue
-        #diffexp_cmd_gene = ["RunDESeq2.R",gene_counts_file,metadata_file,genome_prefix+".genes"]+contrast_cmd
-        #diffexp_cmd_transcript = ["RunDESeq2.R",transcript_counts_file,metadata_file,genome_prefix+".transcripts"]+contrast_cmd
-        diffexp_cmd_gene = ["RunDESeq2.R",gene_counts_file,metadata_file,"genes"]+contrast_cmd
-        diffexp_cmd_transcript = ["RunDESeq2.R",transcript_counts_file,metadata_file,"transcripts"]+contrast_cmd
-        print("%s\n"%" ".join(diffexp_cmd_gene))
-        subprocess.check_call(diffexp_cmd_gene)
-        print("%s\n"%" ".join(diffexp_cmd_transcript))
-        subprocess.check_call(diffexp_cmd_transcript)
-        genome["diff_exp_contrasts"] = []
-        for pair in contrasts:
-            pair = [x.replace(",","_") for x in pair]
-            pair = "_vs_".join(pair) 
-            #diffexp_file = genome_prefix + "_" + pair + ".txt"
-            diffexp_gene = pair + ".genes.deseq2"
-            diffexp_transcript = pair + ".transcripts.deseq2"
-            genome["diff_exp_contrasts"].append(os.path.join(genome["output"],diffexp_gene))
-            genome["diff_exp_contrasts"].append(os.path.join(genome["output"],diffexp_transcript))
+        #diffexp_cmd_gene = ["RunDESeq2.R",genome["gene_matrix"],metadata_file,genome_prefix+".genes"]+contrast_cmd
+        #diffexp_cmd_transcript = ["RunDESeq2.R",genome["transcript_matrix"],metadata_file,genome_prefix+".transcripts"]+contrast_cmd
+        for diffexp_params in diffexp_list:
+            diffexp_cmd = ["RunDESeq2.R",diffexp_params[0],metadata_file,diffexp_params[1],diffexp_params[2]]+contrast_cmd
+            print("%s\n"%" ".join(diffexp_cmd))
+            subprocess.check_call(diffexp_cmd)
+            genome["diff_exp_contrasts"] = []
+            for pair in contrasts:
+                pair = [x.replace(",","_") for x in pair]
+                pair = "_vs_".join(pair) 
+                #diffexp_file = genome_prefix + "_" + pair + ".txt"
+                diffexp_output = pair+"."+diffexp_params[2]+"."+diffexp_params[1]+".deseq2"
+                genome["diff_exp_contrasts"].append(os.path.join(genome["output"],diffexp_output))
          
 #Writes the gene_exp.gmx file used in expression_transform.py from DESeq2 output
-def writeGMXFile(genome_list):
+def write_gmx_file(genome_list):
     gene_set = set()
     gene_count_dict = {}
     contrast_list = []
@@ -867,36 +868,35 @@ def main(genome_list, condition_dict, parameters_str, output_dir, gene_matrix=Fa
 
     #TRUE: runs cufflinks then cuffdiff if differential expression is turned on
     #FALSE: runs either htseq-count or stringtie
-    #run_cuffdiff_pipeline = True
-    run_cuffdiff_pipeline = False
+    run_cuffdiff_pipeline = job_data.get("feature_count","htseq") == "cuffdiff"
     run_alignment(genome_list, condition_dict, parameters, output_dir, job_data)
     if run_cuffdiff_pipeline:
         run_cufflinks(genome_list, condition_dict, parameters, output_dir)
     else:
         run_featurecount(genome_list, condition_dict, parameters, output_dir, job_data)
-    #TODO: change novel_features condition when isoform differential expression is implemented
+    #TODO: change novel_features condition when novel-isoform differential expression is implemented
     if len(condition_dict.keys()) > 1 and not job_data.get("novel_features",False):
         #If running cuffdiff pipeline, terminated after running expression import
         if run_cuffdiff_pipeline:
             run_cuffdiff(genome_list, condition_dict, parameters, output_dir, gene_matrix, contrasts, job_data, map_args, diffexp_json)
-            runDiffExpImport(genome_list, condition_dict, parameters, output_dir, contrasts, job_data, map_args, diffexp_json)
+            run_diff_exp_import(genome_list, condition_dict, parameters, output_dir, contrasts, job_data, map_args, diffexp_json)
             sys.exit(0)
         #Create deseq2 metadata file. Ordering the matrix correctly will be done in R script 
-        createDESeqMetadata(genome_list,condition_dict,output_dir)
+        create_deseq_metadata(genome_list,condition_dict,output_dir)
         #run prepDE.py to create counts files if using stringtie
         if job_data.get("feature_count","htseq") == "stringtie":
-            writeGTFList(genome_list,condition_dict) #function that writes the input for prepDE.py, which is a list of samples and paths to their gtf files. Do this for each genome
-            prepStringtieDiffexp(genome_list,condition_dict)   
-        else:
+            write_gtf_list(genome_list,condition_dict) #function that writes the input for prepDE.py, which is a list of samples and paths to their gtf files. Do this for each genome
+            prep_stringtie_diffexp(genome_list,condition_dict)   
+        else: #htseq
             if job_data.get("recipe","RNA-Rocket") == "Host":
                 create_counts_table_host(genome_list,condition_dict,job_data)
             else:
                 create_counts_table(genome_list,condition_dict,job_data)
         run_deseq2(genome_list,contrasts,job_data)
-        writeGMXFile(genome_list)
+        write_gmx_file(genome_list)
         #differential expression import will fail for host
         if not job_data.get("recipe","RNA-Rocket") == "Host":
-            runDiffExpImport(genome_list, condition_dict, parameters, output_dir, contrasts, job_data, map_args, diffexp_json)
+            run_diff_exp_import(genome_list, condition_dict, parameters, output_dir, contrasts, job_data, map_args, diffexp_json)
 
 if __name__ == "__main__":
     #modelling input parameters after rockhopper

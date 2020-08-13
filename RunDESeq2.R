@@ -8,27 +8,25 @@ args = commandArgs(trailingOnly=TRUE)
 numContrasts = length(args) - 3
 
 if (numContrasts < 1) {
-    stop("Not enough parameters: RunDESeq2.R <counts_file> <metadata_file> <output_prefix> <contrast 1> ... <contrast n>")
+    stop("Not enough parameters: RunDESeq2.R <counts_file> <metadata_file> <output_prefix> <feature_count> <contrast 1> ... <contrast n>")
 }
 
 counts.file = args[1]
 metadata.file = args[2]
 out_prefix = args[3]
+feature_count = args[4]
 
 #Check file extensions
-if (grepl("gene_counts",counts.file)) {
+if (grepl("htseq",feature_count)) {
     count_sep = "\t"
-} else if (grepl("transcript_counts",counts.file)) {
+} else if (grepl("stringtie",feature_count)) {
     count_sep = "," 
 } else { 
-    print("Error in RunDESeq2.R: unsupported file extension")
+    print("Error in RunDESeq2.R: can't determine counts file delimeter")
     print(counts.file)
     stop() 
 }
-###TODO Remove
-#Probably have to go and edit the prepDE.py script to use tsv instead of csv
-count_sep = ","
-###
+
 if (grepl("txt",metadata.file)) {
     meta_sep = "\t"
 }
@@ -53,7 +51,7 @@ count.mtx = count.mtx[,rownames(metadata)]
 
 #iterate over contrasts
 #index 4 in args is where the contrasts currently start
-for (i in 4:length(args)) 
+for (i in 5:length(args)) 
 {
     #Subset data on current contrast
     curr_contrast = unlist(strsplit(args[i],","))
@@ -72,6 +70,6 @@ for (i in 4:length(args))
     colnames(res) = gsub("___","-",colnames(res))
     #write to output file
     #results_file = paste(out_prefix,"_",curr_contrast[1],"_vs_",curr_contrast[2],".txt",sep="")     
-    results_file = paste(curr_contrast[1],"_vs_",curr_contrast[2],".",out_prefix,".deseq2",sep="")     
+    results_file = paste(curr_contrast[1],"_vs_",curr_contrast[2],".",feature_count,".",out_prefix,".deseq2",sep="")     
     write.table(res,file=results_file,sep="\t",quote=FALSE)
 } 
