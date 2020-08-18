@@ -20,7 +20,8 @@ def main(genome_list,condition_dict,job_data,report_file):
     #feature_count: htseq-count or stringtie, or cufflinks
     #recipe: Host or RNA-Rocket. Rockhopper depricated??
     #reference genome id
-    print("nothing implemented yet")
+
+
 
 if __name__ == "__main__":
 

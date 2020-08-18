@@ -42,7 +42,6 @@ def link_space(file_path):
 
 
 #pretty simple: its for prokaryotes in that parameters will be attuned to give best performance and no tophat
-#TODO: don't forget to uncomment skipped steps for testing
 def run_alignment(genome_list, condition_dict, parameters, output_dir, job_data): 
     #modifies condition_dict sub replicates to include 'bowtie' dict recording output files
     for genome in genome_list:
@@ -107,8 +106,7 @@ def run_alignment(genome_list, condition_dict, parameters, output_dir, job_data)
                 r[genome["genome"]]["bam"]=bam_file
                 cur_cmd+=["-S",sam_file]
                 print " ".join(fastqc_cmd)
-                #TODO: uncomment
-                #subprocess.check_call(fastqc_cmd)
+                subprocess.check_call(fastqc_cmd)
                 if os.path.exists(bam_file):
                     sys.stderr.write(bam_file+" alignments file already exists. skipping\n")
                 else:
@@ -121,8 +119,7 @@ def run_alignment(genome_list, condition_dict, parameters, output_dir, job_data)
                     #subprocess.check_call('samtools view -S -b %s > %s' % (sam_file, bam_file+".tmp"), shell=True)
                     #subprocess.check_call('samtools sort %s %s' % (bam_file+".tmp", bam_file), shell=True)
                 print " ".join(samstat_cmd)
-                #TODO: uncomment
-                #subprocess.check_call(samstat_cmd)
+                subprocess.check_call(samstat_cmd)
 
                 for garbage in cur_cleanup:
                     subprocess.call(["rm", garbage])
@@ -159,7 +156,7 @@ def run_stringtie(genome_list, condition_dict, parameters, job_data, output_dir)
                 os.chdir(cur_dir)
                 r[genome_file]["dir"]=cur_dir
                 cuff_gtf=os.path.join(cur_dir,"transcripts.gtf")
-                stringtie_cmd = ["stringtie",r[genome_file]["bam"],"-p",str(thread_count),"-A","gene_abund.tab"]
+                stringtie_cmd = ["stringtie",r[genome_file]["bam"],"-p",str(thread_count),"-A","gene_abund.tab","-M","1.0"]
                 #check if novel features is turned off: add -e flag
                 if not find_novel_features:
                     stringtie_cmd = stringtie_cmd + ["-e"]
