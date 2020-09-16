@@ -38,32 +38,40 @@ def link_space(file_path):
             subprocess.check_call(["ln","-s",file_path,result])
     return result
 
-
-
+#If the hisat_index is tared, untar it
+#If the files exist and are untared, copy to correct location
+#Return hisat index prefix that is passed into hisat command: -x <hisat_index_prefix>
+def setup_hisat_indices(genome,output_dir,final_cleanup,job_data):
+    if genome["hisat_index"].endswith("ht2.tar"):
+        genome_link = genome["genome_link"]
+        archive = tarfile.open(genome["hisat_index"])
+        indices = [os.path.join(output_dir,os.path.basename(x)) for x in archive.getnames()]
+        final_cleanup+=indices
+        archive.close()
+        subprocess.check_call(["tar","-xvf",genome["hisat_index"],"-C",output_dir])
+        if job_data.get("host_ftp",None):
+            index_prefix = os.path.join(output_dir,"/".join(genome["hisat_index"].split("/")[-2:]).replace("ht2.tar","")) 
+        else:
+            index_prefix = os.path.join(output_dir,os.path.basename(genome["hisat_index"]).replace(".ht2.tar",""))
+    else:
+        for index in glob.glob(os.path.join(genome["dir"],"*.ht2")): #for each hisat index file in the genome directory
+            copy_index = os.path.join(output_dir,os.path.basename(index))
+            if not os.path.exists(copy_index):#if it doesn't exist where the index files should be
+                shutil.copy(index,copy_index) #copy it over
+            final_cleanup+=[copy_index]
+            index_prefix = os.path.join(output_dir,".".join(os.path.basename(genome["hisat_index"]).split(".")[:-2]))
+    return index_prefix
 
 #pretty simple: its for prokaryotes in that parameters will be attuned to give best performance and no tophat
+#TODO: rewrite and separate bowtie2 and hisat2 runs into separate functions
+#TODO: check for which feature count so samtools sort can be adjusted as needed (-r name for htseq)
 def run_alignment(genome_list, condition_dict, parameters, output_dir, job_data): 
     #modifies condition_dict sub replicates to include 'bowtie' dict recording output files
     for genome in genome_list:
         genome_link = genome["genome_link"]
         final_cleanup=[]
         if "hisat_index" in genome and genome["hisat_index"]:
-            if genome["hisat_index"].endswith("ht2.tar"):
-                archive = tarfile.open(genome["hisat_index"])
-                indices= [os.path.join(output_dir,os.path.basename(x)) for x in archive.getnames()]
-                final_cleanup+=indices
-                #archive.extractall(path=output_dir)
-                archive.close()
-                #Assuming that the files aren't in another directory (./*ht2) 
-                subprocess.check_call(["tar","-xvf", genome["hisat_index"], "-C", output_dir])
-                index_prefix = os.path.join(output_dir, os.path.basename(genome["hisat_index"]).replace(".ht2.tar","")) 
-            else:
-                for index in glob.glob(os.path.join(genome["dir"],"*.ht2")): #for each hisat index file in the genome directory
-                    copy_index = os.path.join(genome["output"],os.path.basename(index))
-                    if not os.path.exists(copy_index): #if it doesn't exist in the genome output directory
-                        shutil.copy(index,os.path.join(genome["output"],os.path.basename(index))) #copy it over
-                    final_cleanup+=[copy_index]
-                index_prefix = os.path.join(genome["output"],".".join(os.path.basename(genome["hisat_index"]).split(".")[:-2]))
+            index_prefix = setup_hisat_indices(genome,output_dir,final_cleanup,job_data) 
             cmd=["hisat2","--dta-cufflinks", "-x", index_prefix] 
             #cmd=["hisat2","--dta-cufflinks", "-x", index_prefix,"--no-spliced-alignment"] 
             thread_count= parameters.get("hisat2",{}).get("-p",0)
@@ -104,22 +112,29 @@ def run_alignment(genome_list, condition_dict, parameters, output_dir, job_data)
                 samstat_cmd.append(bam_file)
                 r[genome["genome"]]={}
                 r[genome["genome"]]["bam"]=bam_file
+                r[genome["genome"]]["fastqc"] = bam_file.replace(".bam","_fastqc.html") 
                 cur_cmd+=["-S",sam_file]
                 print " ".join(fastqc_cmd)
-                subprocess.check_call(fastqc_cmd)
+                #TODO: uncomment
+                #subprocess.check_call(fastqc_cmd)
                 if os.path.exists(bam_file):
                     sys.stderr.write(bam_file+" alignments file already exists. skipping\n")
                 else:
                     print cur_cmd
-                    subprocess.check_call(cur_cmd) #call bowtie2 or hisat2
+                    #TODO: sent hisat/bowtie2 log output to file so multiqc can read it
+                    alignment_log = bam_file.replace("bam","bowtie") 
+                    with open(alignment_log,"w") as al:
+                        subprocess.check_call(cur_cmd,stdout=al,stderr=al) #call bowtie2 or hisat2
                 if not os.path.exists(bam_file):
                     sort_threads = parameters.get("samtools",{}).get("-@",1)
+                    #TODO: testing -n option in samtools sort, which is passed into htseq
                     subprocess.check_call("samtools view -Su "+sam_file+" | samtools sort -o - - -@ "+str(sort_threads)+" > "+bam_file, shell=True)#convert to bam
                     subprocess.check_call("samtools index "+bam_file, shell=True)
                     #subprocess.check_call('samtools view -S -b %s > %s' % (sam_file, bam_file+".tmp"), shell=True)
                     #subprocess.check_call('samtools sort %s %s' % (bam_file+".tmp", bam_file), shell=True)
                 print " ".join(samstat_cmd)
-                subprocess.check_call(samstat_cmd)
+                #TODO: uncomment
+                #subprocess.check_call(samstat_cmd)
 
                 for garbage in cur_cleanup:
                     subprocess.call(["rm", garbage])
@@ -381,7 +396,7 @@ def run_diff_exp_import(genome_list, condition_dict, parameters, output_dir, con
                subprocess.check_call(convert_cmd)
             except(subprocess.CalledProcessError):
                sys.stderr.write("Running differential expression import failed.\n")
-               subprocess.call(["rm","-rf",experiment_path])
+               #subprocess.call(["rm","-rf",experiment_path])
                return
             diffexp_obj_file=os.path.join(output_dir, os.path.basename(map_args.d.lstrip(".")))
             with open(diffexp_obj_file, 'w') as diffexp_job:
@@ -428,6 +443,7 @@ def split_bam_file(replicate_bam,threads):
 
 def run_htseq_parallel(genome_annotation,replicate_bam,counts_file,strand,feature,feature_type,threads):
     #run htseq-count
+    #TODO: have check to add "-r pos" to command in case of paired end reads
     htseq_cmd = ["htseq-count","-t",feature_type,"-m","intersection-nonempty","--nonunique=all","-f","sam","-s",strand,"-i",feature,"-n",str(threads)]
     for sam in glob.glob("Split_Bams/*"): #iterate through all split files and format
         htseq_cmd.append(sam)
@@ -519,10 +535,10 @@ def run_htseq_count(genome_list, condition_dict, parameters, job_data, output_di
                                 tf_open.close()
                                 os.remove(transcript_file_tmp)
                     else: #bacterial pipeline
-                        split_bam_file(replicate[genome_file]["bam"],threads)
-                        if os.path.exists(counts_file):
+                        if os.path.exists(counts_file_path):
                             sys.stderr.write("%s exists for genome file %s: skipping htseq-count\n"%(counts_file,genome_file))
                         else:
+                            split_bam_file(replicate[genome_file]["bam"],threads)
                             run_htseq_parallel(genome_annotation,replicate[genome_file]["bam"],counts_file,strand,feature,feature_type,threads)
                     if os.path.exists("Split_Bams"):
                         shutil.rmtree("Split_Bams")
@@ -731,7 +747,8 @@ def prep_stringtie_diffexp(genome_list,condition_dict):
         genome["gene_matrix"] = os.path.join(genome["output"],genome_counts_mtx)
         genome["transcript_matrix"] = os.path.join(genome["output"],transcript_counts_mtx)
         if not os.path.exists(genome_counts_mtx):
-            prep_cmd = ["prepDE.py","-i",genome["prepDE_input"],"-g",genome_counts_mtx,"-t",transcript_counts_mtx]
+            #TODO: add check for read length
+            prep_cmd = ["prepDE.py","-i",genome["prepDE_input"],"-l","101","-g",genome_counts_mtx,"-t",transcript_counts_mtx]
             print(" ".join(prep_cmd))
             subprocess.check_call(prep_cmd)
 
@@ -854,7 +871,6 @@ def main(genome_list, condition_dict, parameters_str, output_dir, gene_matrix=Fa
     #parametrs_str is json parameters list keyed as bowtie, cufflinks, cuffdiff.
     output_dir=os.path.abspath(output_dir)
     subprocess.call(["mkdir","-p",output_dir])
-    
     #TODO: Read objects(?) that know their read parameters:
     #TODO: fastq utils to replace certain functionality?
     if parameters_str != None :
@@ -892,8 +908,25 @@ def main(genome_list, condition_dict, parameters_str, output_dir, gene_matrix=Fa
         run_deseq2(genome_list,contrasts,job_data)
         write_gmx_file(genome_list)
         #differential expression import will fail for host
-        if not job_data.get("recipe","RNA-Rocket") == "Host":
-            run_diff_exp_import(genome_list, condition_dict, parameters, output_dir, contrasts, job_data, map_args, diffexp_json)
+        #if not job_data.get("recipe","RNA-Rocket") == "Host":
+        run_diff_exp_import(genome_list, condition_dict, parameters, output_dir, contrasts, job_data, map_args, diffexp_json)
+        ###TODO: Remove
+        #with open("Variable_Outputs.txt","w") as o:
+            #o.write("genome_list:\n")
+            #o.write(genome_list)
+            #o.write("\n\ncondition_dict:\n")
+            #o.write(condition_dict)
+            #o.write("\n\nparameters:\n")
+            #o.write(parameters)
+            #o.write("\n\ncontrasts:\n")
+            #o.write(contrasts)
+            #o.write("\n\njob_data:\n")
+            #o.write(job_data)
+            #o.write("\n\nmap_args:\n")
+            #o.write(map_args)
+            #o.write("\n\ndiffexp_json:\n")
+            #o.write(diffexp_json)
+        ###
 
 if __name__ == "__main__":
     #modelling input parameters after rockhopper

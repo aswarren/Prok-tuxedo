@@ -17,6 +17,18 @@ Summary: The main update is the replacement of the current differential expressi
     - packages:
         - DESeq2
         - Test: EnhancedVolcano for graphics??
+    - dependencies:
+        - mscorefonts (plots on a headless system in a singularity container may output boxes in place of text without this package)
+
+#Will be removing in favor of multiqc
+- create_rnaseq_report.py
+    - packages: beautifulsoup4, lxml (parser)
+
+- Multiqc
+    - bioinformatics report generator program 
+    - pdf compatibility requires:
+        - pandoc 
+        - xelatex
 
 - prok_tuxedo.py
     - version: TODO

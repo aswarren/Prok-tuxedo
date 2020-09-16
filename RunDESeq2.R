@@ -1,11 +1,11 @@
-#!/home/cc8dm/miniconda3/bin/Rscript
+#!/home/cc8dm/miniconda3/envs/patric_env/bin/Rscript
 
 #parameter format: 
 #Rscript RunDESeq2.R <counts_file.txt> <metadata_file.txt> <contrast 1> <contrast 2> ... <contrast n>
 #contrasts should be a csv pair and list all the contrasts to make in this dataset
 args = commandArgs(trailingOnly=TRUE)
 
-numContrasts = length(args) - 3
+numContrasts = length(args) - 4
 
 if (numContrasts < 1) {
     stop("Not enough parameters: RunDESeq2.R <counts_file> <metadata_file> <output_prefix> <feature_count> <contrast 1> ... <contrast n>")
@@ -36,6 +36,7 @@ if (grepl("csv",metadata.file)) {
 
 #Differential expression library, load quietly so it doesn't completely fill the log output
 suppressMessages(library(DESeq2,quietly=TRUE))
+#library(EnhancedVolcano,quietly=TRUE)
 
 #Load counts table and metadata table and replace invalid characters
 count.mtx <- read.table(counts.file,sep=count_sep,header=T,row.names=1,stringsAsFactors=FALSE)
@@ -68,8 +69,14 @@ for (i in 5:length(args))
     #If invalid characters were present, put them back
     rownames(res) = gsub("___","-",rownames(res))
     colnames(res) = gsub("___","-",colnames(res))
+    res = cbind(data.frame(Gene_Name=rownames(res)),res)
     #write to output file
     #results_file = paste(out_prefix,"_",curr_contrast[1],"_vs_",curr_contrast[2],".txt",sep="")     
     results_file = paste(curr_contrast[1],"_vs_",curr_contrast[2],".",feature_count,".",out_prefix,".deseq2",sep="")     
-    write.table(res,file=results_file,sep="\t",quote=FALSE)
+    write.table(res,file=results_file,sep="\t",quote=FALSE,row.names=FALSE)
+    #Create volcano plot
+    #ev_image_name = paste(curr_contrast[1],"_vs_",curr_contrast[2],".",feature_count,".",out_prefix,".ev.png",sep="")
+    #ev_png <- EnhancedVolcano(res,lab=rownames(res),x='log2FoldChange',y='padj')
+    #print(ev_png)
+    #ggsave(ev_image_name)
 } 

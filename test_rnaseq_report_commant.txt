@@ -1,0 +1,1 @@
+python create_rnaseq_report.py -g genome_list -c condition_dict -j job_data
