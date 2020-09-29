@@ -1,0 +1,24 @@
+
+title: "BVBRC RNASeq Analysis"
+subtitle: "Example Subtitle: Can also insert Logo"
+
+sp:
+    hisat2:
+        fn: '*.hisat'
+    bowtie2:
+        fn: '*.bowtie'
+    samtools/stats:
+        fn: '*.samtools_stats'
+
+module_order:
+    - fastqc
+    - samtools/stats
+    - bowtie2
+    - hisat2
+    - htseq
+    - custom_content
+
+remove_sections:
+    - fastqc_status_checks 
+    - fastqc_per_base_sequence_content
+    - samtools-stats

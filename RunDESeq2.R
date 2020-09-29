@@ -36,7 +36,7 @@ if (grepl("csv",metadata.file)) {
 
 #Differential expression library, load quietly so it doesn't completely fill the log output
 suppressMessages(library(DESeq2,quietly=TRUE))
-#library(EnhancedVolcano,quietly=TRUE)
+library(EnhancedVolcano,quietly=TRUE)
 
 #Load counts table and metadata table and replace invalid characters
 count.mtx <- read.table(counts.file,sep=count_sep,header=T,row.names=1,stringsAsFactors=FALSE)
@@ -75,8 +75,9 @@ for (i in 5:length(args))
     results_file = paste(curr_contrast[1],"_vs_",curr_contrast[2],".",feature_count,".",out_prefix,".deseq2",sep="")     
     write.table(res,file=results_file,sep="\t",quote=FALSE,row.names=FALSE)
     #Create volcano plot
-    #ev_image_name = paste(curr_contrast[1],"_vs_",curr_contrast[2],".",feature_count,".",out_prefix,".ev.png",sep="")
-    #ev_png <- EnhancedVolcano(res,lab=rownames(res),x='log2FoldChange',y='padj')
-    #print(ev_png)
-    #ggsave(ev_image_name)
+    ev_image_name = paste(curr_contrast[1],"_vs_",curr_contrast[2],".",feature_count,".",out_prefix,".ev.png",sep="")
+    png(ev_image_name)
+    ev_png <- EnhancedVolcano(res,lab=rownames(res),x='log2FoldChange',y='padj')
+    print(ev_png)
+    dev.off()
 } 
