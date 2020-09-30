@@ -62,13 +62,6 @@ def setup_hisat_indices(genome,output_dir,final_cleanup,job_data):
             index_prefix = os.path.join(output_dir,".".join(os.path.basename(genome["hisat_index"]).split(".")[:-2]))
     return index_prefix
 
-def setup_bowtie(genome_link):
-    try:
-        subprocess.check_call(["bowtie2-build", genome_link, genome_link])
-    except Exception as err:
-        sys.stderr.write("bowtie build failed: %s %s\n"%(err, genome_link))
-        os.exit(1)
-
 #pretty simple: its for prokaryotes in that parameters will be attuned to give best performance and no tophat
 #TODO: replace previous hisat index process here, it works fine
 def run_alignment(genome_list, condition_dict, parameters, output_dir, job_data): 
@@ -77,13 +70,22 @@ def run_alignment(genome_list, condition_dict, parameters, output_dir, job_data)
         genome_link = genome["genome_link"]
         final_cleanup=[]
         if "hisat_index" in genome and genome["hisat_index"]:
-            index_prefix = setup_hisat_indices(genome,output_dir,final_cleanup,job_data) 
+            archive = tarfile.open(genome["hisat_index"])
+            indices = [os.path.join(output_dir,os.path.basename(x)) for x in archive.getnames()]
+            final_cleanup+=indices
+            archive.close()
+            subprocess.check_call(["tar","-xvf",genome["hisat_index"],"-C",output_dir])
+            index_prefix = os.path.join(output_dir, os.path.basename(genome["hisat_index"]).replace(".ht2.tar","")) #somewhat fragile convention. tar prefix is underlying index prefix
             cmd=["hisat2","--dta-cufflinks", "-x", index_prefix] 
             #cmd=["hisat2","--dta-cufflinks", "-x", index_prefix,"--no-spliced-alignment"] 
             thread_count= parameters.get("hisat2",{}).get("-p",0)
         else:
             #cmd=["hisat2","--dta-cufflinks", "-x", genome_link, "--no-spliced-alignment"] 
-            setup_bowtie(genome_link)
+            try:
+                subprocess.check_call(["bowtie2-build", genome_link, genome_link])
+            except Exception as err:
+                sys.stderr.write("bowtie build failed: %s %s\n"%(err, genome_link))
+                os.exit(1)
             cmd=["bowtie2", "-x", genome_link]
             thread_count= parameters.get("bowtie2",{}).get("-p",0)
         if thread_count == 0:
