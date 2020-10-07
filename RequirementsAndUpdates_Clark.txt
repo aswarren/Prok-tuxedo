@@ -26,9 +26,8 @@ Summary: The main update is the replacement of the current differential expressi
 
 - Multiqc
     - bioinformatics report generator program 
-    - pdf compatibility requires:
-        - pandoc 
-        - xelatex
+    - python packages:
+        - matplotlib
 
 - prok_tuxedo.py
     - version: TODO

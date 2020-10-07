@@ -3,12 +3,16 @@ title: "BVBRC RNASeq Analysis"
 subtitle: "Example Subtitle: Can also insert Logo"
 
 sp:
+    general_stats:
+        fn: '*.bam'
     hisat2:
         fn: '*.hisat'
     bowtie2:
         fn: '*.bowtie'
     samtools/stats:
         fn: '*.samtools_stats'
+    htseq:
+        fn: '*.counts'
 
 module_order:
     - fastqc

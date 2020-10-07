@@ -38,32 +38,7 @@ def link_space(file_path):
             subprocess.check_call(["ln","-s",file_path,result])
     return result
 
-#If the hisat_index is tared, untar it
-#If the files exist and are untared, copy to correct location
-#Return hisat index prefix that is passed into hisat command: -x <hisat_index_prefix>
-def setup_hisat_indices(genome,output_dir,final_cleanup,job_data):
-    if genome["hisat_index"].endswith("ht2.tar"):
-        genome_link = genome["genome_link"]
-        archive = tarfile.open(genome["hisat_index"])
-        indices = [os.path.join(output_dir,os.path.basename(x)) for x in archive.getnames()]
-        final_cleanup+=indices
-        archive.close()
-        subprocess.check_call(["tar","-xvf",genome["hisat_index"],"-C",output_dir])
-        if job_data.get("host_ftp",None):
-            index_prefix = os.path.join(output_dir,"/".join(genome["hisat_index"].split("/")[-2:]).replace("ht2.tar","")) 
-        else:
-            index_prefix = os.path.join(output_dir,os.path.basename(genome["hisat_index"]).replace(".ht2.tar",""))
-    else:
-        for index in glob.glob(os.path.join(genome["dir"],"*.ht2")): #for each hisat index file in the genome directory
-            copy_index = os.path.join(output_dir,os.path.basename(index))
-            if not os.path.exists(copy_index):#if it doesn't exist where the index files should be
-                shutil.copy(index,copy_index) #copy it over
-            final_cleanup+=[copy_index]
-            index_prefix = os.path.join(output_dir,".".join(os.path.basename(genome["hisat_index"]).split(".")[:-2]))
-    return index_prefix
-
 #pretty simple: its for prokaryotes in that parameters will be attuned to give best performance and no tophat
-#TODO: replace previous hisat index process here, it works fine
 def run_alignment(genome_list, condition_dict, parameters, output_dir, job_data): 
     #modifies condition_dict sub replicates to include 'bowtie' dict recording output files
     for genome in genome_list:
@@ -73,9 +48,17 @@ def run_alignment(genome_list, condition_dict, parameters, output_dir, job_data)
             archive = tarfile.open(genome["hisat_index"])
             indices = [os.path.join(output_dir,os.path.basename(x)) for x in archive.getnames()]
             final_cleanup+=indices
+            num_parts = archive.getnames()[0].count("/") #strip any subdirectory structure from the tar output
             archive.close()
-            subprocess.check_call(["tar","-xvf",genome["hisat_index"],"-C",output_dir])
+            tar_cmd = ["tar","-xvf",genome["hisat_index"],"-C",output_dir]
+            if num_parts > 0:
+                tar_cmd += ["--strip-components",str(num_parts)]
+            print (" ".join(tar_cmd))
+            subprocess.check_call(tar_cmd)
             index_prefix = os.path.join(output_dir, os.path.basename(genome["hisat_index"]).replace(".ht2.tar","")) #somewhat fragile convention. tar prefix is underlying index prefix
+            if not os.path.exists(index_prefix+".1.ht2"):
+                print("hisant indices were not unpacked correctly: %s"%index_prefix)
+                sys.exit()
             cmd=["hisat2","--dta-cufflinks", "-x", index_prefix] 
             #cmd=["hisat2","--dta-cufflinks", "-x", index_prefix,"--no-spliced-alignment"] 
             thread_count= parameters.get("hisat2",{}).get("-p",0)
@@ -140,8 +123,9 @@ def run_alignment(genome_list, condition_dict, parameters, output_dir, job_data)
                 print " ".join(samstat_cmd)
                 stats_cmd = ["samtools","stats","-@",str(samtools_threads),bam_file]
                 stats_outfile = bam_file.replace("bam","samtools_stats")
-                with open(stats_outfile,"w") as o:
-                    subprocess.check_call(stats_cmd,stdout=o)
+                if not os.path.exists(stats_outfile):
+                    with open(stats_outfile,"w") as o:
+                        subprocess.check_call(stats_cmd,stdout=o)
                 r[genome["genome"]]["avg_read_length"] = get_average_read_length_per_file(stats_outfile)
                 #TODO: uncomment
                 #subprocess.check_call(samstat_cmd)
@@ -179,10 +163,11 @@ def run_stringtie(genome_list, condition_dict, parameters, job_data, output_dir)
                 os.chdir(cur_dir)
                 r[genome_file]["dir"]=cur_dir
                 cuff_gtf=os.path.join(cur_dir,"transcripts.gtf")
-                stringtie_cmd = ["stringtie",r[genome_file]["bam"],"-p",str(thread_count),"-A","gene_abund.tab","-M","1.0"]
+                stringtie_cmd = ["stringtie",r[genome_file]["bam"],"-p",str(thread_count),"-A","gene_abund.tab"]
                 #check if novel features is turned off: add -e flag
                 if not find_novel_features:
                     stringtie_cmd = stringtie_cmd + ["-e"]
+                #TODO: check Andrew's messages, see if removing those lines from the gtf fixes the issue
                 stringtie_cmd = stringtie_cmd + ["-G",genome["annotation"],"-o",cuff_gtf]
                 r[genome_file]["gtf"] = cuff_gtf
                 gtf_list.append(cuff_gtf)
@@ -451,6 +436,7 @@ def split_bam_file(replicate_bam,threads):
 def run_htseq_parallel(genome_annotation,replicate_bam,counts_file,strand,feature,feature_type,threads):
     #run htseq-count
     htseq_cmd = ["htseq-count","-t",feature_type,"-m","intersection-nonempty","--nonunique=all","-f","sam","-r","pos","-s",strand,"-i",feature,"-n",str(threads)]
+    #htseq_cmd = ["htseq-count","-t",feature_type,"-f","sam","-r","pos","-s",strand,"-i",feature,"-n",str(threads)]
     for sam in glob.glob("Split_Bams/*"): #iterate through all split files and format
         htseq_cmd.append(sam)
     htseq_cmd.append(genome_annotation)
@@ -511,10 +497,10 @@ def run_htseq_count(genome_list, condition_dict, parameters, job_data, output_di
                             #Run gene_count matrix parameters
                             #Create two counts files and append them together
                             genes_file = os.path.basename(replicate[genome_file]["gene_counts"])
-                            genes_file_1 = genes_file+".1" 
+                            genes_file_1 = genes_file+".tmp" 
                             run_htseq_parallel(genome_annotation,replicate[genome_file]["bam"],genes_file,strand,"ID","gene",threads)
                             run_htseq_parallel(genome_annotation,replicate[genome_file]["bam"],genes_file_1,strand,"ID","pseudogene",threads)
-                            cf_open = open(counts_file,"a")
+                            cf_open = open(genes_file,"a")
                             cf1_open = open(genes_file_1,"r")
                             cf1_lines = cf1_open.readlines()
                             cf1_open.close()
@@ -525,11 +511,8 @@ def run_htseq_count(genome_list, condition_dict, parameters, job_data, output_di
                             sys.stderr.write("%s exists for genome file %s: skipping htseq-count for transcripts\n"%(replicate[genome_file]["transcript_counts"],genome_file))
                         else:
                             #Run transcript_count matrix parameters
-                            #First run one feature, then iterate through and append results to output transcripts file 
                             transcript_file = os.path.basename(replicate[genome_file]["transcript_counts"])
-                            #run_htseq_parallel(genome_annotation,replicate[genome_file]["bam"],transcript_file,strand,"ID","mRNA",threads)
-                            #feature_list = ["mRNA","pseudogene","lnc_RNA","transcript","snRNA","V_gene_segment"]
-                            feature_list = ["mRNA","pseudogene","lnc_RNA","transcript","snRNA","V_gene_segment","snoRNA","enhancer","biological_region","primary_transcript","miRNA","C_gene_segment","rRNA","tRNA"]
+                            feature_list = ["mRNA","lnc_RNA","transcript","snRNA","V_gene_segment","snoRNA","enhancer","biological_region","primary_transcript","miRNA","C_gene_segment","rRNA","tRNA"]
                             for f in feature_list:
                                 transcript_file_tmp = transcript_file+".tmp" 
                                 run_htseq_parallel(genome_annotation,replicate[genome_file]["bam"],transcript_file_tmp,strand,"ID",f,threads)
@@ -776,10 +759,10 @@ def run_deseq2(genome_list,contrasts,job_data):
         os.chdir(genome["output"])
         genome_prefix = os.path.basename(genome["output"])
         diffexp_list = [] #list of files to run differential expression on 
-        diffexp_list.append((genome["gene_matrix"],"genes",job_data.get("feature_count","htseq")))
+        diffexp_list.append((genome["gene_matrix"],"Genes",job_data.get("feature_count","htseq")))
         #transcript_matrix doesn't exist for bacterial pipeline
         if "transcript_matrix" in genome:
-            diffexp_list.append((genome["transcript_matrix"],"transcripts",job_data.get("feature_count","htseq")))
+            diffexp_list.append((genome["transcript_matrix"],"Transcripts",job_data.get("feature_count","htseq")))
         metadata_file = genome["deseq_metadata"] 
         if not os.path.exists(genome["gene_matrix"]):
             print("%s: file doesn't exist"%genome["gene_matrix"])
@@ -813,6 +796,9 @@ def write_gmx_file(genome_list):
         os.chdir(genome["output"])
         contrast_file_list = genome["diff_exp_contrasts"]
         for contrast_file in contrast_file_list:
+            #when creating gene_exp.gmx, ignore transcripts
+            if "transcript" in contrast_file:
+                continue
             contrast_name = os.path.basename(contrast_file).replace(".txt","")
             contrast_list.append(contrast_name)
             gene_count_dict[contrast_name] = {}
@@ -820,7 +806,7 @@ def write_gmx_file(genome_list):
                 next(cf)
                 for line in cf:
                     gene,baseMean,log2FC,lfcSE,stat,pvalue,padj = line.strip().split("\t")
-                    gene_set.add(gene)
+                    gene_set.add(gene.replace("gene-",""))
                     gene_count_dict[contrast_name][gene] = log2FC
 
         with open("gene_exp.gmx","w") as o:
@@ -852,6 +838,18 @@ def average_read_length_total(condition_dict,genome):
             total_length = total_length + int(r[genome["genome"]]["avg_read_length"])
     avg_length = int(total_length/num_replicates)
     return avg_length
+
+def run_multiqc(genome_list):
+    config_path = "/scratch/cc8dm/PATRIC/Prok-tuxedo/Multiqc/multiqc_config.yaml"
+    debug_multiqc = True
+    for genome in genome_list:
+        os.chdir(genome["output"])
+        report_name = os.path.basename(genome["output"])+"_report.html"
+        #multiqc_cmd = ["multiqc","--flat","-o",".","-n",report_name,"-t","simple","--no-data-dir",".","-c",config_path,"-f"]
+        multiqc_cmd = ["multiqc","--flat","-o",".","-n",report_name,"-t","simple",".","-c",config_path,"-f"]
+        if debug_multiqc:
+            multiqc_cmd += ["--lint"]
+        subprocess.check_call(multiqc_cmd)
 
 def setup(genome_list, condition_dict, parameters, output_dir, job_data):
     for genome in genome_list:
@@ -899,7 +897,7 @@ def main(genome_list, condition_dict, parameters_str, output_dir, gene_matrix=Fa
     else:
         parameters = {}
     setup(genome_list, condition_dict, parameters, output_dir, job_data)
-
+    print(genome_list)
     #TRUE: runs cufflinks then cuffdiff if differential expression is turned on
     #FALSE: runs either htseq-count or stringtie
     run_cuffdiff_pipeline = job_data.get("feature_count","htseq") == "cuffdiff"
@@ -928,7 +926,7 @@ def main(genome_list, condition_dict, parameters_str, output_dir, gene_matrix=Fa
                 create_counts_table(genome_list,condition_dict,job_data)
         run_deseq2(genome_list,contrasts,job_data)
         write_gmx_file(genome_list)
-
+        run_multiqc(genome_list)
         #differential expression import will fail for host
         #if not job_data.get("recipe","RNA-Rocket") == "Host":
         try:
@@ -1020,11 +1018,8 @@ if __name__ == "__main__":
                 cur_genome["genome"].append(os.path.abspath(os.path.join(g,f)))
             elif f.endswith(".gff"):
                 cur_genome["annotation"].append(os.path.abspath(os.path.join(g,f)))
-            #Change to check for ht2 files instead of just the tar file
-            elif f.endswith(".ht2.tar") and len(cur_genome["hisat_index"]) == 0: 
+            elif f.endswith(".ht2.tar"): 
                 cur_genome["hisat_index"].append(os.path.abspath(os.path.join(g,f)))
-            #elif f.endswith(".1.ht2"):
-            #    cur_genome["hisat_index"].append(os.path.abspath(os.path.join(g,f)))
 
         if len(cur_genome["genome"]) != 1:
             sys.stderr.write("Too many or too few fasta files present in "+g+"\n")
