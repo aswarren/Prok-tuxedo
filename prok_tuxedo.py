@@ -7,7 +7,7 @@ import multiprocessing
 import cuffdiff_to_genematrix
 import glob
 import tarfile, json
-import shutil
+import requests,shutil
 import math
 
 #take genome data structure and condition_dict and make directory names. processses condition to ensure no special characters, or whitespace
@@ -102,8 +102,8 @@ def run_alignment(genome_list, condition_dict, parameters, output_dir, job_data)
                 r[genome["genome"]]["fastqc"] = bam_file.replace(".bam","_fastqc.html") 
                 cur_cmd+=["-S",sam_file]
                 print " ".join(fastqc_cmd)
-                #TODO: uncomment
-                #subprocess.check_call(fastqc_cmd)
+                if not os.path.exists(r[genome["genome"]]["fastqc"]):
+                    subprocess.check_call(fastqc_cmd)
                 if os.path.exists(bam_file):
                     sys.stderr.write(bam_file+" alignments file already exists. skipping\n")
                 else:
@@ -127,8 +127,7 @@ def run_alignment(genome_list, condition_dict, parameters, output_dir, job_data)
                     with open(stats_outfile,"w") as o:
                         subprocess.check_call(stats_cmd,stdout=o)
                 r[genome["genome"]]["avg_read_length"] = get_average_read_length_per_file(stats_outfile)
-                #TODO: uncomment
-                #subprocess.check_call(samstat_cmd)
+                subprocess.check_call(samstat_cmd)
                 for garbage in cur_cleanup:
                     subprocess.call(["rm", garbage])
         for garbage in final_cleanup:
@@ -167,7 +166,6 @@ def run_stringtie(genome_list, condition_dict, parameters, job_data, output_dir)
                 #check if novel features is turned off: add -e flag
                 if not find_novel_features:
                     stringtie_cmd = stringtie_cmd + ["-e"]
-                #TODO: check Andrew's messages, see if removing those lines from the gtf fixes the issue
                 stringtie_cmd = stringtie_cmd + ["-G",genome["annotation"],"-o",cuff_gtf]
                 r[genome_file]["gtf"] = cuff_gtf
                 gtf_list.append(cuff_gtf)
@@ -532,7 +530,6 @@ def run_htseq_count(genome_list, condition_dict, parameters, job_data, output_di
                     if os.path.exists("Split_Bams"):
                         shutil.rmtree("Split_Bams")
                 else:
-                    #TODO: add support for host pipeline 
                     if recipe == "Host":
                         print("Host htseq pipeline not enabled for 1 thread, will take too long")
                         sys.exit(1)
@@ -775,11 +772,11 @@ def run_deseq2(genome_list,contrasts,job_data):
             continue
         #diffexp_cmd_gene = ["RunDESeq2.R",genome["gene_matrix"],metadata_file,genome_prefix+".genes"]+contrast_cmd
         #diffexp_cmd_transcript = ["RunDESeq2.R",genome["transcript_matrix"],metadata_file,genome_prefix+".transcripts"]+contrast_cmd
+        genome["diff_exp_contrasts"] = []
         for diffexp_params in diffexp_list:
             diffexp_cmd = ["RunDESeq2.R",diffexp_params[0],metadata_file,diffexp_params[1],diffexp_params[2]]+contrast_cmd
             print("%s\n"%" ".join(diffexp_cmd))
             subprocess.check_call(diffexp_cmd)
-            genome["diff_exp_contrasts"] = []
             for pair in contrasts:
                 pair = [x.replace(",","_") for x in pair]
                 pair = "_vs_".join(pair) 
@@ -797,7 +794,7 @@ def write_gmx_file(genome_list):
         contrast_file_list = genome["diff_exp_contrasts"]
         for contrast_file in contrast_file_list:
             #when creating gene_exp.gmx, ignore transcripts
-            if "transcript" in contrast_file:
+            if "Transcript" in contrast_file:
                 continue
             contrast_name = os.path.basename(contrast_file).replace(".txt","")
             contrast_list.append(contrast_name)
@@ -839,9 +836,41 @@ def average_read_length_total(condition_dict,genome):
     avg_length = int(total_length/num_replicates)
     return avg_length
 
+def run_subsystem_analysis(genome_list):
+    for genome in genome_list:
+        #retrieve subsystem information
+        subsystem_dict = get_subsystem_ids(genome)
+        if not subsystem_dict:
+            sys.stderr.write("Error in subsystem analysis for genome_id %s"%genome["genome"])
+            return None
+        #TODO:map and plot
+        
+            
+#TODO: incorporate KB_Auth token check
+def get_subsystem_ids(genome):
+    genome_url = "https://patricbrc.org/api/subsystem/?eq(genome_id,"+genome["genome"]+")&limit(10000000)&http_accept=application/solr+json"
+    req = requests.Request('GET',genome_url)
+    prepared = req.prepare()
+    s = requests.Session()
+    response = s.send(prepared)
+    subsystem_dict = {}
+    superclass_set = set()
+    class_set = set()
+    if not respone.ok:
+        sys.stderr.write("Failed to retrieve subsystem ids for genomd_id %s"%str(genome["genome"]))
+        return None
+    for entry in response.json()['respone']['docs']: 
+        subsystem_dict[entry['patric_id']]['superclass'] = entry['superclass']
+        superclass_set.add(entry['superclass'])
+        subsystem_dict[entry['patric_id']]['class'] = entry['class']
+        class_set.add(entry['class'])
+    subsystem_dict["superclass_set"] = superclass_set
+    subsystem_dict["class_set"] = class_set
+    return subsystem_dict
+
 def run_multiqc(genome_list):
-    config_path = "/scratch/cc8dm/PATRIC/Prok-tuxedo/Multiqc/multiqc_config.yaml"
-    debug_multiqc = True
+    config_path = "/homes/clarkc/RNASeq_Pipeline/Prok-tuxedo/Multiqc/multiqc_config.yaml"
+    debug_multiqc = False
     for genome in genome_list:
         os.chdir(genome["output"])
         report_name = os.path.basename(genome["output"])+"_report.html"
@@ -849,6 +878,7 @@ def run_multiqc(genome_list):
         multiqc_cmd = ["multiqc","--flat","-o",".","-n",report_name,"-t","simple",".","-c",config_path,"-f"]
         if debug_multiqc:
             multiqc_cmd += ["--lint"]
+	print(" ".join(multiqc_cmd))
         subprocess.check_call(multiqc_cmd)
 
 def setup(genome_list, condition_dict, parameters, output_dir, job_data):
@@ -927,13 +957,15 @@ def main(genome_list, condition_dict, parameters_str, output_dir, gene_matrix=Fa
         run_deseq2(genome_list,contrasts,job_data)
         write_gmx_file(genome_list)
         run_multiqc(genome_list)
+        if job_data.get("recipe","RNA-Rocket") == "RNA-Rocket":
+            run_subsystem_analysis(genome_list)
         #differential expression import will fail for host
         #if not job_data.get("recipe","RNA-Rocket") == "Host":
         try:
             run_diff_exp_import(genome_list, condition_dict, parameters, output_dir, contrasts, job_data, map_args, diffexp_json)
         except:
             if job_data.get("recipe","RNA-Rocket") == "Host":
-                print("Expression import failed for host: Not exiting with error")
+                print("Expression import failed for host: Exiting with error")
             else:
                 print("Expression import failed for bacterial: Exiting with error")
             sys.exit(-1)
