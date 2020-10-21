@@ -839,15 +839,39 @@ def average_read_length_total(condition_dict,genome):
 def run_subsystem_analysis(genome_list):
     for genome in genome_list:
         #retrieve subsystem information
-        subsystem_dict = get_subsystem_ids(genome)
+        subsystem_dict = get_subsystem_mapping(genome)
         if not subsystem_dict:
             sys.stderr.write("Error in subsystem analysis for genome_id %s"%genome["genome"])
-            return None
-        #TODO:map and plot
+        else:
+            genome["subsystem_dict"] = subsystem_dict
+    #write mapping file
+    write_subsystem_mapping_files(genome_list) 
+    #Run subsytem plotting R script
         
-            
+        
+def write_subsystem_mapping_files(genome_list):
+    for genome in genome_list:
+        if "subsystem_dict" not in genome:
+            continue 
+        subsystem_dict = genome["subsystem_dict"] 
+        os.chdir(genome["output"])     
+        superclass_map = os.path.basename(genome["output"])+".superclass_mapping"
+        class_map = os.path.basename(genome["output"])+".class_mapping"
+        superclass_path = os.path.join(genome["output"],superclass_map)
+        class_path = os.path.join(genome["output"],class_map)
+        genome["superclass_map"] = superclass_path
+        genome["class_map"] = class_path
+        #write superclass file
+        with open(superclass_map,"w") as sm, open(class_map,"w") as cm:
+            #write headers
+            sm.write("Patric_ID,Superclass\n")
+            cm.write("Patric_ID,Class\n")
+            for sub_id in subsystem_dict:
+                sm.write("%s,%s\n"%(sub_id,subsystem_dict[sub_id]["superclass"])) 
+                cm.write("%s,%s\n"%(sub_id,subsystem_dict[sub_id]["class"])) 
+                
 #TODO: incorporate KB_Auth token check
-def get_subsystem_ids(genome):
+def get_subsystem_mapping(genome):
     genome_url = "https://patricbrc.org/api/subsystem/?eq(genome_id,"+genome["genome"]+")&limit(10000000)&http_accept=application/solr+json"
     req = requests.Request('GET',genome_url)
     prepared = req.prepare()
@@ -856,6 +880,8 @@ def get_subsystem_ids(genome):
     subsystem_dict = {}
     superclass_set = set()
     class_set = set()
+    print("Retrieving subsystem ids for genome_id %s"%(genome["genome"]))
+    print(genome_url)
     if not respone.ok:
         sys.stderr.write("Failed to retrieve subsystem ids for genomd_id %s"%str(genome["genome"]))
         return None
