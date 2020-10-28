@@ -127,7 +127,9 @@ def run_alignment(genome_list, condition_dict, parameters, output_dir, job_data)
                     with open(stats_outfile,"w") as o:
                         subprocess.check_call(stats_cmd,stdout=o)
                 r[genome["genome"]]["avg_read_length"] = get_average_read_length_per_file(stats_outfile)
-                subprocess.check_call(samstat_cmd)
+                samstat_file = bam_file+".samstat.html"
+                if not os.path.exists(samstat_file):
+                    subprocess.check_call(samstat_cmd)
                 for garbage in cur_cleanup:
                     subprocess.call(["rm", garbage])
         for garbage in final_cleanup:
@@ -670,7 +672,7 @@ def create_counts_table(genome_list,condition_dict,job_data):
 
 #Put a metadata file in each genome directory
 #Subsetting the data on current conditions can be done in R
-def create_deseq_metadata(genome_list,condition_dict,output_dir):
+def create_metadata_file(genome_list,condition_dict,output_dir):
     #From genome list, get any genome key to get a replicate identifier  
     genome_key = genome_list[0]["genome"]
     #stores conditions as keys and replicate list as value
@@ -683,7 +685,7 @@ def create_deseq_metadata(genome_list,condition_dict,output_dir):
     #write metadata file: column 1 == replicate ids and column 2 == condition
     #Print file to top level output directory, only 1 metadat file is needed
     #Get the top level output directory
-    metadata_file = os.path.join(output_dir,"DESeq_Metadata.txt")
+    metadata_file = os.path.join(output_dir,"Metadata.txt")
     with open(metadata_file,"w") as mf:
         mf.write("Sample\tCondition\n")
         for condition in info_dict:
@@ -836,7 +838,7 @@ def average_read_length_total(condition_dict,genome):
     avg_length = int(total_length/num_replicates)
     return avg_length
 
-def run_subsystem_analysis(genome_list):
+def run_subsystem_analysis(genome_list,job_data):
     for genome in genome_list:
         #retrieve subsystem information
         subsystem_dict = get_subsystem_mapping(genome)
@@ -847,7 +849,16 @@ def run_subsystem_analysis(genome_list):
     #write mapping file
     write_subsystem_mapping_files(genome_list) 
     #Run subsytem plotting R script
-        
+    #plot_subsystems.R <subsystem_map.txt> <counts_file.txt|csv> <metadata.txt>  <subsystem_level> <feature_count>
+    feature_count = "htseq" if job_data.get("feature_count","htseq") == "htseq" else "stringtie"
+    subsystem_levels = ["Superclass","Class"]
+    subsystem_map = ["superclass_map","class_map"]
+    for genome in genome_list:
+        os.chdir(genome["output"])
+        for i,level in enumerate(subsystem_levels):
+            subsystem_plot_cmd = ["plot_subsystems.R",genome[subsystem_map[i]],genome["gene_matrix"],genome["deseq_metadata"],level,feature_count]    
+            print(" ".join(subsystem_plot_cmd))
+            subprocess.check_call(subsystem_plot_cmd)
         
 def write_subsystem_mapping_files(genome_list):
     for genome in genome_list:
@@ -864,15 +875,17 @@ def write_subsystem_mapping_files(genome_list):
         #write superclass file
         with open(superclass_map,"w") as sm, open(class_map,"w") as cm:
             #write headers
-            sm.write("Patric_ID,Superclass\n")
-            cm.write("Patric_ID,Class\n")
+            sm.write("Patric_ID\tSuperclass\n")
+            cm.write("Patric_ID\tClass\n")
             for sub_id in subsystem_dict:
-                sm.write("%s,%s\n"%(sub_id,subsystem_dict[sub_id]["superclass"])) 
-                cm.write("%s,%s\n"%(sub_id,subsystem_dict[sub_id]["class"])) 
+                if sub_id == "superclass_set" or sub_id == "class_set":
+                    continue
+                sm.write("%s\t%s\n"%(sub_id,subsystem_dict[sub_id]["superclass"])) 
+                cm.write("%s\t%s\n"%(sub_id,subsystem_dict[sub_id]["class"])) 
                 
 #TODO: incorporate KB_Auth token check
 def get_subsystem_mapping(genome):
-    genome_url = "https://patricbrc.org/api/subsystem/?eq(genome_id,"+genome["genome"]+")&limit(10000000)&http_accept=application/solr+json"
+    genome_url = "https://patricbrc.org/api/subsystem/?eq(genome_id,"+os.path.basename(genome["output"])+")&limit(10000000)&http_accept=application/solr+json"
     req = requests.Request('GET',genome_url)
     prepared = req.prepare()
     s = requests.Session()
@@ -880,15 +893,16 @@ def get_subsystem_mapping(genome):
     subsystem_dict = {}
     superclass_set = set()
     class_set = set()
-    print("Retrieving subsystem ids for genome_id %s"%(genome["genome"]))
+    print("Retrieving subsystem ids for genome_id %s"%(os.path.basename(genome["output"])))
     print(genome_url)
-    if not respone.ok:
-        sys.stderr.write("Failed to retrieve subsystem ids for genomd_id %s"%str(genome["genome"]))
+    if not response.ok:
+        sys.stderr.write("Failed to retrieve subsystem ids for genomd_id %s"%os.path.basename(genome["output"]))
         return None
-    for entry in response.json()['respone']['docs']: 
-        subsystem_dict[entry['patric_id']]['superclass'] = entry['superclass']
+    for entry in response.json()['response']['docs']: 
+        subsystem_dict[entry['patric_id']] = {}
+        subsystem_dict[entry['patric_id']]['superclass'] = entry['superclass'] if len(entry['superclass']) > 0 else 'NONE'
         superclass_set.add(entry['superclass'])
-        subsystem_dict[entry['patric_id']]['class'] = entry['class']
+        subsystem_dict[entry['patric_id']]['class'] = entry['class'] if len(entry['class']) > 0 else 'NONE'
         class_set.add(entry['class'])
     subsystem_dict["superclass_set"] = superclass_set
     subsystem_dict["class_set"] = class_set
@@ -953,7 +967,6 @@ def main(genome_list, condition_dict, parameters_str, output_dir, gene_matrix=Fa
     else:
         parameters = {}
     setup(genome_list, condition_dict, parameters, output_dir, job_data)
-    print(genome_list)
     #TRUE: runs cufflinks then cuffdiff if differential expression is turned on
     #FALSE: runs either htseq-count or stringtie
     run_cuffdiff_pipeline = job_data.get("feature_count","htseq") == "cuffdiff"
@@ -962,7 +975,18 @@ def main(genome_list, condition_dict, parameters_str, output_dir, gene_matrix=Fa
         run_cufflinks(genome_list, condition_dict, parameters, output_dir)
     else:
         run_featurecount(genome_list, condition_dict, parameters, output_dir, job_data)
+    create_metadata_file(genome_list,condition_dict,output_dir)
     #TODO: change novel_features condition when novel-isoform differential expression is implemented
+    if job_data.get("feature_count","htseq") == "stringtie":
+        write_gtf_list(genome_list,condition_dict) #function that writes the input for prepDE.py, which is a list of samples and paths to their gtf files. Do this for each genome
+        prep_stringtie_diffexp(genome_list,condition_dict,job_data.get("recipe","RNA-Rocket") == "Host")   
+    else: #htseq
+        if job_data.get("recipe","RNA-Rocket") == "Host":
+            create_counts_table_host(genome_list,condition_dict,job_data)
+        else:
+            create_counts_table(genome_list,condition_dict,job_data)
+    if job_data.get("recipe","RNA-Rocket") == "RNA-Rocket":
+        run_subsystem_analysis(genome_list,job_data)
     if len(condition_dict.keys()) > 1 and not job_data.get("novel_features",False):
         #If running cuffdiff pipeline, terminated after running expression import
         if run_cuffdiff_pipeline:
@@ -970,31 +994,17 @@ def main(genome_list, condition_dict, parameters_str, output_dir, gene_matrix=Fa
             run_diff_exp_import(genome_list, condition_dict, parameters, output_dir, contrasts, job_data, map_args, diffexp_json)
             sys.exit(0)
         #Create deseq2 metadata file. Ordering the matrix correctly will be done in R script 
-        create_deseq_metadata(genome_list,condition_dict,output_dir)
         #run prepDE.py to create counts files if using stringtie
-        if job_data.get("feature_count","htseq") == "stringtie":
-            write_gtf_list(genome_list,condition_dict) #function that writes the input for prepDE.py, which is a list of samples and paths to their gtf files. Do this for each genome
-            prep_stringtie_diffexp(genome_list,condition_dict,job_data.get("recipe","RNA-Rocket") == "Host")   
-        else: #htseq
-            if job_data.get("recipe","RNA-Rocket") == "Host":
-                create_counts_table_host(genome_list,condition_dict,job_data)
-            else:
-                create_counts_table(genome_list,condition_dict,job_data)
+        
         run_deseq2(genome_list,contrasts,job_data)
         write_gmx_file(genome_list)
-        run_multiqc(genome_list)
-        if job_data.get("recipe","RNA-Rocket") == "RNA-Rocket":
-            run_subsystem_analysis(genome_list)
-        #differential expression import will fail for host
-        #if not job_data.get("recipe","RNA-Rocket") == "Host":
+        #TODO: differential expression import will fail for host, fix by getting valid genes 
         try:
             run_diff_exp_import(genome_list, condition_dict, parameters, output_dir, contrasts, job_data, map_args, diffexp_json)
         except:
-            if job_data.get("recipe","RNA-Rocket") == "Host":
-                print("Expression import failed for host: Exiting with error")
-            else:
-                print("Expression import failed for bacterial: Exiting with error")
-            sys.exit(-1)
+            print("Expression import failed")
+    run_multiqc(genome_list)
+        
         
 
 if __name__ == "__main__":

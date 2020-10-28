@@ -1,14 +1,14 @@
 #!/homes/clarkc/miniconda3/bin/Rscript
 
 #parameter format: 
-#Rscript RunDESeq2.R <counts_file.txt> <metadata_file.txt> <contrast 1> <contrast 2> ... <contrast n>
+#RunDESeq2.R <counts_file.txt> <metadata_file.txt> <output_prefix> <htseq|stringtiet> <contrast 1> <contrast 2> ... <contrast n>
 #contrasts should be a csv pair and list all the contrasts to make in this dataset
 args = commandArgs(trailingOnly=TRUE)
 
 numContrasts = length(args) - 4
 
 if (numContrasts < 1) {
-    stop("Not enough parameters: RunDESeq2.R <counts_file> <metadata_file> <output_prefix> <feature_count> <contrast 1> ... <contrast n>")
+    stop("Not enough parameters: RunDESeq2.R <counts_file> <metadata_file> <output_prefix> <htseq|stringtie> <contrast 1> ... <contrast n>")
 }
 counts.file = args[1]
 metadata.file = args[2]
@@ -44,10 +44,6 @@ rownames(count.mtx) = gsub("gene-","",rownames(count.mtx))
 rownames(count.mtx) = gsub("rna-","",rownames(count.mtx))
 #colnames(count.mtx) = gsub("\\.","_",colnames(count.mtx))
 metadata <- read.table(metadata.file,sep=meta_sep,header=T,row.names=1,stringsAsFactors=FALSE)
-#metadata$Condition = gsub("\\.","_",metadata$Condition)
-#rownames(metadata) = gsub("\\.","_",rownames(metadata))
-#Reorder columns of counts table to match row order of metadata 
-#count.mtx = count.mtx[,rownames(metadata)]
 #iterate over contrasts
 #index 4 in args is where the contrasts currently start
 for (i in 5:length(args)) 
