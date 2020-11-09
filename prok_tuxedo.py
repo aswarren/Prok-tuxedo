@@ -183,7 +183,7 @@ def write_subsystem_mapping_files(genome_list):
                 sm.write("%s\t%s\n"%(sub_id,subsystem_dict[sub_id]["superclass"])) 
                 cm.write("%s\t%s\n"%(sub_id,subsystem_dict[sub_id]["class"])) 
                 
-#TODO
+#TODO: might not need function
 #Function that checks the genes from the host pipeline 
 #removes genes that arent in the system 
 def validate_host_genes():
@@ -299,15 +299,15 @@ def main(genome_list, condition_dict, parameters_str, output_dir, gene_matrix=Fa
         quantification.run_featurecount(genome_list, condition_dict, parameters, output_dir, job_data)
     prep_diffexp_files.create_metadata_file(genome_list,condition_dict,output_dir)
     #TODO: change novel_features condition when novel-isoform differential expression is implemented
-    if job_data.get("feature_count","htseq") == "stringtie":
+    if not run_cuffdiff_pipeline and job_data.get("feature_count","htseq") == "stringtie":
         prep_diffexp_files.write_gtf_list(genome_list,condition_dict) #function that writes the input for prepDE.py, which is a list of samples and paths to their gtf files. Do this for each genome
         prep_diffexp_files.prep_stringtie_diffexp(genome_list,condition_dict,job_data.get("recipe","RNA-Rocket") == "Host")   
-    else: #htseq
+    elif not run_cuffdiff_pipeline and job_data.get("feature_count","htseq") == "htseq": #htseq
         if job_data.get("recipe","RNA-Rocket") == "Host":
             prep_diffexp_files.create_counts_table_host(genome_list,condition_dict,job_data)
         else:
             prep_diffexp_files.create_counts_table(genome_list,condition_dict,job_data)
-    if job_data.get("recipe","RNA-Rocket") == "RNA-Rocket":
+    if not run_cuffdiff_pipeline and job_data.get("recipe","RNA-Rocket") == "RNA-Rocket":
         run_subsystem_analysis(genome_list,job_data)
     if len(condition_dict.keys()) > 1 and not job_data.get("novel_features",False):
         #If running cuffdiff pipeline, terminated after running expression import
