@@ -1,6 +1,9 @@
 
-title: "BVBRC RNASeq Analysis"
-subtitle: "Example Subtitle: Can also insert Logo"
+title: "BVBRC Transcriptomic Service"
+subtitle: "RNASeq Analysis"
+
+custom_logo: '/homes/clarkc/RNASeq_Pipeline/Prok-tuxedo/Multiqc/BV_BRC.png'
+custom_logo_title: 'BV-BRC'
 
 sp:
     general_stats:

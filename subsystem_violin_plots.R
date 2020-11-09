@@ -1,11 +1,11 @@
 #!/homes/clarkc/miniconda3/bin/Rscript
 
 #parameter format and check parameter inputs
-#plot_subsystems.R <subsystem_map.csv> <counts_file.txt|csv> <subsystem_level>
+#subsystem_violin_plots.R <subsystem_map.csv> <counts_file.txt|csv> <subsystem_level>
 args = commandArgs(trailingOnly=TRUE)
 
 if (length(args) != 5) {
-    stop("Incorrect parameters: plot_subsystems.R <subsystem_map.txt> <counts_file.txt|csv> <metadata.txt>  <subsystem_level> <feature_count>")
+    stop("Incorrect parameters: subsystem_violin_plots.R <subsystem_map.txt> <counts_file.txt|csv> <metadata.txt>  <subsystem_level> <feature_count>")
 }
 
 subsystem.file = args[1]
@@ -20,7 +20,7 @@ if (grepl("htseq",feature.count)) {
 } else if (grepl("stringtie",feature.count)) {
     count_sep = ","
 } else {
-    print("Error in plot_subsystems.R: can't determine counts file delimeter")
+    print("Error in subsystem_violin_plots.R: can't determine counts file delimeter")
     print(counts.file)
     stop()
 }
@@ -42,21 +42,21 @@ conditions = unique(metadata$Condition)
 #Create a plot for each condition
 for (c in conditions) {
     print(c)
-    cond_label = paste(c,"_Expression",sep="")
+    #cond_label = paste(c,"_Expression",sep="")
+    cond_label = c
     curr.mtx = counts.mtx[,subset(metadata,subset=Condition==c)$Sample]
     if (ncol(curr.mtx) > 1) {
         curr.mtx <- cbind(curr.mtx,rowMeans(curr.mtx))
     }
     colnames(curr.mtx)[-1] <- cond_label 
     plot.df <- data.frame(Genes=rownames(curr.mtx),Expression=log(curr.mtx[,c(cond_label)]+1),System=subsystem.map[,c(subsystem.level)])
-    #box-whisker plot
-    #boxplot <- ggplot(plot.df,aes(x=System,y=Expression))+geom_boxplot()+theme(axis.text.x=element_text(angle=90))
-    #png(paste("test_boxplot",cond_label,".png",sep=""))
-    #png(paste("test_boxplot",cond_label,".png",sep=""))
-    #print(boxplot) 
     #violin plot
-    vln_plot <- ggplot(plot.df,aes(x=System,y=Expression))+geom_violin()+theme(axis.text.x=element_text(angle=90))+ggtitle(cond_label)+ylab("Log-Expression")+xlab(subsystem.level)
-    png(paste("Violin_",cond_label,"_",subsystem.level,"_mqc.png",sep="")) 
+    cond_title = paste(cond_label," Log-Expression",sep="")
+    vln_plot <- ggplot(plot.df,aes(x=System,y=Expression))+geom_violin()+theme(axis.text.x=element_text(angle=90,vjust=-0.5))+ggtitle(cond_title)+ylab("Log-Expression")+xlab(subsystem.level)
+    #add boxplot
+    vln_plot = vln_plot + geom_boxplot(width=0.1)
+    #plot image and send to png file
+    png(paste(cond_label,"_",subsystem.level,"_Expression","_mqc.png",sep="")) 
     print(vln_plot)
     dev.off()
 }
