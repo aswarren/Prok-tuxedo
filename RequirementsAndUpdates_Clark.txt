@@ -16,7 +16,9 @@ Summary: The main update is the replacement of the current differential expressi
     - version: 3.6.1 
     - packages:
         - DESeq2
-        - Test: EnhancedVolcano for graphics??
+        - ggplot2
+        - ComplexHeatmap
+        - EnhancedVolcano
     - dependencies:
         - mscorefonts (plots on a headless system in a singularity container may output boxes in place of text without this package)
 
@@ -57,9 +59,5 @@ Summary: The main update is the replacement of the current differential expressi
     - Summary: transforms the individual gtf files output from stringtie into a single gene count and transcript count matrix  
 
 - TODO:
-    - parallelize htseq-count
     - review RockHopper for snRNA and other RNA quantification support
     - record changes for App-RNASeq.pl and RNASeq.json
-    - develop a "Report" for the RNA-Seq pipeline
-        - SAMstat reports?
-    - include volcano plots in the RNA-Seq report: see R package "EnhancedVolcano"

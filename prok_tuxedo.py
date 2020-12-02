@@ -14,6 +14,10 @@ import quantification
 import cufflinks_pipeline
 import prep_diffexp_files
 
+#testing subsystems.py
+#import subsystems
+#can't import subsystems, relies on python3 
+
 #take genome data structure and condition_dict and make directory names. processses condition to ensure no special characters, or whitespace
 def make_directory_names(genome, condition_dict):
     if genome["dir"].endswith('/'):
@@ -138,97 +142,72 @@ def write_gmx_file(genome_list):
                         o.write("\t0")
                 o.write("\n")
 
-def run_subsystem_analysis(genome_list,job_data):
-    for genome in genome_list:
-        #retrieve subsystem information
-        subsystem_dict = get_subsystem_mapping(genome)
-        if not subsystem_dict:
-            sys.stderr.write("Error in subsystem analysis for genome_id %s"%genome["genome"])
-        else:
-            genome["subsystem_dict"] = subsystem_dict
-    #write mapping file
-    write_subsystem_mapping_files(genome_list) 
-    #Run subsytem plotting R script
-    #subsystem_violin_plots.R <subsystem_map.txt> <counts_file.txt|csv> <metadata.txt>  <subsystem_level> <feature_count>
-    feature_count = "htseq" if job_data.get("feature_count","htseq") == "htseq" else "stringtie"
-    subsystem_levels = ["Superclass","Class"]
-    subsystem_map = ["superclass_map","class_map"]
-    for genome in genome_list:
-        os.chdir(genome["output"])
-        for i,level in enumerate(subsystem_levels):
-            subsystem_plot_cmd = ["subsystem_violin_plots.R",genome[subsystem_map[i]],genome["gene_matrix"],genome["deseq_metadata"],level,feature_count]    
-            print(" ".join(subsystem_plot_cmd))
-            subprocess.check_call(subsystem_plot_cmd)
-        
-def write_subsystem_mapping_files(genome_list):
-    for genome in genome_list:
-        if "subsystem_dict" not in genome:
-            continue 
-        subsystem_dict = genome["subsystem_dict"] 
-        os.chdir(genome["output"])     
-        superclass_map = os.path.basename(genome["output"])+".superclass_mapping"
-        class_map = os.path.basename(genome["output"])+".class_mapping"
-        superclass_path = os.path.join(genome["output"],superclass_map)
-        class_path = os.path.join(genome["output"],class_map)
-        genome["superclass_map"] = superclass_path
-        genome["class_map"] = class_path
-        #write superclass file
-        with open(superclass_map,"w") as sm, open(class_map,"w") as cm:
-            #write headers
-            sm.write("Patric_ID\tSuperclass\n")
-            cm.write("Patric_ID\tClass\n")
-            for sub_id in subsystem_dict:
-                if sub_id == "superclass_set" or sub_id == "class_set":
-                    continue
-                sm.write("%s\t%s\n"%(sub_id,subsystem_dict[sub_id]["superclass"])) 
-                cm.write("%s\t%s\n"%(sub_id,subsystem_dict[sub_id]["class"])) 
-                
 #TODO: might not need function
 #Function that checks the genes from the host pipeline 
 #removes genes that arent in the system 
 def validate_host_genes():
     print("need to write function")
 
-#TODO: incorporate KB_Auth token check
-def get_subsystem_mapping(genome):
-    genome_url = "https://patricbrc.org/api/subsystem/?eq(genome_id,"+os.path.basename(genome["output"])+")&limit(10000000)&http_accept=application/solr+json"
-    req = requests.Request('GET',genome_url)
-    prepared = req.prepare()
-    s = requests.Session()
-    response = s.send(prepared)
-    subsystem_dict = {}
-    superclass_set = set()
-    class_set = set()
-    print("Retrieving subsystem ids for genome_id %s"%(os.path.basename(genome["output"])))
-    print(genome_url)
-    if not response.ok:
-        sys.stderr.write("Failed to retrieve subsystem ids for genomd_id %s"%os.path.basename(genome["output"]))
-        return None
-    for entry in response.json()['response']['docs']: 
-        subsystem_dict[entry['patric_id']] = {}
-        subsystem_dict[entry['patric_id']]['superclass'] = entry['superclass'] if len(entry['superclass']) > 0 else 'NONE'
-        superclass_set.add(entry['superclass'])
-        subsystem_dict[entry['patric_id']]['class'] = entry['class'] if len(entry['class']) > 0 else 'NONE'
-        class_set.add(entry['class'])
-    subsystem_dict["superclass_set"] = superclass_set
-    subsystem_dict["class_set"] = class_set
-    return subsystem_dict
-
 #TODO: what if they don't do differential expression
 #TODO: should we care about the p-value?
+#TODO: maybe two heatmaps: 50 upregulated and 50 downregulated?
 #Strategy: 
 #   - go through and keep two sorted lists: upregulated and downregulated
-#   - TODO p-value step
 #   - pass top 50(?) into heatmap program 
-def top_diffexp_genes(genome_list,condition_dict): 
+#Returns: number of genes in the heatmap, skip heatmap if 0
+def top_diffexp_genes(genome_list): 
+    #TODO: log_threshold = 1
+    #pval_threshold = 0.05
+    pval_threshold = 1.0
     for genome in genome_list:
+        os.chdir(genome["output"])
         contrast_file_list = genome["diff_exp_contrasts"]
-        top_genes_list = []
+        #List for upregulated genes
+        up_genes_list = []
+        up_log_list = []
+        #List for downregulated genes
+        down_genes_list = []
+        down_log_list = []
+        #grab all signification genes
         for contrast_file in contrast_file_list:
             with open(contrast_file,"r") as cf:
-                   for line in cf:
-                        line = line.strip().split("\t") 
-                        
+                next(cf) #skip header
+                for line in cf:
+                    gene,baseMean,logFC,lfcSE,stat,pvalue,padj = line.strip().split("\t") 
+                    if float(padj) < pval_threshold:
+                        if float(logFC) < 0:
+                            down_genes_list.append(gene)
+                            down_log_list.append(float(logFC))
+                        elif float(logFC) > 0:
+                            up_genes_list.append(gene)
+                            up_log_list.append(float(logFC))
+        #zip and sort lists 
+        up_sorted = sorted(tuple(zip(up_genes_list,up_log_list)),key=lambda x:x[1],reverse=True)
+        down_sorted = sorted(tuple(zip(down_genes_list,down_log_list)),key=lambda x:x[1])
+        #get subset of genes for heatmap
+        num_up = 25 if len(up_sorted) > 25 else len(up_sorted)
+        num_down = 25 if len(down_sorted) > 25 else len(down_sorted)
+        heatmap_genes = list(up_sorted)[:num_up]+list(down_sorted)[:num_down]
+        if len(heatmap_genes) == 0:
+            sys.stderr.write("No significant genes found in differential expression file: no heatmap output\n")
+            continue 
+        #write genes to file
+        heatmap_genes_file = os.path.join(genome["output"],os.path.basename(genome["output"]+"_heatmap_genes.txt"))    
+        genome["heatmap_genes"] = heatmap_genes_file 
+        with open(heatmap_genes_file,"w") as o:
+            for gene in heatmap_genes:
+                o.write("%s\n"%gene[0]) 
+
+def generate_heatmaps(genome_list,job_data):
+    feature_count = "htseq" if job_data.get("feature_count","htseq") == "htseq" else "stringtie"
+    for genome in genome_list:
+        os.chdir(genome["output"])
+        if not "heatmap_genes" in genome:
+            continue
+        heatmap_gene_file = genome["heatmap_genes"]
+        #<heatmap_script.R> <gene_counts.txt> <metaata.txt> <heatmap_genes.txt> <output_prefix> <feature_count>
+        heatmap_cmd = ["generate_heatmaps.R",genome["gene_matrix"],genome["deseq_metadata"],os.path.basename(genome["output"]),feature_count]
+        print(" ".join(heatmap_cmd))
 
 def run_multiqc(genome_list):
     config_path = "/homes/clarkc/RNASeq_Pipeline/Prok-tuxedo/Multiqc/multiqc_config.yaml"
@@ -307,17 +286,17 @@ def main(genome_list, condition_dict, parameters_str, output_dir, gene_matrix=Fa
             prep_diffexp_files.create_counts_table_host(genome_list,condition_dict,job_data)
         else:
             prep_diffexp_files.create_counts_table(genome_list,condition_dict,job_data)
-    if not run_cuffdiff_pipeline and job_data.get("recipe","RNA-Rocket") == "RNA-Rocket":
-        run_subsystem_analysis(genome_list,job_data)
+    #TODO: remove False
+    if False and not run_cuffdiff_pipeline and job_data.get("recipe","RNA-Rocket") == "RNA-Rocket":
+        subsystems.run_subsystem_analysis(genome_list,job_data)
+    #STOP HERE FOR NOW
+    sys.exit()
     if len(condition_dict.keys()) > 1 and not job_data.get("novel_features",False):
         #If running cuffdiff pipeline, terminated after running expression import
         if run_cuffdiff_pipeline:
             cufflinks_pipeline.run_cuffdiff(genome_list, condition_dict, parameters, output_dir, gene_matrix, contrasts, job_data, map_args, diffexp_json)
             run_diff_exp_import(genome_list, condition_dict, parameters, output_dir, contrasts, job_data, map_args, diffexp_json)
             sys.exit(0)
-        #Create deseq2 metadata file. Ordering the matrix correctly will be done in R script 
-        #run prepDE.py to create counts files if using stringtie
-        
         run_deseq2(genome_list,contrasts,job_data)
         write_gmx_file(genome_list)
         #TODO: differential expression import will fail for host, fix by getting valid genes 
@@ -325,6 +304,9 @@ def main(genome_list, condition_dict, parameters_str, output_dir, gene_matrix=Fa
             run_diff_exp_import(genome_list, condition_dict, parameters, output_dir, contrasts, job_data, map_args, diffexp_json)
         except:
             print("Expression import failed")
+        #try to generate heatmaps 
+        top_diffexp_genes(genome_list) 
+        generate_heatmaps(genome_list,job_data)
     run_multiqc(genome_list)
         
         
@@ -501,4 +483,76 @@ if __name__ == "__main__":
 """)
     main(genome_list,condition_dict,map_args.p,output_dir,gene_matrix,contrasts,job_data,map_args,diffexp_json)
 
+'''
 
+def run_subsystem_analysis(genome_list,job_data):
+    for genome in genome_list:
+        #retrieve subsystem information
+        subsystem_dict = get_subsystem_mapping(genome)
+        if not subsystem_dict:
+            sys.stderr.write("Error in subsystem analysis for genome_id %s"%genome["genome"])
+        else:
+            genome["subsystem_dict"] = subsystem_dict
+    #write mapping file
+    write_subsystem_mapping_files(genome_list) 
+    #Run subsytem plotting R script
+    #subsystem_violin_plots.R <subsystem_map.txt> <counts_file.txt|csv> <metadata.txt>  <subsystem_level> <feature_count>
+    feature_count = "htseq" if job_data.get("feature_count","htseq") == "htseq" else "stringtie"
+    subsystem_levels = ["Superclass","Class"]
+    subsystem_map = ["superclass_map","class_map"]
+    for genome in genome_list:
+        os.chdir(genome["output"])
+        for i,level in enumerate(subsystem_levels):
+            subsystem_plot_cmd = ["subsystem_violin_plots.R",genome[subsystem_map[i]],genome["gene_matrix"],genome["deseq_metadata"],level,feature_count]    
+            print(" ".join(subsystem_plot_cmd))
+            subprocess.check_call(subsystem_plot_cmd)
+            
+def write_subsystem_mapping_files(genome_list):
+    for genome in genome_list:
+        if "subsystem_dict" not in genome:
+            continue 
+        subsystem_dict = genome["subsystem_dict"] 
+        os.chdir(genome["output"])     
+        superclass_map = os.path.basename(genome["output"])+".superclass_mapping"
+        class_map = os.path.basename(genome["output"])+".class_mapping"
+        superclass_path = os.path.join(genome["output"],superclass_map)
+        class_path = os.path.join(genome["output"],class_map)
+        genome["superclass_map"] = superclass_path
+        genome["class_map"] = class_path
+        #write superclass file
+        with open(superclass_map,"w") as sm, open(class_map,"w") as cm:
+            #write headers
+            sm.write("Patric_ID\tSuperclass\n")
+            cm.write("Patric_ID\tClass\n")
+            for sub_id in subsystem_dict:
+                if sub_id == "superclass_set" or sub_id == "class_set":
+                    continue
+                sm.write("%s\t%s\n"%(sub_id,subsystem_dict[sub_id]["superclass"])) 
+                cm.write("%s\t%s\n"%(sub_id,subsystem_dict[sub_id]["class"])) 
+
+#TODO: incorporate KB_Auth token check
+def get_subsystem_mapping(genome):
+    genome_url = "https://patricbrc.org/api/subsystem/?eq(genome_id,"+os.path.basename(genome["output"])+")&limit(10000000)&http_accept=application/solr+json"
+    req = requests.Request('GET',genome_url)
+    prepared = req.prepare()
+    s = requests.Session()
+    response = s.send(prepared)
+    subsystem_dict = {}
+    superclass_set = set()
+    class_set = set()
+    print("Retrieving subsystem ids for genome_id %s"%(os.path.basename(genome["output"])))
+    print(genome_url)
+    if not response.ok:
+        sys.stderr.write("Failed to retrieve subsystem ids for genomd_id %s"%os.path.basename(genome["output"]))
+        return None
+    for entry in response.json()['response']['docs']: 
+        subsystem_dict[entry['patric_id']] = {}
+        subsystem_dict[entry['patric_id']]['superclass'] = entry['superclass'] if len(entry['superclass']) > 0 else 'NONE'
+        superclass_set.add(entry['superclass'])
+        subsystem_dict[entry['patric_id']]['class'] = entry['class'] if len(entry['class']) > 0 else 'NONE'
+        class_set.add(entry['class'])
+    subsystem_dict["superclass_set"] = superclass_set
+    subsystem_dict["class_set"] = class_set
+    return subsystem_dict
+
+'''
