@@ -4,7 +4,7 @@ args = commandArgs(trailingOnly=TRUE)
 numContrasts = length(args) - 4
 
 if (numContrasts < 1) {
-    stop("Not enough parameters: generate_heatmaps.R <counts_file> <metadata_file> <heatmap_genes_file> <output_prefix> <feature_count>")
+    stop("Not enough parameters: generate_heatmaps.R <counts_file> <metadata_file> <heatmap_genes_file> <output_prefix> <feature_count> <specialty_genes")
 }
 
 #check argument length
@@ -13,6 +13,7 @@ metadata.file = args[2]
 genes.file = args[3]
 prefix = args[4]
 feature.count = args[5]
+specialty_genes.file = args[6]
 
 #check file extensions
 if (grepl("htseq",feature.count)) {

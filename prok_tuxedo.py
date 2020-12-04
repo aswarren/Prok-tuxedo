@@ -202,49 +202,6 @@ def top_diffexp_genes(genome_list):
             for gene in heatmap_genes:
                 o.write("%s\n"%gene[0]) 
 
-#TODO: write this function
-#TODO: url does not result in a list of amr genes, just an empty list
-#https://patricbrc.org/api/genome_amr/?in(genome_id,(242231.10))&in(resistant_phenotype,(Resistant,Susceptible,Intermediate))&limit(1)&facet((pivot,(antibiotic,resistant_phenotype,genome_id)),(mincount,1),(limit,-1))&json(nl,map)
-def get_amr_mapping(genome):
-    prefix_url = "https://patricbrc.org/api/genome_amr/?in(genome_id,("
-    suffix_url = "))&in(resistant_phenotype,(Resistant,Susceptible,Intermediate))&limit(1)&facet((pivot,(antibiotic,resistant_phenotype,genome_id)),(mincount,1),(limit,-1))&json(nl,map)"
-    amr_url = prefix_url + os.path.basename(genome["output"]) + suffix_url
-    print("Retrieving amr ids for genome_id %s\n"%(os.path.basename(genome["output"])))
-    print(amr_url)
-    req = requests.Request('GET',amr_url)
-    prepared = req.prepare()
-    s = requests.Session()
-    response = s.send(prepared)
-    print(response)
-    amr_dict = {}
-    if not response.ok:
-        sys.stderr.write("Failed to retrieve amr ids for genome_id %s"%os.path.basename(genome["output"]))
-        return None
-    for entry in response.json()['response']['docs']:
-        print(entry)
-        return None
-
-#TODO: write this function
-#https://patricbrc.org/api/sp_gene/?in(genome_id,(242231.10))&limit(8000)&select(property,patric_id)&http_accept=application/solr+json
-def get_specialty_genes_mapping(genome):
-    prefix_url = "https://patricbrc.org/api/sp_gene/?in(genome_id,("
-    suffix_url = "))&limit(8000)&select(property,patric_id)&http_accept=application/solr+json"
-    sp_gene_url = prefix_url + os.path.basename(genome["output"]) + suffix_url
-    print("Retrieving specialty gene ids for genome_id %s\n"%(os.path.basename(genome["output"])))
-    print(sp_gene_url)
-    req = requests.Request('GET',sp_gene_url)
-    prepared = req.prepare()
-    s = requests.Session()
-    response = s.send(prepared)
-    print(response)
-    sp_dict = {}
-    if not response.ok:
-        sys.stderr.write("Failed to retrieve specialty_gene ids for genome_id %s"%os.path.basename(genome["output"]))
-        return None
-    for entry in response.json()['response']['docs']:
-        print(entry)
-        return None
-
 def generate_heatmaps(genome_list,job_data):
     feature_count = "htseq" if job_data.get("feature_count","htseq") == "htseq" else "stringtie"
     for genome in genome_list:
@@ -337,12 +294,10 @@ def main(genome_list, condition_dict, parameters_str, output_dir, gene_matrix=Fa
     if False and not run_cuffdiff_pipeline and job_data.get("recipe","RNA-Rocket") == "RNA-Rocket":
         subsystems.run_subsystem_analysis(genome_list,job_data)
     
-    ###Test getting amr genes
-    #get_amr_mapping(genome_list[0])
-    ###Test getting specialty genes
-    get_specialty_genes_mapping(genome_list[0])
-
-    #STOP HERE FOR NOW
+    ####STOP HERE FOR NOW
+    ###Moved amr and specialty genes to subsystems.py
+    ###Figure out what's wrong with AMR
+    ###Finish implementing specialty genes and add to heatmap generator
     sys.exit()
     if len(condition_dict.keys()) > 1 and not job_data.get("novel_features",False):
         #If running cuffdiff pipeline, terminated after running expression import
