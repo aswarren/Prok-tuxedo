@@ -38,7 +38,8 @@ counts.mtx = counts.mtx[subsystem.map[,1],]
 
 #Get all unique conditions
 conditions = unique(metadata$Condition)
-
+#TODO: increasing the image width and height
+#TODO: add colors to the 
 #Create a plot for each condition
 for (c in conditions) {
     print(c)
@@ -52,11 +53,16 @@ for (c in conditions) {
     plot.df <- data.frame(Genes=rownames(curr.mtx),Expression=log(curr.mtx[,c(cond_label)]+1),System=subsystem.map[,c(subsystem.level)])
     #violin plot
     cond_title = paste(cond_label," Log-Expression",sep="")
-    vln_plot <- ggplot(plot.df,aes(x=System,y=Expression))+geom_violin()+theme(axis.text.x=element_text(angle=90,vjust=-0.5))+ggtitle(cond_title)+ylab("Log-Expression")+xlab(subsystem.level)
+    vln_plot <- ggplot(plot.df,aes(x=System,y=Expression,fill=System))+geom_violin(trim=FALSE)+ggtitle(cond_title)+ylab("Log-Expression")+xlab("System")
     #add boxplot
-    vln_plot = vln_plot + geom_boxplot(width=0.1)
+    vln_plot = vln_plot + geom_boxplot(width=0.1,fill="white") 
+    #remove x-axis text
+    #+theme(axis.text.x=element_text(size=0,angle=45,vjust=-0.5))
+    vln_plot = vln_plot + theme(axis.text.x = element_blank(),axis.ticks.x = element_blank())
     #plot image and send to png file
-    png(paste(cond_label,"_",subsystem.level,"_Expression","_mqc.png",sep="")) 
+    vln_png = paste(cond_label,"_",subsystem.level,"_Expression","_mqc.png",sep="")
+    png(vln_png,res=100,width=700) 
     print(vln_plot)
     dev.off()
+    #ggsave(file=vln_png)
 }

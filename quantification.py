@@ -1,6 +1,6 @@
 #!/usr/bin/env python
 
-import os,sys,glob,subprocess
+import os,sys,glob,math,shutil,subprocess
 
 #Run the feature count program specified in json input, or run htseq-count by default
 def run_featurecount(genome_list, condition_dict, parameters, output_dir, job_data):

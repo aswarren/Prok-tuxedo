@@ -57,20 +57,10 @@ for (c in conditions) {
 colnames(expression.df) = matrix_headers
 rownames(expression.df) = expression.df$Genes
 expression.mtx = as.matrix(expression.df[-1])
-png("test_heatmap.png")
+out_png = paste(prefix,"_heatmap_mqc.png",sep="")
+#TODO: calculate image width and height based on number of samples
+png(out_png,width=600,heigh=600)
 #heatmap(expression.mtx,cexCol=1,Colv=NULL)
-Heatmap(expression.mtx,name="log-expression",cluster_columns=FALSE,row_names_gp = gpar(fontsize=6),column_names_gp = gpar(fontsize=8), column_split = sample_split)
+Heatmap(expression.mtx,name="log-expression",cluster_columns=FALSE,row_names_gp = gpar(fontsize=8),column_names_gp = gpar(fontsize=8),column_names_rot = 45, column_split = sample_split, border=TRUE)
 #legend(x="bottomright",
-dev.off()
-
-
-stop()
-#beolow is teh ggplot2 implementation
-#melt data frame
-heatmap.melt = melt(expression.df)
-heatmap.headers = c("Gene","Condition","Log_Expression")
-colnames(heatmap.melt) = heatmap.headers
-#create heatmap
-png("test_heatmap_ggplot.png")
-ggplot(heatmap.melt,aes(x=Condition,y=Gene,fill=Log_Expression))+geom_tile()+theme(axis.text.y=element_text(size=10))+scale_fill_gradient2(low=c("blue"),high=c("red"))
 dev.off()
