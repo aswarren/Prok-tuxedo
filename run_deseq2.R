@@ -69,9 +69,10 @@ for (i in 5:length(args))
     #write to output file
     results_file = paste(curr_contrast[1],"_vs_",curr_contrast[2],".",feature_count,".",out_prefix,".deseq2",sep="")     
     write.table(res,file=results_file,sep="\t",quote=FALSE,row.names=FALSE)
+
     #Create volcano plot
     ev_image_name = paste(out_prefix,"_",curr_contrast[1],"_vs_",curr_contrast[2],"_mqc.png",sep="")
-    png(ev_image_name)
+    png(ev_image_name,width=669,height=459)
     ev_png <- EnhancedVolcano(res,lab=rownames(res),x='log2FoldChange',y='padj',subtitle="",legendPosition="right")
     print(ev_png)
     dev.off()

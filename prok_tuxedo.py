@@ -208,10 +208,10 @@ def generate_heatmaps(genome_list,job_data):
         os.chdir(genome["output"])
         if not "heatmap_genes" in genome:
             continue
-        #<heatmap_script.R> <gene_counts.txt> <metaata.txt> <heatmap_genes.txt> <output_prefix> <feature_count>
-        heatmap_cmd = ["generate_heatmaps.R",genome["gene_matrix"],genome["deseq_metadata"],genome["heatmap_genes"],os.path.basename(genome["output"]),feature_count]
+        #<heatmap_script.R> <gene_counts.txt> <metaata.txt> <heatmap_genes.txt> <output_prefix> <feature_count> <specialty_genes)
+        heatmap_cmd = ["generate_heatmaps.R",genome["gene_matrix"],genome["deseq_metadata"],genome["heatmap_genes"],os.path.basename(genome["output"]),feature_count,genome["specialty_genes_map"]]
         print(" ".join(heatmap_cmd))
-        subprocess.check_call(heatmap_cmd)
+        #subprocess.check_call(heatmap_cmd)
 
 def run_multiqc(genome_list):
     config_path = "/homes/clarkc/RNASeq_Pipeline/Prok-tuxedo/Multiqc/multiqc_config.yaml"
@@ -298,7 +298,7 @@ def main(genome_list, condition_dict, parameters_str, output_dir, gene_matrix=Fa
     ###Moved amr and specialty genes to subsystems.py
     ###Figure out what's wrong with AMR
     ###Finish implementing specialty genes and add to heatmap generator
-    sys.exit()
+    #sys.exit()
     if len(condition_dict.keys()) > 1 and not job_data.get("novel_features",False):
         #If running cuffdiff pipeline, terminated after running expression import
         if run_cuffdiff_pipeline:
@@ -312,9 +312,13 @@ def main(genome_list, condition_dict, parameters_str, output_dir, gene_matrix=Fa
             run_diff_exp_import(genome_list, condition_dict, parameters, output_dir, contrasts, job_data, map_args, diffexp_json)
         except:
             print("Expression import failed")
-        #try to generate heatmaps 
+        #get amr and specialty genes for labeling the heatmap
+        subsystems.setup_specialty_genes(genome_list)
+        #generate heatmaps 
         top_diffexp_genes(genome_list) 
         generate_heatmaps(genome_list,job_data)
+    #TODO: uncomment generate_heatmaps (above)
+    #sys.exit()
     run_multiqc(genome_list)
         
         

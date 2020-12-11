@@ -90,7 +90,11 @@ def write_subsystem_mapping_files(genome_list):
                 sm.write("%s\t%s\n"%(sub_id,subsystem_dict[sub_id]["Superclass"])) 
                 cm.write("%s\t%s\n"%(sub_id,subsystem_dict[sub_id]["Class"])) 
 
-#TODO: have not written part where "specialty_genes_dict" is added to genome_list entry
+def setup_specialty_genes(genome_list):
+    for genome in genome_list:
+        genome["specialty_genes_dict"] = get_specialty_genes_mapping(genome)
+    write_specialty_genes_mapping_files(genome_list)
+
 def write_specialty_genes_mapping_files(genome_list):
     for genome in genome_list:
         if "specialty_genes_dict" not in genome:
@@ -99,8 +103,9 @@ def write_specialty_genes_mapping_files(genome_list):
         os.chdir(genome["output"])
         sp_map = os.path.basename(genome["output"])+".specialty_genes"
         sp_path = os.path.join(genome["output"],sp_map)
+        genome["specialty_genes_map"] = sp_path
         with open(sp_map,"w") as o:
-            o.write("Patric_ID\tSP_Gene\n")
+            o.write("Patric_ID\tSP_Field\n")
             for p_id in sp_dict:
                 o.write("%s\t%s\n"%(p_id,sp_dict[p_id]['property']))
 
