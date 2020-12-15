@@ -211,7 +211,7 @@ def generate_heatmaps(genome_list,job_data):
         #<heatmap_script.R> <gene_counts.txt> <metaata.txt> <heatmap_genes.txt> <output_prefix> <feature_count> <specialty_genes)
         heatmap_cmd = ["generate_heatmaps.R",genome["gene_matrix"],genome["deseq_metadata"],genome["heatmap_genes"],os.path.basename(genome["output"]),feature_count,genome["specialty_genes_map"]]
         print(" ".join(heatmap_cmd))
-        #subprocess.check_call(heatmap_cmd)
+        subprocess.check_call(heatmap_cmd)
 
 def run_multiqc(genome_list):
     config_path = "/homes/clarkc/RNASeq_Pipeline/Prok-tuxedo/Multiqc/multiqc_config.yaml"

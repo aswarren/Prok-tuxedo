@@ -39,7 +39,7 @@ counts.mtx = counts.mtx[subsystem.map[,1],]
 #Get all unique conditions
 conditions = unique(metadata$Condition)
 #TODO: increasing the image width and height
-#TODO: add colors to the 
+#TODO: change color palette
 #Create a plot for each condition
 for (c in conditions) {
     print(c)
