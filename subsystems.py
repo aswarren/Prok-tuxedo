@@ -85,8 +85,6 @@ def write_subsystem_mapping_files(genome_list):
             sm.write("Patric_ID\tSuperclass\n")
             cm.write("Patric_ID\tClass\n")
             for sub_id in subsystem_dict:
-                #if sub_id == "superclass_set" or sub_id == "class_set":
-                #    continue
                 sm.write("%s\t%s\n"%(sub_id,subsystem_dict[sub_id]["Superclass"])) 
                 cm.write("%s\t%s\n"%(sub_id,subsystem_dict[sub_id]["Class"])) 
 
@@ -120,7 +118,6 @@ def get_specialty_genes_mapping(genome):
     prepared = req.prepare()
     s = requests.Session()
     response = s.send(prepared)
-    print(response)
     sp_dict = {}
     if not response.ok:
         sys.stderr.write("Failed to retrieve specialty_gene ids for genome_id %s"%os.path.basename(genome["output"]))

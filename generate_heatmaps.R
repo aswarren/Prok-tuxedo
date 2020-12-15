@@ -4,7 +4,7 @@ args = commandArgs(trailingOnly=TRUE)
 numContrasts = length(args) - 4
 
 if (numContrasts < 1) {
-    stop("Not enough parameters: generate_heatmaps.R <counts_file> <metadata_file> <heatmap_genes_file> <output_prefix> <feature_count> <specialty_genes")
+    stop("Not enough parameters: generate_heatmaps.R <counts_file> <metadata_file> <heatmap_genes_file> <output_prefix> <feature_count> <specialty_genes> <subsystem_map>")
 }
 
 #TODO: adjust so if specialty genes or other features aren't past in the script will still run
@@ -16,6 +16,7 @@ genes.file = args[3]
 prefix = args[4]
 feature.count = args[5]
 specialty_genes.file = args[6]
+subsystem.file = args[7]
 
 #check file extensions
 if (grepl("htseq",feature.count)) {
@@ -44,17 +45,32 @@ colnames(genes.list) <- c("Genes")
 png_width = nrow(metadata)*100   
 
 ###Process specialty genes
-#TODO:total 9 different fields for the moment
-sp.colors = c("#E41A1C","#377EB8","#4DAF4A","#984EA3","#FF7F00","#FFFF33","#A65628","#F781BF","#999999")
+#TODO: replace colors with letters/shapes appended to genes
+sp.labels = LETTERS 
 specialty.genes <- read.table(specialty_genes.file,header=T,sep="\t")
 specialty.genes = subset(specialty.genes,subset=Patric_ID %in% genes.list$Genes)
-uniq_fields = unique(specialty.genes$SP_Field)
-sp.colors = sp.colors[1:length(uniq_fields)]
-specialty.genes$SP_Color = rep(0,length.out=length(specialty.genes$SP_Field))
-for (i in 1:length(uniq_fields)) {
-    specialty.genes[which(specialty.genes$SP_Field == uniq_fields[i]),][,3] = sp.colors[i] 
+uniq_sp = unique(specialty.genes$SP_Field)
+sp.labels = sp.labels[1:length(uniq_sp)]
+specialty.genes$SP_Label = rep("",length.out=length(specialty.genes$SP_Field))
+for (i in 1:length(uniq_sp)) {
+    specialty.genes[which(specialty.genes$SP_Field == uniq_sp[i]),][,3] = paste("_",sp.labels[i],sep="") 
 }
 specialty.genes$Patric_ID = as.character(specialty.genes$Patric_ID)
+
+###Process subsystem genes
+subsystem.map <- read.table(subsystem.file,sep="\t",header=T,stringsAsFactors=FALSE)
+#Filter entries with no label and get any included in the heatmap 
+#TODO:total 9 different fields for the moment
+sub.colors = c("#E41A1C","#377EB8","#4DAF4A","#984EA3","#FF7F00","#FFFF33","#A65628","#F781BF","#999999")
+subsystem.map = subsystem.map[!grepl("NONE",subsystem.map[,2]),]
+subsystem.map = subset(subsystem.map,subset=Patric_ID %in% genes.list$Genes)
+uniq_subsystems = unique(subsystem.map[,2]) 
+sub.colors = sub.colors[1:length(uniq_subsystems)] 
+subsystem.map$Sub_Color = rep(0,length.out=length(subsystem.map[,2]))
+for (i in 1:length(uniq_subsystems)) {
+    subsystem.map[which(subsystem.map[,2] == uniq_subsystems[i]),][,3] = sub.colors[i]
+}
+subsystem.map$Patric_ID = as.character(subsystem.map$Patric_ID)
 
 #Create Matrix: log transform data
 expression.df <- data.frame(Genes=genes.list$Genes)
@@ -74,16 +90,29 @@ colnames(expression.df) = matrix_headers
 rownames(expression.df) = expression.df$Genes
 expression.mtx = as.matrix(expression.df[-1])
 
-###setup the colors list
+###setup the subsystem colors list
 colors.list = rep("black",length.out=length(rownames(expression.mtx)))
 names(colors.list) = rownames(expression.df)
-colors.list[specialty.genes$Patric_ID] = specialty.genes$SP_Color
+colors.list[subsystem.map$Patric_ID] = subsystem.map$Sub_Color
+###setup te specialty genes label additions
+sp.index = rownames(expression.mtx) %in% specialty.genes$Patric_ID
+rownames(expression.mtx)[sp.index] = paste(rownames(expression.mtx)[sp.index],specialty.genes[,3],sep="")
+###Create subsystem genes legend
+sub_legend = Legend(labels = uniq_subsystems, title = "Subsystem Genes", legend_gp = gpar(fill=sub.colors))
 ###Create specialty genes legend
-sp_legend = Legend(labels = uniq_fields, title = "Specialty Genes", legend_gp = gpar(fill=sp.colors))
+#sp_list = rep(0,length.out=length(sp.labels))
+#use x,y,w, or h to index sp.labels somehow: check those values
+sp_list <- vector("list",length(sp.labels))
+for (i in 1:length(sp.labels)) {
+    sp_list[[i]] = function(x, y, w, h) grid.text(sp.labels[i],x,y)
+}
+print(sp_list)
+stop()
+sp_legend = Legend(labels = uniq_sp, title = "Specialty Genes", graphics = sp_list) 
 ###Name of output png: must end with "_mqc" in order to multiqc to recognize it
 out_png = paste(prefix,"_heatmap_mqc.png",sep="")
 ###Create heatmap
 png(out_png,width=png_width,height=600)
 ht = Heatmap(expression.mtx,name="log-counts",cluster_columns=FALSE,row_names_gp = gpar(fontsize=8,col=colors.list),column_names_gp = gpar(fontsize=8),column_names_rot = 45, column_split = sample_split, border=TRUE)
-draw(ht,heatmap_legend_list=list(sp_legend),padding=unit(c(1,1,1,15),"mm"))
+draw(ht,heatmap_legend_list=list(sub_legend,sp_legend),padding=unit(c(1,1,1,15),"mm"))
 dev.off()

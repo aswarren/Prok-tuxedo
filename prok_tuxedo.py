@@ -209,7 +209,7 @@ def generate_heatmaps(genome_list,job_data):
         if not "heatmap_genes" in genome:
             continue
         #<heatmap_script.R> <gene_counts.txt> <metaata.txt> <heatmap_genes.txt> <output_prefix> <feature_count> <specialty_genes)
-        heatmap_cmd = ["generate_heatmaps.R",genome["gene_matrix"],genome["deseq_metadata"],genome["heatmap_genes"],os.path.basename(genome["output"]),feature_count,genome["specialty_genes_map"]]
+        heatmap_cmd = ["generate_heatmaps.R",genome["gene_matrix"],genome["deseq_metadata"],genome["heatmap_genes"],os.path.basename(genome["output"]),feature_count,genome["specialty_genes_map"],genome["superclass_map"]]
         print(" ".join(heatmap_cmd))
         subprocess.check_call(heatmap_cmd)
 
@@ -291,7 +291,8 @@ def main(genome_list, condition_dict, parameters_str, output_dir, gene_matrix=Fa
         else:
             prep_diffexp_files.create_counts_table(genome_list,condition_dict,job_data)
     #TODO: remove False
-    if False and not run_cuffdiff_pipeline and job_data.get("recipe","RNA-Rocket") == "RNA-Rocket":
+    #TODO: reorganize queries to occur in one script instead of creating a dependency between different query functions and their order
+    if True and not run_cuffdiff_pipeline and job_data.get("recipe","RNA-Rocket") == "RNA-Rocket":
         subsystems.run_subsystem_analysis(genome_list,job_data)
     
     ####STOP HERE FOR NOW
