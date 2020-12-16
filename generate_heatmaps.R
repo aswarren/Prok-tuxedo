@@ -94,7 +94,7 @@ expression.mtx = as.matrix(expression.df[-1])
 colors.list = rep("black",length.out=length(rownames(expression.mtx)))
 names(colors.list) = rownames(expression.df)
 colors.list[subsystem.map$Patric_ID] = subsystem.map$Sub_Color
-###setup te specialty genes label additions
+###setup the specialty genes label additions
 sp.index = rownames(expression.mtx) %in% specialty.genes$Patric_ID
 rownames(expression.mtx)[sp.index] = paste(rownames(expression.mtx)[sp.index],specialty.genes[,3],sep="")
 ###Create subsystem genes legend

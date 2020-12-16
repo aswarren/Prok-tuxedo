@@ -48,19 +48,23 @@ subsystem.map <- read.table(subsystem.file,sep="\t",header=T,stringsAsFactors=FA
 subsystem.map = subsystem.map[!grepl("NONE",subsystem.map[,2]),]
 counts.mtx = counts.mtx[subsystem.map[,1],]
 
-#Calculate image width and height
-png_width = 1000
-png_height = 600 
-
 #Testing: min and max values
 log_min = log(min(counts.mtx)+1)
 log_max = log(max(counts.mtx))
 
-#Get all unique conditions
+#Get all unique subsystems and conditions
 conditions = unique(metadata$Condition)
+subsystems = unique(subsystem.map[,2])  
+
+#Calculate image width and height
+num_columns <- ceiling(sqrt(length(subsystems)))
+num_samples <- ncol(curr.mtx)
+num_rows <- ceiling(length(subsystems)/num_columns)
+png_width = (num_columns + num_samples)*100
+png_height = num_rows*200 
+
 #Get all unique features/subsystems
 legend <- NULL 
-subsystems = unique(subsystem.map[,2])  
 plot_list = vector("list",length(subsystems)+1)
 for (i in 1:length(subsystems)) {
     curr.system = subsystems[i] 
@@ -83,7 +87,7 @@ for (i in 1:length(subsystems)) {
     plot_list[[i]] <- vln_plot
 }
 plot_list[[length(subsystems)+1]] <- legend
-num_columns <- ceiling(sqrt(length(subsystems)))
-png("test_grid_vln_plot.png",width=png_width,height=png_height)
+vln_png = paste(subsystem.level,"_Subsystem_Distribution_mqc.png",sep="")
+png(vln_png,width=png_width,height=png_height)
 do.call("grid.arrange",c(plot_list,ncol=num_columns))
 dev.off()

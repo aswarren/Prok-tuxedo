@@ -1,21 +1,7 @@
 #!/usr/bin/env python
-###!/homes/clarkc/miniconda3/bin/python3
 
 import sys,os,subprocess
 import requests
-#sys.path.append('/homes/clarkc/miniconda3/lib/python3.7/site-packages/')
-#import pandas as pd
-
-#TODO: apparently I never finished setting up this script
-#TODO: finish it
-
-#TODO: remove this function: don't need it in current setup
-def subsystem_violin_plot(subsystem_dict,counts_mtx_file,metadata_file,level,feature_count):
-    counts_sep = "," if feature_count == "stringtie" else "\t"
-    count_mtx = pd.read_csv(counts_mtx_file,sep=counts_sep)
-    counts_mtx.head()
-    #for patric_id in subsystem_dict: 
-         
 
 def run_subsystem_analysis(genome_list,job_data):
     for genome in genome_list:
@@ -37,7 +23,8 @@ def run_subsystem_analysis(genome_list,job_data):
     for genome in genome_list:
         os.chdir(genome["output"])
         for i,level in enumerate(subsystem_levels):
-            subsystem_plot_cmd = ["subsystem_violin_plots.R",genome[subsystem_map[i]],genome["gene_matrix"],genome["deseq_metadata"],level,feature_count]    
+            #subsystem_plot_cmd = ["subsystem_violin_plots.R",genome[subsystem_map[i]],genome["gene_matrix"],genome["deseq_metadata"],level,feature_count]    
+            subsystem_plot_cmd = ["grid_violin_plots.R",genome[subsystem_map[i]],genome["gene_matrix"],genome["deseq_metadata"],level,feature_count]    
             print(" ".join(subsystem_plot_cmd))
             subprocess.check_call(subsystem_plot_cmd)
             #subsystem_violin_plot(subsystem_dict,genome["gene_matrix"],genome["deseq_metadata"],level,feature_count)
