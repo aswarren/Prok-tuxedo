@@ -100,15 +100,13 @@ rownames(expression.mtx)[sp.index] = paste(rownames(expression.mtx)[sp.index],sp
 ###Create subsystem genes legend
 sub_legend = Legend(labels = uniq_subsystems, title = "Subsystem Genes", legend_gp = gpar(fill=sub.colors))
 ###Create specialty genes legend
-#sp_list = rep(0,length.out=length(sp.labels))
-#use x,y,w, or h to index sp.labels somehow: check those values
-sp_list <- vector("list",length(sp.labels))
-for (i in 1:length(sp.labels)) {
-    sp_list[[i]] = function(x, y, w, h) grid.text(sp.labels[i],x,y)
-}
-print(sp_list)
-stop()
-sp_legend = Legend(labels = uniq_sp, title = "Specialty Genes", graphics = sp_list) 
+#eval(substitute()) exchanges the value of i for the integer at that step when evaluating the function call in draw()
+#otherwise, sp.labels[i] uses the last value of i in the loop, which sets the icons in the legend ot the same value
+sp_list <- lapply(1:length(sp.labels),function(i){
+    retval <- function(x,y,w,h) grid.text(eval(substitute(sp.labels[i],list(f=as.name(i)))),x,y)
+    retval
+})
+sp_legend = Legend(labels = uniq_sp, title = "Specialty Genes", graphics = sp_list)
 ###Name of output png: must end with "_mqc" in order to multiqc to recognize it
 out_png = paste(prefix,"_heatmap_mqc.png",sep="")
 ###Create heatmap
