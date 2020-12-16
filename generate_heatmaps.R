@@ -108,7 +108,7 @@ sp_list <- lapply(1:length(sp.labels),function(i){
 })
 sp_legend = Legend(labels = uniq_sp, title = "Specialty Genes", graphics = sp_list)
 ###Name of output png: must end with "_mqc" in order to multiqc to recognize it
-out_png = paste(prefix,"_heatmap_mqc.png",sep="")
+out_png = paste(prefix,"Differentially_Expressed_Genes_Heatmap_mqc.png",sep="")
 ###Create heatmap
 png(out_png,width=png_width,height=600)
 ht = Heatmap(expression.mtx,name="log-counts",cluster_columns=FALSE,row_names_gp = gpar(fontsize=8,col=colors.list),column_names_gp = gpar(fontsize=8),column_names_rot = 45, column_split = sample_split, border=TRUE)
