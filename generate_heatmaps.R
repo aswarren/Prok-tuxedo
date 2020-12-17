@@ -34,11 +34,14 @@ library(ComplexHeatmap,quietly=TRUE)
 
 ###TODO: add units to the heatmap (TPM, TPKM, etc)
 
-#create a heatmap with the log(gene_expression)
+#create a heatmap with normalized expression 
 counts.mtx <- read.table(counts.file,sep=count_sep,header=T,row.names=1,stringsAsFactors=FALSE)
 metadata <- read.table(metadata.file,sep="\t",header=T,stringsAsFactors=FALSE)
 genes.list <- read.table(genes.file,stringsAsFactors=FALSE)
 colnames(genes.list) <- c("Genes")
+
+#normalize counts 
+counts.mtx = scale(counts.mtx)
 
 ###Calculate picture widtth based on the number of samples
 #heatmap width and offset are set in the draw() method at the bottom
@@ -72,7 +75,7 @@ for (i in 1:length(uniq_subsystems)) {
 }
 subsystem.map$Patric_ID = as.character(subsystem.map$Patric_ID)
 
-#Create Matrix: log transform data
+#Create Matrix
 expression.df <- data.frame(Genes=genes.list$Genes)
 matrix_headers = c("Genes")
 sample_split = c()
@@ -82,7 +85,8 @@ for (c in conditions) {
     #Subset data on current contrast
     curr.metadata = subset(metadata,subset=Condition==c)
     sample_split = c(sample_split,rep(c,length(curr.metadata$Sample)))
-    curr.count.mtx = log(counts.mtx[genes.list$Genes,curr.metadata$Sample]+1)
+    #curr.count.mtx = log(counts.mtx[genes.list$Genes,curr.metadata$Sample]+1)
+    curr.count.mtx = counts.mtx[genes.list$Genes,curr.metadata$Sample]
     matrix_headers = c(matrix_headers,curr.metadata$Sample)
     expression.df = cbind(expression.df,curr.count.mtx)
 }
@@ -108,9 +112,9 @@ sp_list <- lapply(1:length(sp.labels),function(i){
 })
 sp_legend = Legend(labels = uniq_sp, title = "Specialty Genes", graphics = sp_list)
 ###Name of output png: must end with "_mqc" in order to multiqc to recognize it
-out_png = paste(prefix,"Differentially_Expressed_Genes_Heatmap_mqc.png",sep="")
+out_png = paste("Normalized_Differentially_Expressed_Genes_mqc.png",sep="")
 ###Create heatmap
 png(out_png,width=png_width,height=600)
-ht = Heatmap(expression.mtx,name="log-counts",cluster_columns=FALSE,row_names_gp = gpar(fontsize=8,col=colors.list),column_names_gp = gpar(fontsize=8),column_names_rot = 45, column_split = sample_split, border=TRUE)
+ht = Heatmap(expression.mtx,name="Normalized-Counts",cluster_columns=FALSE,row_names_gp = gpar(fontsize=8,col=colors.list),column_names_gp = gpar(fontsize=8),column_names_rot = 45, column_split = sample_split, border=TRUE)
 draw(ht,heatmap_legend_list=list(sub_legend,sp_legend),padding=unit(c(1,1,1,15),"mm"))
 dev.off()

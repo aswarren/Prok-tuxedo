@@ -58,7 +58,7 @@ subsystems = unique(subsystem.map[,2])
 
 #Calculate image width and height
 num_columns <- ceiling(sqrt(length(subsystems)))
-num_samples <- ncol(curr.mtx)
+num_samples <- ncol(counts.mtx)
 num_rows <- ceiling(length(subsystems)/num_columns)
 png_width = (num_columns + num_samples)*100
 png_height = num_rows*200 

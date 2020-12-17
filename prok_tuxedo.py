@@ -179,10 +179,10 @@ def top_diffexp_genes(genome_list):
                     if padj == "NA":
                         continue
                     if float(padj) < pval_threshold:
-                        if float(logFC) < 0:
+                        if float(logFC) < 0 and gene not in down_genes_list and gene not in up_genes_list:
                             down_genes_list.append(gene)
                             down_log_list.append(float(logFC))
-                        elif float(logFC) > 0:
+                        elif float(logFC) > 0 and gene not in up_genes_list and gene not in down_genes_list:
                             up_genes_list.append(gene)
                             up_log_list.append(float(logFC))
         #zip and sort lists 

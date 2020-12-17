@@ -37,16 +37,30 @@ if (grepl("csv",metadata.file)) {
 suppressMessages(library(DESeq2,quietly=TRUE))
 library(ggplot2,quietly=TRUE)
 library(EnhancedVolcano,quietly=TRUE)
+library(gridExtra,quietly=TRUE)
 
-#Load counts table and metadata table and replace invalid characters
+#Load counts table and metadata table 
 count.mtx <- read.table(counts.file,sep=count_sep,header=T,row.names=1,stringsAsFactors=FALSE)
 rownames(count.mtx) = gsub("gene-","",rownames(count.mtx))
 rownames(count.mtx) = gsub("rna-","",rownames(count.mtx))
 metadata <- read.table(metadata.file,sep=meta_sep,header=T,row.names=1,stringsAsFactors=FALSE)
+
+#calculate png width and height
+png_width = 600
+if (numContrasts > 1) {
+    png_width = png_width * 2
+}
+png_height = 460
+if (numContrasts > 1) {
+    png_height = ceiling((numContrasts/2)) * png_height
+}
+
 #iterate over contrasts
-#index 4 in args is where the contrasts currently start
+#index 5 in args is where the contrasts currently start
+plot_list = vector("list",numContrasts)
 for (i in 5:length(args)) 
 {
+    contrast.index = i - 4
     #Subset data on current contrast
     curr_contrast = unlist(strsplit(args[i],","))
     #curr_contrast = gsub("-","_",curr_contrast)
@@ -56,7 +70,7 @@ for (i in 5:length(args))
     curr.count.mtx = curr.count.mtx[rowSums(curr.count.mtx) != 0,]
     curr.count.mtx = curr.count.mtx + 1
     #Run standard DESeq2 pipeline
-    print("running DESeq")
+    print(paste("running DESeq: ",curr_contrast[1]," against ",curr_contrast[2],sep=""))
     dds <- DESeqDataSetFromMatrix(countData = curr.count.mtx, colData = curr.metadata, design = ~Condition)
     dds <- DESeq(dds)
     res <- results(dds,contrast=c("Condition",curr_contrast[1],curr_contrast[2]))
@@ -70,10 +84,15 @@ for (i in 5:length(args))
     #Create volcano plot
     min_x_axis = min(res$log2FoldChange) - 1
     max_x_axis = max(res$log2FoldChange) + 1
-    ev_image_name = paste(out_prefix,"_",curr_contrast[1],"_vs_",curr_contrast[2],"_mqc.png",sep="")
-    contrast_name = paste(curr_contrast[1]," vs ",curr_contrast[2],sep="")
-    png(ev_image_name,width=600,height=460)
+    #ev_image_name = paste(out_prefix,"_",curr_contrast[1],"_vs_",curr_contrast[2],"_mqc.png",sep="")
+    contrast_name = paste(curr_contrast[1]," over ",curr_contrast[2],sep="")
+    #png(ev_image_name,width=png_width,height=png_height)
     ev_png <- EnhancedVolcano(res,lab=rownames(res),x='log2FoldChange',y='padj',xlim=c(min_x_axis,max_x_axis),subtitle="",title=contrast_name,legendPosition="top")
-    print(ev_png)
-    dev.off()
+    plot_list[[contrast.index]] <- ev_png
+    #print(ev_png)
+    #dev.off()
 } 
+grid_png = paste("Volcano_Plots_mqc.png",sep="")
+png(grid_png,width=png_width,height=png_height)
+do.call("grid.arrange",c(plot_list,ncol=2))
+dev.off()

@@ -16,10 +16,10 @@ def run_subsystem_analysis(genome_list,job_data):
     #Run subsytem plotting R script
     #subsystem_violin_plots.R <subsystem_map.txt> <counts_file.txt|csv> <metadata.txt>  <subsystem_level> <feature_count>
     feature_count = "htseq" if job_data.get("feature_count","htseq") == "htseq" else "stringtie"
-    #subsystem_levels = ["Superclass","Class"]
-    subsystem_levels = ["Superclass"]
-    #subsystem_map = ["superclass_map","class_map"]
-    subsystem_map = ["superclass_map"]
+    subsystem_levels = ["Superclass","Class"]
+    #subsystem_levels = ["Superclass"]
+    subsystem_map = ["superclass_map","class_map"]
+    #subsystem_map = ["superclass_map"]
     for genome in genome_list:
         os.chdir(genome["output"])
         for i,level in enumerate(subsystem_levels):
