@@ -45,7 +45,8 @@ counts.mtx = scale(counts.mtx)
 
 ###Calculate picture widtth based on the number of samples
 #heatmap width and offset are set in the draw() method at the bottom
-png_width = nrow(metadata)*100   
+#png_width = nrow(metadata)*100   
+svg_width = nrow(metadata)*ncol(metadata)
 
 ###Process specialty genes
 #TODO: replace colors with letters/shapes appended to genes
@@ -74,6 +75,11 @@ for (i in 1:length(uniq_subsystems)) {
     subsystem.map[which(subsystem.map[,2] == uniq_subsystems[i]),][,3] = sub.colors[i]
 }
 subsystem.map$Patric_ID = as.character(subsystem.map$Patric_ID)
+
+###TODO: test and compare the assigments of the specialty genes labels on the heatmaps
+#Do it for the subsystems as well
+#print(subsystem.map)
+#stop()
 
 #Create Matrix
 expression.df <- data.frame(Genes=genes.list$Genes)
@@ -111,10 +117,19 @@ sp_list <- lapply(1:length(sp.labels),function(i){
     retval
 })
 sp_legend = Legend(labels = uniq_sp, title = "Specialty Genes", graphics = sp_list)
-###Name of output png: must end with "_mqc" in order to multiqc to recognize it
-out_png = paste("Normalized_Differentially_Expressed_Genes_mqc.png",sep="")
-###Create heatmap
-png(out_png,width=png_width,height=600)
+###Create heatmap: SVG
+out_svg = paste("Normalized_Top_50_Differentially_Expressed_Genes_mqc.svg",sep="")
 ht = Heatmap(expression.mtx,name="Normalized-Counts",cluster_columns=FALSE,row_names_gp = gpar(fontsize=8,col=colors.list),column_names_gp = gpar(fontsize=8),column_names_rot = 45, column_split = sample_split, border=TRUE)
+svg(out_svg)
 draw(ht,heatmap_legend_list=list(sub_legend,sp_legend),padding=unit(c(1,1,1,15),"mm"))
 dev.off()
+
+###Name of output png: must end with "_mqc" in order to multiqc to recognize it
+#out_png = paste("Normalized_Top_50_Differentially_Expressed_Genes_mqc.png",sep="")
+###Create heatmap
+#png(out_png,width=png_width,height=600)
+#ht = Heatmap(expression.mtx,name="Normalized-Counts",cluster_columns=FALSE,row_names_gp = gpar(fontsize=8,col=colors.list),column_names_gp = gpar(fontsize=8),column_names_rot = 45, column_split = sample_split, border=TRUE)
+#draw(ht,heatmap_legend_list=list(sub_legend,sp_legend),padding=unit(c(1,1,1,15),"mm"))
+#dev.off()
+
+
