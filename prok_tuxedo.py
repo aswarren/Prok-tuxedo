@@ -15,10 +15,6 @@ import cufflinks_pipeline
 import prep_diffexp_files
 import subsystems
 
-#testing subsystems.py
-#import subsystems
-#can't import subsystems, relies on python3 
-
 #take genome data structure and condition_dict and make directory names. processses condition to ensure no special characters, or whitespace
 def make_directory_names(genome, condition_dict):
     if genome["dir"].endswith('/'):
@@ -209,9 +205,23 @@ def generate_heatmaps(genome_list,job_data):
         if not "heatmap_genes" in genome:
             continue
         #<heatmap_script.R> <gene_counts.txt> <metaata.txt> <heatmap_genes.txt> <output_prefix> <feature_count> <specialty_genes)
+        #Test_Htseq_four_cond/83333.13/Normalized_Top_50_Differentially_Expressed_Genes_mqc.svg
         heatmap_cmd = ["generate_heatmaps.R",genome["gene_matrix"],genome["deseq_metadata"],genome["heatmap_genes"],os.path.basename(genome["output"]),feature_count,genome["specialty_genes_map"],genome["superclass_map"]]
+        genome["heatmap_svg"] = os.path.join(genome["output"],"Normalized_Top_50_Differentially_Expressed_Genes_mqc.svg")
         print(" ".join(heatmap_cmd))
         subprocess.check_call(heatmap_cmd)
+        genome["heatmap_html"] = wrap_svg_in_html(genome["heatmap_svg"])
+
+#Places <DOCTYPE> and <html>/</html> around svg code
+#Returns html string, replacing svg with html from the svg_file parameter
+def wrap_svg_in_html(svg_file):
+    html_file = svg_file.replace(".svg",".html")
+    with open(svg_file,"r") as sf:
+        svg_lines = sf.readlines()
+    html_lines = ["<!DOCTYPE html>","<html>"]+svg_lines+["</html>"]
+    with open(html_file,"w") as hf:
+        hf.write("%s"%"\n".join(html_lines))
+    return html_file
 
 def run_multiqc(genome_list):
     config_path = "/homes/clarkc/RNASeq_Pipeline/Prok-tuxedo/Multiqc/multiqc_config.yaml"
@@ -290,16 +300,10 @@ def main(genome_list, condition_dict, parameters_str, output_dir, gene_matrix=Fa
             prep_diffexp_files.create_counts_table_host(genome_list,condition_dict,job_data)
         else:
             prep_diffexp_files.create_counts_table(genome_list,condition_dict,job_data)
-    #TODO: remove False
     #TODO: reorganize queries to occur in one script instead of creating a dependency between different query functions and their order
-    if True and not run_cuffdiff_pipeline and job_data.get("recipe","RNA-Rocket") == "RNA-Rocket":
+    if not run_cuffdiff_pipeline and job_data.get("recipe","RNA-Rocket") == "RNA-Rocket":
         subsystems.run_subsystem_analysis(genome_list,job_data)
     
-    ####STOP HERE FOR NOW
-    ###Moved amr and specialty genes to subsystems.py
-    ###Figure out what's wrong with AMR
-    ###Finish implementing specialty genes and add to heatmap generator
-    #sys.exit()
     if len(condition_dict.keys()) > 1 and not job_data.get("novel_features",False):
         #If running cuffdiff pipeline, terminated after running expression import
         if run_cuffdiff_pipeline:
@@ -318,8 +322,6 @@ def main(genome_list, condition_dict, parameters_str, output_dir, gene_matrix=Fa
         #generate heatmaps 
         top_diffexp_genes(genome_list) 
         generate_heatmaps(genome_list,job_data)
-    #TODO: uncomment generate_heatmaps (above)
-    #sys.exit()
     run_multiqc(genome_list)
         
         

@@ -18,12 +18,12 @@ sp:
         fn: '*.counts'
 
 module_order:
+    - custom_content
     - fastqc
     - samtools/stats
     - bowtie2
     - hisat2
     - htseq
-    - custom_content
 
 remove_sections:
     - fastqc_status_checks 

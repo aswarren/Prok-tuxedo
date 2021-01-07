@@ -42,6 +42,13 @@ def run_alignment(genome_list, condition_dict, parameters, output_dir, job_data)
         else:
             #cmd=["hisat2","--dta-cufflinks", "-x", genome_link, "--no-spliced-alignment"] 
             try:
+                ###TODO: remove 
+                print("here")
+                if os.path.exists(genome_link):
+                    print("wtf man")
+                ###
+                bowtie_build_cmd = ["bowtie2-build", genome_link, genome_link]
+                print(" ".join(bowtie_build_cmd))
                 subprocess.check_call(["bowtie2-build", genome_link, genome_link])
             except Exception as err:
                 sys.stderr.write("bowtie build failed: %s %s\n"%(err, genome_link))
@@ -51,9 +58,11 @@ def run_alignment(genome_list, condition_dict, parameters, output_dir, job_data)
         if thread_count == 0:
             thread_count=2 #multiprocessing.cpu_count()
         cmd+=["-p",str(thread_count)]
+        scount = 0 #used in modifying labels for the samstat reports
         for condition in condition_dict:
             rcount=0
             for r in condition_dict[condition]["replicates"]:
+                scount+=1
                 cur_cleanup=[]
                 rcount+=1
                 target_dir=r["target_dir"]
@@ -105,8 +114,11 @@ def run_alignment(genome_list, condition_dict, parameters, output_dir, job_data)
                         subprocess.check_call(stats_cmd,stdout=o)
                 r[genome["genome"]]["avg_read_length"] = get_average_read_length_per_file(stats_outfile)
                 samstat_file = bam_file+".samstat.html"
+                mod_samstat_file = bam_file+".samstat_mqc.html"
                 if not os.path.exists(samstat_file):
                     subprocess.check_call(samstat_cmd)
+                #if not os.path.exists(mod_samstat_file):
+                modify_samstat_for_multiqc(samstat_file,scount)
                 for garbage in cur_cleanup:
                     subprocess.call(["rm", garbage])
         for garbage in final_cleanup:
@@ -121,3 +133,29 @@ def get_average_read_length_per_file(stats_file):
                 avg_length = line[-1]
                 return avg_length
 
+#Pass in a samstat html file to remove portion that conflicts with the multiqc report
+#Uses sed to remove the block of css code that clashes with multiqc
+#Then goes through and removes all content other than the intro statistics and base quality distribution by position
+def modify_samstat_for_multiqc(samstat_filename,count):
+    sed_cmd = ["sed","-i","/body {/,/}/ d;",samstat_filename]
+    subprocess.check_call(sed_cmd)
+    out_samstat = samstat_filename.replace(".html","_mqc.html")    
+    with open(samstat_filename,"r") as sf:
+        samstat_lines = sf.readlines()
+    start_remove = 0
+    end_remove = 0
+    for index,line in enumerate(samstat_lines): 
+        if "Base quality distributions separated by mapping quality thresholds" in line:
+            start_remove = index
+        if "</footer>" in line:
+            end_remove = index
+    ###Need to rename canvas element variables since they have the same name across samstat reports and cause problems
+    ###in the multiqc report. Also only uses variable names canvas<1-4> 
+    canvas_vars = ["canvas1","canvas2","canvas3","canvas4"] 
+    canvas_replace = [x[:len(x)-1]+str(count)+x[len(x)-1] for x in canvas_vars]
+    output_lines = samstat_lines[:start_remove] + samstat_lines[end_remove:]
+    output_lines = "".join(output_lines) 
+    for ci,canvas in enumerate(canvas_vars):
+        output_lines = output_lines.replace(canvas,canvas_replace[ci])
+    with open(out_samstat,"w") as o:
+        o.write("%s"%output_lines)

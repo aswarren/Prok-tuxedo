@@ -1,11 +1,6 @@
 #!/homes/clarkc/miniconda3/bin/Rscript
+
 args = commandArgs(trailingOnly=TRUE)
-
-numContrasts = length(args) - 4
-
-if (numContrasts < 1) {
-    stop("Not enough parameters: generate_heatmaps.R <counts_file> <metadata_file> <heatmap_genes_file> <output_prefix> <feature_count> <specialty_genes> <subsystem_map>")
-}
 
 #TODO: adjust so if specialty genes or other features aren't past in the script will still run
 #TODO: as in, make the coloring of genes and such on the heatmap optional
@@ -45,8 +40,8 @@ counts.mtx = scale(counts.mtx)
 
 ###Calculate picture widtth based on the number of samples
 #heatmap width and offset are set in the draw() method at the bottom
-#png_width = nrow(metadata)*100   
-svg_width = nrow(metadata)*ncol(metadata)
+png_width = nrow(metadata)*100 + 200   
+svg_width = nrow(metadata) + ncol(metadata)
 
 ###Process specialty genes
 #TODO: replace colors with letters/shapes appended to genes
@@ -117,10 +112,11 @@ sp_list <- lapply(1:length(sp.labels),function(i){
     retval
 })
 sp_legend = Legend(labels = uniq_sp, title = "Specialty Genes", graphics = sp_list)
+
 ###Create heatmap: SVG
 out_svg = paste("Normalized_Top_50_Differentially_Expressed_Genes_mqc.svg",sep="")
 ht = Heatmap(expression.mtx,name="Normalized-Counts",cluster_columns=FALSE,row_names_gp = gpar(fontsize=8,col=colors.list),column_names_gp = gpar(fontsize=8),column_names_rot = 45, column_split = sample_split, border=TRUE)
-svg(out_svg)
+svg(out_svg,width=svg_width)
 draw(ht,heatmap_legend_list=list(sub_legend,sp_legend),padding=unit(c(1,1,1,15),"mm"))
 dev.off()
 
