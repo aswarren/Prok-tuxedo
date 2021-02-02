@@ -38,6 +38,7 @@ suppressMessages(library(DESeq2,quietly=TRUE))
 library(ggplot2,quietly=TRUE)
 library(EnhancedVolcano,quietly=TRUE)
 library(gridExtra,quietly=TRUE)
+library(svglite)
 
 #Load counts table and metadata table 
 count.mtx <- read.table(counts.file,sep=count_sep,header=T,row.names=1,stringsAsFactors=FALSE)
@@ -54,6 +55,8 @@ png_height = 460
 if (numContrasts > 1) {
     png_height = ceiling((numContrasts/2)) * png_height
 }
+svg_width = 14
+svg_height = ceiling((numContrasts/2)) * 5
 
 #iterate over contrasts
 #index 5 in args is where the contrasts currently start
@@ -87,12 +90,21 @@ for (i in 5:length(args))
     #ev_image_name = paste(out_prefix,"_",curr_contrast[1],"_vs_",curr_contrast[2],"_mqc.png",sep="")
     contrast_name = paste(curr_contrast[1]," over ",curr_contrast[2],sep="")
     #png(ev_image_name,width=png_width,height=png_height)
-    ev_png <- EnhancedVolcano(res,lab=rownames(res),x='log2FoldChange',y='padj',xlim=c(min_x_axis,max_x_axis),subtitle="",title=contrast_name,legendPosition="top")
-    plot_list[[contrast.index]] <- ev_png
-    #print(ev_png)
+    ev_img <- EnhancedVolcano(res,lab=rownames(res),x='log2FoldChange',y='padj',xlim=c(min_x_axis,max_x_axis),subtitle="",title=contrast_name,legendPosition="top",titleLabSize=14)
+    plot_list[[contrast.index]] <- ev_img
+    #print(ev_img)
     #dev.off()
 } 
-grid_png = paste("Volcano_Plots_mqc.png",sep="")
-png(grid_png,width=png_width,height=png_height)
+
+###Output PNG
+#grid_png = paste("Volcano_Plots_mqc.png",sep="")
+#png(grid_png,width=png_width,height=png_height)
+#do.call("grid.arrange",c(plot_list,ncol=2))
+#dev.off()
+
+###Output SVG
+grid_svg = paste("Volcano_Plots_mqc.svg",sep="")
+#svg(grid_svg,width=svg_width,height=svg_height)
+svglite(grid_svg,width=svg_width,height=svg_height)
 do.call("grid.arrange",c(plot_list,ncol=2))
 dev.off()

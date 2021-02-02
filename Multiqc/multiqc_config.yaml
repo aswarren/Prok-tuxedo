@@ -18,9 +18,10 @@ sp:
         fn: '*.counts'
 
 module_order:
-    - custom_content
+    - Samstat-Summary
     - fastqc
     - samtools/stats
+    - custom_content
     - bowtie2
     - hisat2
     - htseq
@@ -29,3 +30,9 @@ remove_sections:
     - fastqc_status_checks 
     - fastqc_per_base_sequence_content
     - samtools-stats
+
+custom_content:
+    order:
+        - Superclass_Subsystem_Distribution
+        - Volcano_Plots
+        - Normalized_Top_50_Differentially_Expressed_Genes

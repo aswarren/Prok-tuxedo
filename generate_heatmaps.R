@@ -26,12 +26,14 @@ if (grepl("htseq",feature.count)) {
 
 #load libraries quietly
 library(ComplexHeatmap,quietly=TRUE)
+library(svglite)
 
 ###TODO: add units to the heatmap (TPM, TPKM, etc)
 
 #create a heatmap with normalized expression 
 counts.mtx <- read.table(counts.file,sep=count_sep,header=T,row.names=1,stringsAsFactors=FALSE)
 metadata <- read.table(metadata.file,sep="\t",header=T,stringsAsFactors=FALSE)
+specialty.genes <- read.table(specialty_genes.file,header=T,sep="\t")
 genes.list <- read.table(genes.file,stringsAsFactors=FALSE)
 colnames(genes.list) <- c("Genes")
 
@@ -41,18 +43,17 @@ counts.mtx = scale(counts.mtx)
 ###Calculate picture widtth based on the number of samples
 #heatmap width and offset are set in the draw() method at the bottom
 png_width = nrow(metadata)*100 + 200   
-svg_width = nrow(metadata) + ncol(metadata)
+svg_width = nrow(metadata) + ncol(metadata) 
 
 ###Process specialty genes
 #TODO: replace colors with letters/shapes appended to genes
 sp.labels = LETTERS 
-specialty.genes <- read.table(specialty_genes.file,header=T,sep="\t")
 specialty.genes = subset(specialty.genes,subset=Patric_ID %in% genes.list$Genes)
 uniq_sp = unique(specialty.genes$SP_Field)
 sp.labels = sp.labels[1:length(uniq_sp)]
 specialty.genes$SP_Label = rep("",length.out=length(specialty.genes$SP_Field))
 for (i in 1:length(uniq_sp)) {
-    specialty.genes[which(specialty.genes$SP_Field == uniq_sp[i]),][,3] = paste("_",sp.labels[i],sep="") 
+    specialty.genes[which(specialty.genes$SP_Field == uniq_sp[i]),][,3] = paste(" ",sp.labels[i],sep="") 
 }
 specialty.genes$Patric_ID = as.character(specialty.genes$Patric_ID)
 
@@ -70,11 +71,6 @@ for (i in 1:length(uniq_subsystems)) {
     subsystem.map[which(subsystem.map[,2] == uniq_subsystems[i]),][,3] = sub.colors[i]
 }
 subsystem.map$Patric_ID = as.character(subsystem.map$Patric_ID)
-
-###TODO: test and compare the assigments of the specialty genes labels on the heatmaps
-#Do it for the subsystems as well
-#print(subsystem.map)
-#stop()
 
 #Create Matrix
 expression.df <- data.frame(Genes=genes.list$Genes)
@@ -100,8 +96,13 @@ colors.list = rep("black",length.out=length(rownames(expression.mtx)))
 names(colors.list) = rownames(expression.df)
 colors.list[subsystem.map$Patric_ID] = subsystem.map$Sub_Color
 ###setup the specialty genes label additions
-sp.index = rownames(expression.mtx) %in% specialty.genes$Patric_ID
-rownames(expression.mtx)[sp.index] = paste(rownames(expression.mtx)[sp.index],specialty.genes[,3],sep="")
+#TODO: issue with incorrect specialty-genes labels occurs here 
+#incorrect addition of the specialty genes suffixes
+#specialty.genes = specialty.genes[rownames(expression.mtx)[rownames(expression.mtx) %in% specialty.genes$Patric_ID],]
+for (usp in uniq_sp) {
+    rownames(expression.mtx)[rownames(expression.mtx) %in% specialty.genes[which(specialty.genes$SP_Field == usp),]$Patric_ID] = paste(rownames(expression.mtx)[rownames(expression.mtx) %in% specialty.genes[which(specialty.genes$SP_Field == usp),]$Patric_ID],specialty.genes[which(specialty.genes$SP_Field == usp),]$SP_Label,sep="")
+}
+sp.index = which(rownames(expression.mtx) %in% specialty.genes$Patric_ID)
 ###Create subsystem genes legend
 sub_legend = Legend(labels = uniq_subsystems, title = "Subsystem Genes", legend_gp = gpar(fill=sub.colors))
 ###Create specialty genes legend
@@ -115,8 +116,9 @@ sp_legend = Legend(labels = uniq_sp, title = "Specialty Genes", graphics = sp_li
 
 ###Create heatmap: SVG
 out_svg = paste("Normalized_Top_50_Differentially_Expressed_Genes_mqc.svg",sep="")
-ht = Heatmap(expression.mtx,name="Normalized-Counts",cluster_columns=FALSE,row_names_gp = gpar(fontsize=8,col=colors.list),column_names_gp = gpar(fontsize=8),column_names_rot = 45, column_split = sample_split, border=TRUE)
-svg(out_svg,width=svg_width)
+ht = Heatmap(expression.mtx,name="Normalized-Counts",cluster_columns=FALSE,row_names_max_width = unit(8, "cm"),show_row_dend = FALSE,row_names_gp = gpar(fontsize=8,col=colors.list),column_names_gp = gpar(fontsize=8),column_names_rot = 45, column_split = sample_split, border=TRUE)
+#svg(out_svg,width=svg_width)
+svglite(out_svg,width=svg_width)
 draw(ht,heatmap_legend_list=list(sub_legend,sp_legend),padding=unit(c(1,1,1,15),"mm"))
 dev.off()
 

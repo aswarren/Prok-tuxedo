@@ -14,6 +14,7 @@ import quantification
 import cufflinks_pipeline
 import prep_diffexp_files
 import subsystems
+import multiqc_report
 
 #take genome data structure and condition_dict and make directory names. processses condition to ensure no special characters, or whitespace
 def make_directory_names(genome, condition_dict):
@@ -27,7 +28,8 @@ def make_directory_names(genome, condition_dict):
         for r in condition_dict[condition]["replicates"]:
             cur_cleanup=[]
             rcount+=1
-            target_dir=os.path.join(genome["output"], str(condition_index),"replicate"+str(rcount))
+            #target_dir=os.path.join(genome["output"], str(condition_index),"replicate"+str(rcount))
+            target_dir=os.path.join(genome["output"], str(condition),"replicate"+str(rcount))
             target_dir=os.path.abspath(target_dir)
             r["target_dir"]=target_dir
 
@@ -99,12 +101,14 @@ def run_deseq2(genome_list,contrasts,job_data):
             diffexp_cmd = ["run_deseq2.R",diffexp_params[0],metadata_file,diffexp_params[1],diffexp_params[2]]+contrast_cmd
             print("%s\n"%" ".join(diffexp_cmd))
             subprocess.check_call(diffexp_cmd)
+            wrap_svg_in_html("Volcano_Plots_mqc.svg")
             for pair in contrasts:
                 pair = [x.replace(",","_") for x in pair]
                 pair = "_vs_".join(pair) 
                 #diffexp_file = genome_prefix + "_" + pair + ".txt"
                 diffexp_output = pair+"."+diffexp_params[2]+"."+diffexp_params[1]+".deseq2"
                 genome["diff_exp_contrasts"].append(os.path.join(genome["output"],diffexp_output))
+            
          
 #Writes the gene_exp.gmx file used in expression_transform.py from DESeq2 output
 def write_gmx_file(genome_list):
@@ -218,23 +222,10 @@ def wrap_svg_in_html(svg_file):
     html_file = svg_file.replace(".svg",".html")
     with open(svg_file,"r") as sf:
         svg_lines = sf.readlines()
-    html_lines = ["<!DOCTYPE html>","<html>"]+svg_lines+["</html>"]
+    html_lines = ["<!DOCTYPE html>\n","<html>\n"]+svg_lines+["</html>"]
     with open(html_file,"w") as hf:
-        hf.write("%s"%"\n".join(html_lines))
+        hf.write("%s"%"".join(html_lines))
     return html_file
-
-def run_multiqc(genome_list):
-    config_path = "/homes/clarkc/RNASeq_Pipeline/Prok-tuxedo/Multiqc/multiqc_config.yaml"
-    debug_multiqc = False
-    for genome in genome_list:
-        os.chdir(genome["output"])
-        report_name = os.path.basename(genome["output"])+"_report.html"
-        #multiqc_cmd = ["multiqc","--flat","-o",".","-n",report_name,"-t","simple","--no-data-dir",".","-c",config_path,"-f"]
-        multiqc_cmd = ["multiqc","--flat","-o",".","-n",report_name,"-t","simple",".","-c",config_path,"-f"]
-        if debug_multiqc:
-            multiqc_cmd += ["--lint"]
-        print(" ".join(multiqc_cmd))
-        subprocess.check_call(multiqc_cmd)
 
 def setup(genome_list, condition_dict, parameters, output_dir, job_data):
     for genome in genome_list:
@@ -282,19 +273,22 @@ def main(genome_list, condition_dict, parameters_str, output_dir, gene_matrix=Fa
     else:
         parameters = {}
     setup(genome_list, condition_dict, parameters, output_dir, job_data)
+    #pipeline_log holds the commands at each step of the pipeline and prints it to an output file Pipeline.txt
+    #TODO: should it contain the json dump of the input parameters? 
+    pipeline_log = []
     #TRUE: runs cufflinks then cuffdiff if differential expression is turned on
     #FALSE: runs either htseq-count or stringtie
     run_cuffdiff_pipeline = job_data.get("feature_count","htseq") == "cuffdiff"
-    alignment.run_alignment(genome_list, condition_dict, parameters, output_dir, job_data)
+    alignment.run_alignment(genome_list, condition_dict, parameters, output_dir, job_data, pipeline_log)
     if run_cuffdiff_pipeline:
         cufflinks_pipeline.run_cufflinks(genome_list, condition_dict, parameters, output_dir)
     else:
-        quantification.run_featurecount(genome_list, condition_dict, parameters, output_dir, job_data)
+        quantification.run_featurecount(genome_list, condition_dict, parameters, output_dir, job_data, pipeline_log)
     prep_diffexp_files.create_metadata_file(genome_list,condition_dict,output_dir)
     #TODO: change novel_features condition when novel-isoform differential expression is implemented
     if not run_cuffdiff_pipeline and job_data.get("feature_count","htseq") == "stringtie":
         prep_diffexp_files.write_gtf_list(genome_list,condition_dict) #function that writes the input for prepDE.py, which is a list of samples and paths to their gtf files. Do this for each genome
-        prep_diffexp_files.prep_stringtie_diffexp(genome_list,condition_dict,job_data.get("recipe","RNA-Rocket") == "Host")   
+        prep_diffexp_files.prep_stringtie_diffexp(genome_list,condition_dict,job_data.get("recipe","RNA-Rocket") == "Host",pipeline_log)   
     elif not run_cuffdiff_pipeline and job_data.get("feature_count","htseq") == "htseq": #htseq
         if job_data.get("recipe","RNA-Rocket") == "Host":
             prep_diffexp_files.create_counts_table_host(genome_list,condition_dict,job_data)
@@ -322,8 +316,10 @@ def main(genome_list, condition_dict, parameters_str, output_dir, gene_matrix=Fa
         #generate heatmaps 
         top_diffexp_genes(genome_list) 
         generate_heatmaps(genome_list,job_data)
-    run_multiqc(genome_list)
-        
+    multiqc_report.run_multiqc(genome_list,condition_dict)
+    os.chdir(output_dir)
+    with open("Pipeline.txt","w") as o:
+        o.write("\n".join(pipeline_log))
         
 
 if __name__ == "__main__":
@@ -498,76 +494,3 @@ if __name__ == "__main__":
 """)
     main(genome_list,condition_dict,map_args.p,output_dir,gene_matrix,contrasts,job_data,map_args,diffexp_json)
 
-'''
-
-def run_subsystem_analysis(genome_list,job_data):
-    for genome in genome_list:
-        #retrieve subsystem information
-        subsystem_dict = get_subsystem_mapping(genome)
-        if not subsystem_dict:
-            sys.stderr.write("Error in subsystem analysis for genome_id %s"%genome["genome"])
-        else:
-            genome["subsystem_dict"] = subsystem_dict
-    #write mapping file
-    write_subsystem_mapping_files(genome_list) 
-    #Run subsytem plotting R script
-    #subsystem_violin_plots.R <subsystem_map.txt> <counts_file.txt|csv> <metadata.txt>  <subsystem_level> <feature_count>
-    feature_count = "htseq" if job_data.get("feature_count","htseq") == "htseq" else "stringtie"
-    subsystem_levels = ["Superclass","Class"]
-    subsystem_map = ["superclass_map","class_map"]
-    for genome in genome_list:
-        os.chdir(genome["output"])
-        for i,level in enumerate(subsystem_levels):
-            subsystem_plot_cmd = ["subsystem_violin_plots.R",genome[subsystem_map[i]],genome["gene_matrix"],genome["deseq_metadata"],level,feature_count]    
-            print(" ".join(subsystem_plot_cmd))
-            subprocess.check_call(subsystem_plot_cmd)
-            
-def write_subsystem_mapping_files(genome_list):
-    for genome in genome_list:
-        if "subsystem_dict" not in genome:
-            continue 
-        subsystem_dict = genome["subsystem_dict"] 
-        os.chdir(genome["output"])     
-        superclass_map = os.path.basename(genome["output"])+".superclass_mapping"
-        class_map = os.path.basename(genome["output"])+".class_mapping"
-        superclass_path = os.path.join(genome["output"],superclass_map)
-        class_path = os.path.join(genome["output"],class_map)
-        genome["superclass_map"] = superclass_path
-        genome["class_map"] = class_path
-        #write superclass file
-        with open(superclass_map,"w") as sm, open(class_map,"w") as cm:
-            #write headers
-            sm.write("Patric_ID\tSuperclass\n")
-            cm.write("Patric_ID\tClass\n")
-            for sub_id in subsystem_dict:
-                if sub_id == "superclass_set" or sub_id == "class_set":
-                    continue
-                sm.write("%s\t%s\n"%(sub_id,subsystem_dict[sub_id]["superclass"])) 
-                cm.write("%s\t%s\n"%(sub_id,subsystem_dict[sub_id]["class"])) 
-
-#TODO: incorporate KB_Auth token check
-def get_subsystem_mapping(genome):
-    genome_url = "https://patricbrc.org/api/subsystem/?eq(genome_id,"+os.path.basename(genome["output"])+")&limit(10000000)&http_accept=application/solr+json"
-    req = requests.Request('GET',genome_url)
-    prepared = req.prepare()
-    s = requests.Session()
-    response = s.send(prepared)
-    subsystem_dict = {}
-    superclass_set = set()
-    class_set = set()
-    print("Retrieving subsystem ids for genome_id %s"%(os.path.basename(genome["output"])))
-    print(genome_url)
-    if not response.ok:
-        sys.stderr.write("Failed to retrieve subsystem ids for genomd_id %s"%os.path.basename(genome["output"]))
-        return None
-    for entry in response.json()['response']['docs']: 
-        subsystem_dict[entry['patric_id']] = {}
-        subsystem_dict[entry['patric_id']]['superclass'] = entry['superclass'] if len(entry['superclass']) > 0 else 'NONE'
-        superclass_set.add(entry['superclass'])
-        subsystem_dict[entry['patric_id']]['class'] = entry['class'] if len(entry['class']) > 0 else 'NONE'
-        class_set.add(entry['class'])
-    subsystem_dict["superclass_set"] = superclass_set
-    subsystem_dict["class_set"] = class_set
-    return subsystem_dict
-
-'''

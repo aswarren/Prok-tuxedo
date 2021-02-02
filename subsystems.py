@@ -2,6 +2,7 @@
 
 import sys,os,subprocess
 import requests
+from prok_tuxedo import wrap_svg_in_html
 
 def run_subsystem_analysis(genome_list,job_data):
     for genome in genome_list:
@@ -16,17 +17,22 @@ def run_subsystem_analysis(genome_list,job_data):
     #Run subsytem plotting R script
     #subsystem_violin_plots.R <subsystem_map.txt> <counts_file.txt|csv> <metadata.txt>  <subsystem_level> <feature_count>
     feature_count = "htseq" if job_data.get("feature_count","htseq") == "htseq" else "stringtie"
-    #subsystem_levels = ["Superclass","Class"]
-    subsystem_levels = ["Superclass"]
-    #subsystem_map = ["superclass_map","class_map"]
-    subsystem_map = ["superclass_map"]
+    add_class = False
+    if add_class:
+        subsystem_levels = ["Superclass","Class"]
+        subsystem_map = ["superclass_map","class_map"]
+    else:
+        subsystem_levels = ["Superclass"]
+        subsystem_map = ["superclass_map"]
     for genome in genome_list:
         os.chdir(genome["output"])
         for i,level in enumerate(subsystem_levels):
             #subsystem_plot_cmd = ["subsystem_violin_plots.R",genome[subsystem_map[i]],genome["gene_matrix"],genome["deseq_metadata"],level,feature_count]    
             subsystem_plot_cmd = ["grid_violin_plots.R",genome[subsystem_map[i]],genome["gene_matrix"],genome["deseq_metadata"],level,feature_count]    
+            output_grid_file = level + "_Subsystem_Distribution_mqc.svg"
             print(" ".join(subsystem_plot_cmd))
             subprocess.check_call(subsystem_plot_cmd)
+            wrap_svg_in_html(output_grid_file)
             #subsystem_violin_plot(subsystem_dict,genome["gene_matrix"],genome["deseq_metadata"],level,feature_count)
             
 #TODO: incorporate KB_Auth token check

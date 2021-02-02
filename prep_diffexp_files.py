@@ -183,7 +183,7 @@ def write_gtf_list(genome_list,condition_dict):
         genome["prepDE_input"] = gtf_path_filename
 
 #Calls the prepDE.py script that transforms stringtie output into a format usable by DESeq2
-def prep_stringtie_diffexp(genome_list,condition_dict,host_bool):
+def prep_stringtie_diffexp(genome_list,condition_dict,host_bool,pipeline_log):
     for genome in genome_list:
         avg_length = str(average_read_length_total(condition_dict,genome))
         genome_file = genome["genome"]
@@ -199,6 +199,7 @@ def prep_stringtie_diffexp(genome_list,condition_dict,host_bool):
             prep_cmd+=["-t",transcript_counts_mtx]
         if not os.path.exists(genome_counts_mtx):
             print(" ".join(prep_cmd))
+            pipeline_log.append(" ".join(prep_cmd))
             subprocess.check_call(prep_cmd)
 
 def average_read_length_total(condition_dict,genome):

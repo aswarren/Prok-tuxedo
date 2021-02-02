@@ -9,15 +9,17 @@ g_legend <- function(a.gplot) {
     legend
 }
 
+###TODO: rename variables to not include "subsystem"
+
 #parameter format and check parameter inputs
 #subsystem_violin_plots.R <subsystem_map.csv> <counts_file.txt|csv> <subsystem_level>
 args = commandArgs(trailingOnly=TRUE)
 
 if (length(args) != 5) {
-    stop("Incorrect parameters: subsystem_violin_plots.R <subsystem_map.txt> <counts_file.txt|csv> <metadata.txt>  <subsystem_level> <feature_count>")
+    stop("Incorrect parameters: subsystem_violin_plots.R <gene_map.txt> <counts_file.txt|csv> <metadata.txt> <system_prefix> <feature_count>")
 }
 
-subsystem.file = args[1]
+mapping.file = args[1]
 counts.file = args[2]
 metadata.file = args[3]
 subsystem.level = args[4]
@@ -38,11 +40,13 @@ if (grepl("htseq",feature.count)) {
 library(ggplot2,quietly=TRUE)
 library(gridExtra,quietly=TRUE)
 library(reshape2,quietly=TRUE)
+#TESTING
+library(svglite)
 
 #read tables
 counts.mtx <- read.table(counts.file,sep=count_sep,header=T,row.names=1,stringsAsFactors=FALSE)
 metadata <- read.table(metadata.file,sep="\t",header=T,stringsAsFactors=FALSE)
-subsystem.map <- read.table(subsystem.file,sep="\t",header=T,stringsAsFactors=FALSE)
+subsystem.map <- read.table(mapping.file,sep="\t",header=T,stringsAsFactors=FALSE)
 
 #Filter entries with no system label and get the intersection of patric_ids
 subsystem.map = subsystem.map[!grepl("NONE",subsystem.map[,2]),]
@@ -62,6 +66,8 @@ num_samples <- ncol(counts.mtx)
 num_rows <- ceiling(length(subsystems)/num_columns)
 png_width = (num_columns + num_samples)*100
 png_height = num_rows*200 
+svg_width = num_columns + num_samples
+svg_height = num_rows + 5
 
 #Get all unique features/subsystems
 legend <- NULL 
@@ -78,7 +84,8 @@ for (i in 1:length(subsystems)) {
     for (c in conditions) {
         melt.df[melt.df$Sample %in% subset(metadata,subset=Condition==c)$Sample,]$Condition = c
     }
-    vln_plot <- ggplot(melt.df,aes(x=Sample,y=LogCounts,fill=Condition))+geom_violin(trim=FALSE)+ylim(log_min,log_max)+ggtitle(curr.system)+ylab("Log-Counts")+xlab("Sample") 
+    x_axis_label = paste(toString(length(curr.mtx$Genes))," Genes",sep="")
+    vln_plot <- ggplot(melt.df,aes(x=Sample,y=LogCounts,fill=Condition))+geom_violin(trim=FALSE)+ylim(log_min,log_max)+ggtitle(curr.system)+ylab("Log-Counts")+xlab(x_axis_label) 
     vln_plot = vln_plot + geom_boxplot(width=0.1,fill="white")
     if (is.null(legend)) {
         legend <- g_legend(vln_plot)
@@ -87,7 +94,17 @@ for (i in 1:length(subsystems)) {
     plot_list[[i]] <- vln_plot
 }
 plot_list[[length(subsystems)+1]] <- legend
-vln_png = paste(subsystem.level,"_Subsystem_Distribution_mqc.png",sep="")
-png(vln_png,width=png_width,height=png_height)
+
+###Output PNG image
+#vln_png = paste(subsystem.level,"_Subsystem_Distribution_mqc.png",sep="")
+#png(vln_png,width=png_width,height=png_height)
+#do.call("grid.arrange",c(plot_list,ncol=num_columns))
+#dev.off()
+
+#TODO: issue where it opens a second image and saves one as Rplot.pdf
+###Output SVG image
+vln_svg = paste(subsystem.level,"_Subsystem_Distribution_mqc.svg",sep="")
+#svg(vln_svg,width=svg_width,height=svg_height)
+svglite(vln_svg,width=svg_width,height=svg_height)
 do.call("grid.arrange",c(plot_list,ncol=num_columns))
 dev.off()
