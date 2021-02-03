@@ -11,7 +11,7 @@ SPACE = "    " #multiqc does not like the tab character, using a 4-space macro
 # - function for creating config file
 # - base section names on the files: example, sections for each of the samstat reports then setup the order
 def setup_multiqc_configs(genome_list,condition_dict):
-    section_order = ["title","logo","sp","module_order","remove_sections","custom_content"]
+    section_order = ["title","logo","sp","module_order","section_comments","remove_sections","custom_content"]
     config_dict = setup_shared_config_sections() 
     config_list = []
     for genome in genome_list:
@@ -96,14 +96,21 @@ def setup_shared_config_sections():
     config_dict["sp"] = sp_list
     module_list = [
                 "module_order:",
+                SPACE+"- test_html_intro",
                 SPACE+"- fastqc",
                 SPACE+"- bowtie2",
                 SPACE+"- hisat2",
                 SPACE+"- htseq",
-                SPACE+"- samtools/stats",
+                SPACE+"- samtools",
                 SPACE+"- custom_content"
                 ]
     config_dict["module_order"] = module_list
+    comments_list = [
+        "section_comments:",
+        SPACE+"general_stats: \"Introduction to general statistics section\"",
+        SPACE+"htseq: \"Introduction to htseq\""
+    ]
+    config_dict["section_comments"] = comments_list
     remove_list = [
                 "remove_sections:",
                 SPACE+"- fastqc_status_checks",
