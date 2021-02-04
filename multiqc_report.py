@@ -19,7 +19,6 @@ def setup_multiqc_configs(genome_list,condition_dict):
         config_path = os.path.join(genome["output"],os.path.basename(genome["output"])+"_multiqc_config.yaml")
         config_list.append(config_path)
         ###Setup structure of the report
-        ###TODO: am here
         #Samstat_SRR10075886.bam.samstat_mqc.html
         for condition in condition_dict:
             for replicate in condition_dict[condition]["replicates"]:  
@@ -32,6 +31,9 @@ def setup_multiqc_configs(genome_list,condition_dict):
         ###write config file
         curr_config_list = []
         for section in section_order:
+            if section not in config_dict:
+                sys.stderr.write("%s not in section_comments section in the multiqc configuration file\n"%section)
+                continue
             curr_config_list = curr_config_list + config_dict[section] 
         config_str = "\n".join(curr_config_list)
         with open(config_path,"w") as o:
@@ -107,7 +109,7 @@ def setup_shared_config_sections():
     config_dict["module_order"] = module_list
     comments_list = [
         "section_comments:",
-        SPACE+"general_stats: \"Introduction to general statistics section\"",
+        SPACE+"general_stats: \""+get_general_stats_intro()+"\"",
         SPACE+"htseq: \"Introduction to htseq\""
     ]
     config_dict["section_comments"] = comments_list
@@ -127,3 +129,16 @@ def setup_shared_config_sections():
                 ]
     config_dict["custom_content"] = custom_content_list
     return config_dict
+
+#Returns a string used in the introduction of the general_stats section of the multiqc report
+#strings in this section are read using a markup interpreter 
+def get_general_stats_intro():
+    gs_string = "<p style=font-size:60%;>Column Descriptors (hover headers for detail):<br />"    
+    gs_string = gs_string + "<b>%Assigned</b>: Percentage of sample reads HTSeq attributes to genomic feature abundance"
+    gs_string = gs_string + " <b>M Assigned</b>: Number of reads (millions) HTSeq attributes to genomic feature abundance"
+    gs_string = gs_string + " <b>Error rate</b>: mismatches (NM) / bases mapped (CIGAR), calculated by Samtools;"
+    gs_string = gs_string + " <b>M Reads Mapped</b>: Number of reads (millions) mapped in the bam file, calculated by Samtools;"
+    gs_string = gs_string + " <b>% Mapped</b>: Percentage of sample reads mapped in the bam file, calculated by Samtools;"
+    gs_string = gs_string + " <b>M Total seqs</b>: Total sequences in the bam file (millions), calculated by Samtools"
+    gs_string = gs_string + "</p>"
+    return gs_string

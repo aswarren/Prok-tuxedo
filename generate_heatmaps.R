@@ -96,11 +96,10 @@ colors.list = rep("black",length.out=length(rownames(expression.mtx)))
 names(colors.list) = rownames(expression.df)
 colors.list[subsystem.map$Patric_ID] = subsystem.map$Sub_Color
 ###setup the specialty genes label additions
-#TODO: issue with incorrect specialty-genes labels occurs here 
-#incorrect addition of the specialty genes suffixes
-#specialty.genes = specialty.genes[rownames(expression.mtx)[rownames(expression.mtx) %in% specialty.genes$Patric_ID],]
 for (usp in uniq_sp) {
-    rownames(expression.mtx)[rownames(expression.mtx) %in% specialty.genes[which(specialty.genes$SP_Field == usp),]$Patric_ID] = paste(rownames(expression.mtx)[rownames(expression.mtx) %in% specialty.genes[which(specialty.genes$SP_Field == usp),]$Patric_ID],specialty.genes[which(specialty.genes$SP_Field == usp),]$SP_Label,sep="")
+    usp.genes = specialty.genes[which(specialty.genes$SP_Field == usp),]$Patric_ID
+    exp.index = which(rownames(expression.mtx) %in% usp.genes)
+    rownames(expression.mtx)[exp.index] = paste(rownames(expression.mtx)[exp.index],specialty.genes[which(specialty.genes$SP_Field == usp),]$SP_Label,sep="")
 }
 sp.index = which(rownames(expression.mtx) %in% specialty.genes$Patric_ID)
 ###Create subsystem genes legend
