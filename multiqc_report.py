@@ -133,7 +133,7 @@ def setup_shared_config_sections():
 #Returns a string used in the introduction of the general_stats section of the multiqc report
 #strings in this section are read using a markup interpreter 
 def get_general_stats_intro():
-    gs_string = "<p style=font-size:60%;>Column Descriptors (hover headers for detail):<br />"    
+    gs_string = "<p style=font-size:60%;>Column Descriptors (hover over headers for detail):<br />"    
     gs_string = gs_string + "<b>%Assigned</b>: Percentage of sample reads HTSeq attributes to genomic feature abundance"
     gs_string = gs_string + " <b>M Assigned</b>: Number of reads (millions) HTSeq attributes to genomic feature abundance"
     gs_string = gs_string + " <b>Error rate</b>: mismatches (NM) / bases mapped (CIGAR), calculated by Samtools;"
