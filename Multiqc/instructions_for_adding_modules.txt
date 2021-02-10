@@ -2,6 +2,7 @@ Documentation found at: https://multiqc.info/docs/#writing-new-modules
 
 See example.py and __init__.py in this directory for an example of the basic content to put in these files
 
+#~/miniconda3/envs/pip_multiqc_env/lib/python3.9/site-packages/multiqc/modules/
 1. in "*/multiqc/modules/" 
     - create a directory called <module_name>
     - in <module_name>, create <module_name>.py and __init__.py

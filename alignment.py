@@ -3,6 +3,7 @@
 import os,sys,subprocess
 import shutil
 import tarfile
+import json
 
 #hisat2 has problems with spaces in filenames
 #prevent spaces in filenames. if one exists link the file to a no-space version.
@@ -21,6 +22,9 @@ def run_alignment(genome_list, condition_dict, parameters, output_dir, job_data,
     #modifies condition_dict sub replicates to include 'bowtie' dict recording output files
     for genome in genome_list:
         genome_link = genome["genome_link"]
+        ###TODO: testing samstat dict for putting the samstat reports in the same portion in the multiqc report
+        samstat_dict = {}
+        samstat_dict["reports"] = []
         final_cleanup=[]
         if "hisat_index" in genome and genome["hisat_index"]:
             archive = tarfile.open(genome["hisat_index"])
@@ -117,9 +121,11 @@ def run_alignment(genome_list, condition_dict, parameters, output_dir, job_data,
                         subprocess.check_call(stats_cmd,stdout=o)
                 r[genome["genome"]]["avg_read_length"] = get_average_read_length_per_file(stats_outfile)
                 samstat_file = bam_file+".samstat.html"
-                mod_samstat_file = os.path.join(os.path.dirname(bam_file),"Samstat_"+os.path.basename(bam_file)+".samstat_mqc.html")
+                #mod_samstat_file = os.path.join(os.path.dirname(bam_file),"Samstat_"+os.path.basename(bam_file)+".samstat_mqc.html")
+                mod_samstat_file = os.path.join(os.path.dirname(bam_file),"Samstat_"+os.path.basename(bam_file)+".samstat.html")
                 print(mod_samstat_file)
                 r[genome["genome"]]["samstat"] = mod_samstat_file
+                samstat_dict["reports"].append(mod_samstat_file)
                 if not os.path.exists(samstat_file):
                     pipeline_log.append(" ".join(samstat_cmd))
                     subprocess.check_call(samstat_cmd)
@@ -127,6 +133,11 @@ def run_alignment(genome_list, condition_dict, parameters, output_dir, job_data,
                 modify_samstat_for_multiqc(samstat_file,scount)
                 for garbage in cur_cleanup:
                     subprocess.call(["rm", garbage])
+        ###write out samstat json file
+        os.chdir(genome["output"])
+        with open("samstat.json","w") as so:
+            so.write(json.dumps(samstat_dict))
+        ###cleanup files
         for garbage in final_cleanup:
             subprocess.call(["rm", garbage])
 
@@ -145,7 +156,8 @@ def get_average_read_length_per_file(stats_file):
 def modify_samstat_for_multiqc(samstat_filename,count):
     sed_cmd = ["sed","-i","/body {/,/}/ d;",samstat_filename]
     subprocess.check_call(sed_cmd)
-    out_samstat = os.path.join(os.path.dirname(samstat_filename),"Samstat_"+os.path.basename(samstat_filename.replace(".html","_mqc.html")))    
+    #out_samstat = os.path.join(os.path.dirname(samstat_filename),"Samstat_"+os.path.basename(samstat_filename.replace(".html","_mqc.html")))    
+    out_samstat = os.path.join(os.path.dirname(samstat_filename),"Samstat_"+os.path.basename(samstat_filename))    
     mqc_id = os.path.basename(out_samstat).split(".")[0]
     with open(samstat_filename,"r") as sf:
         samstat_lines = sf.readlines()
@@ -157,19 +169,11 @@ def modify_samstat_for_multiqc(samstat_filename,count):
             start_remove = index
         if "</footer>" in line:
             end_remove = index
-    #TODO: create multiqc module for this section and modify image prefix  
-    ###Add multiqc header for correct report order
-    #header = "<!--\nid: \'Samstat-Summary\'\nsection_name: \'Samstat Statistics\'\nplot_type: \'html\'\nparent_id: Samstat-Summary\n-->\n"
-    #header = "<!--\nid: \'" + mqc_id + "\'\nparent_id: Samstat-Summary\nsection_name: \'Samstat Statistics\'\nplot_type: \'html\'\n-->\n"
-    #header = "<!--\nid: \'" + mqc_id + "\'\nsection_name: \'Samstat Statistics\'\nplot_type: \'html\'\n-->\n"
-    header = "id: \'" + mqc_id + "\'\nsection_name: \'Samstat Statistics\'\nplot_type: \'html\'\n-->\n"
     ###Need to rename canvas element variables since they have the same name across samstat reports and cause problems
-    ###in the multiqc report. Also only uses variable names canvas<1-4> 
+    ###in the multiqc report. Also only uses variable names canvas<1-4> in samstat report 
     canvas_vars = ["canvas1","canvas2","canvas3","canvas4"] 
     canvas_replace = [x[:len(x)-1]+str(count)+x[len(x)-1] for x in canvas_vars]
     output_lines = samstat_lines[:start_remove] + samstat_lines[end_remove:]
-    #output_lines = [output_lines[0]] + [header] + output_lines[1:]
-    output_lines = [header] + output_lines
     output_lines = "".join(output_lines) 
     for ci,canvas in enumerate(canvas_vars):
         output_lines = output_lines.replace(canvas,canvas_replace[ci])

@@ -2,9 +2,13 @@
 
 import sys,os,subprocess
 import requests
+import json
 from prok_tuxedo import wrap_svg_in_html
 
+
 def run_subsystem_analysis(genome_list,job_data):
+    ###TODO: how to structure
+    subsystem_json = {}
     for genome in genome_list:
         #retrieve subsystem information
         subsystem_dict = get_subsystem_mapping(genome)
@@ -29,10 +33,14 @@ def run_subsystem_analysis(genome_list,job_data):
         for i,level in enumerate(subsystem_levels):
             #subsystem_plot_cmd = ["subsystem_violin_plots.R",genome[subsystem_map[i]],genome["gene_matrix"],genome["deseq_metadata"],level,feature_count]    
             subsystem_plot_cmd = ["grid_violin_plots.R",genome[subsystem_map[i]],genome["gene_matrix"],genome["deseq_metadata"],level,feature_count]    
-            output_grid_file = level + "_Subsystem_Distribution_mqc.svg"
+            #output_grid_file = level + "_Subsystem_Distribution_mqc.svg"
+            output_grid_file = level + "_Subsystem_Distribution.svg"
             print(" ".join(subsystem_plot_cmd))
             subprocess.check_call(subsystem_plot_cmd)
-            wrap_svg_in_html(output_grid_file)
+            ###TODO: reformat how the picture json files are output
+            subsystem_json["subsystem_grid"] = wrap_svg_in_html(output_grid_file)
+            with open("subsystems.json","w") as o: 
+                o.write(json.dumps(subsystem_json)) 
             #subsystem_violin_plot(subsystem_dict,genome["gene_matrix"],genome["deseq_metadata"],level,feature_count)
             
 #TODO: incorporate KB_Auth token check

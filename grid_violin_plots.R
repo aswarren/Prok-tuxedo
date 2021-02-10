@@ -103,7 +103,8 @@ plot_list[[length(subsystems)+1]] <- legend
 
 #TODO: issue where it opens a second image and saves one as Rplot.pdf
 ###Output SVG image
-vln_svg = paste(subsystem.level,"_Subsystem_Distribution_mqc.svg",sep="")
+#vln_svg = paste(subsystem.level,"_Subsystem_Distribution_mqc.svg",sep="")
+vln_svg = paste(subsystem.level,"_Subsystem_Distribution.svg",sep="")
 #svg(vln_svg,width=svg_width,height=svg_height)
 svglite(vln_svg,width=svg_width,height=svg_height)
 do.call("grid.arrange",c(plot_list,ncol=num_columns))

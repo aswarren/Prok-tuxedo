@@ -15,6 +15,7 @@ import cufflinks_pipeline
 import prep_diffexp_files
 import subsystems
 import multiqc_report
+import multiqc_module_output as mmo
 
 #take genome data structure and condition_dict and make directory names. processses condition to ensure no special characters, or whitespace
 def make_directory_names(genome, condition_dict):
@@ -273,6 +274,12 @@ def main(genome_list, condition_dict, parameters_str, output_dir, gene_matrix=Fa
     else:
         parameters = {}
     setup(genome_list, condition_dict, parameters, output_dir, job_data)
+    
+    ###write the introduction to the multiqc report based on the recipe, number of samples, conditions, and contrasts
+    for genome in genome_list:
+        os.chdir(genome["output"])
+        num_samples = len(job_data.get("single_end_libs",[])) + len(job_data.get("paired_end_libs",[])) 
+        mmo.write_introduction_pipeline(job_data.get("recipe","None"),str(num_samples),str(len(job_data.get("experimental_conditions","0"))),str(len(job_data.get("contrasts","0"))))
     #pipeline_log holds the commands at each step of the pipeline and prints it to an output file Pipeline.txt
     #TODO: should it contain the json dump of the input parameters? 
     pipeline_log = []
