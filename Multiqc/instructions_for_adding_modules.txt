@@ -6,6 +6,7 @@ See example.py and __init__.py in this directory for an example of the basic con
 1. in "*/multiqc/modules/" 
     - create a directory called <module_name>
     - in <module_name>, create <module_name>.py and __init__.py
+    - modify __init__.py with correctly module name (replace "example")
 2. in "entry_points.txt"
     - For anaconda its location is in: /miniconda3/envs/<env_name>/lib/python3.9/site-packages/multiqc-1.10.dev0.dist-info/entry_points.txt 
     - add "<module_name> = multiqc.modules.<module_name>:MultiqcModule" to the bottom of the [multiqc.modules.v1] section 

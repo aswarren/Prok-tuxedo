@@ -104,6 +104,7 @@ introduction = multiqc.modules.introduction:MultiqcModule
 subsystems = multiqc.modules.subsystems:MultiqcModule
 samstat = multiqc.modules.samstat:MultiqcModule
 references = multiqc.modules.references:MultiqcModule
+differential_expression = multiqc.modules.differential_expression:MultiqcModule
 
 [multiqc.templates.v1]
 default = multiqc.templates.default
