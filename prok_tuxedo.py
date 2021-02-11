@@ -66,7 +66,7 @@ def run_diff_exp_import(genome_list, condition_dict, parameters, output_dir, con
 
 #Gets the lists of contrasts and runs DESeq2
 #Runs DESeq2 once for each genome
-def run_deseq2(genome_list,contrasts,job_data):
+def run_deseq2(genome_list,contrasts,job_data,dge_dict):
     #Get list of contrasts to pass into deseq2 R script
     contrast_cmd = []
     for pair in contrasts:
@@ -102,7 +102,8 @@ def run_deseq2(genome_list,contrasts,job_data):
             diffexp_cmd = ["run_deseq2.R",diffexp_params[0],metadata_file,diffexp_params[1],diffexp_params[2]]+contrast_cmd
             print("%s\n"%" ".join(diffexp_cmd))
             subprocess.check_call(diffexp_cmd)
-            wrap_svg_in_html("Volcano_Plots_mqc.svg")
+            #wrap_svg_in_html("Volcano_Plots_mqc.svg")
+            dge_dict["volcano"] = wrap_svg_in_html("Volcano_Plots.svg")
             for pair in contrasts:
                 pair = [x.replace(",","_") for x in pair]
                 pair = "_vs_".join(pair) 
@@ -203,7 +204,7 @@ def top_diffexp_genes(genome_list):
             for gene in heatmap_genes:
                 o.write("%s\n"%gene[0]) 
 
-def generate_heatmaps(genome_list,job_data):
+def generate_heatmaps(genome_list,job_data,dge_dict):
     feature_count = "htseq" if job_data.get("feature_count","htseq") == "htseq" else "stringtie"
     for genome in genome_list:
         os.chdir(genome["output"])
@@ -212,10 +213,11 @@ def generate_heatmaps(genome_list,job_data):
         #<heatmap_script.R> <gene_counts.txt> <metaata.txt> <heatmap_genes.txt> <output_prefix> <feature_count> <specialty_genes)
         #Test_Htseq_four_cond/83333.13/Normalized_Top_50_Differentially_Expressed_Genes_mqc.svg
         heatmap_cmd = ["generate_heatmaps.R",genome["gene_matrix"],genome["deseq_metadata"],genome["heatmap_genes"],os.path.basename(genome["output"]),feature_count,genome["specialty_genes_map"],genome["superclass_map"]]
-        genome["heatmap_svg"] = os.path.join(genome["output"],"Normalized_Top_50_Differentially_Expressed_Genes_mqc.svg")
+        #genome["heatmap_svg"] = os.path.join(genome["output"],"Normalized_Top_50_Differentially_Expressed_Genes_mqc.svg")
+        genome["heatmap_svg"] = os.path.join(genome["output"],"Normalized_Top_50_Differentially_Expressed_Genes.svg")
         print(" ".join(heatmap_cmd))
         subprocess.check_call(heatmap_cmd)
-        genome["heatmap_html"] = wrap_svg_in_html(genome["heatmap_svg"])
+        dge_dict["heatmap"] = wrap_svg_in_html(genome["heatmap_svg"])
 
 #Places <DOCTYPE> and <html>/</html> around svg code
 #Returns html string, replacing svg with html from the svg_file parameter
@@ -275,6 +277,10 @@ def main(genome_list, condition_dict, parameters_str, output_dir, gene_matrix=Fa
         parameters = {}
     setup(genome_list, condition_dict, parameters, output_dir, job_data)
     
+    ###Setup dictionaries for the multiqc modules: use json dump to put these files at the top of each genome directory
+    dge_dict = {}
+    subsystem_dict = {}
+
     ###write the introduction to the multiqc report based on the recipe, number of samples, conditions, and contrasts
     for genome in genome_list:
         os.chdir(genome["output"])
@@ -311,7 +317,8 @@ def main(genome_list, condition_dict, parameters_str, output_dir, gene_matrix=Fa
             cufflinks_pipeline.run_cuffdiff(genome_list, condition_dict, parameters, output_dir, gene_matrix, contrasts, job_data, map_args, diffexp_json)
             run_diff_exp_import(genome_list, condition_dict, parameters, output_dir, contrasts, job_data, map_args, diffexp_json)
             sys.exit(0)
-        run_deseq2(genome_list,contrasts,job_data)
+        #volcano plots are generated in the same script that runs deseq2
+        run_deseq2(genome_list,contrasts,job_data,dge_dict)
         write_gmx_file(genome_list)
         #TODO: differential expression import will fail for host, fix by getting valid genes 
         try:
@@ -322,7 +329,14 @@ def main(genome_list, condition_dict, parameters_str, output_dir, gene_matrix=Fa
         subsystems.setup_specialty_genes(genome_list)
         #generate heatmaps 
         top_diffexp_genes(genome_list) 
-        generate_heatmaps(genome_list,job_data)
+        generate_heatmaps(genome_list,job_data,dge_dict)
+    #write out any of the json files to the top level of the genomes
+    #TODO: rewrite dictionaries to be in the context of genomes
+    for genome in genome_list:
+        os.chdir(genome["output"])
+        #output dge_dict
+        with open("differential_expression.json","w") as dge_handle:
+            dge_handle.write(json.dumps(dge_dict))
     multiqc_report.run_multiqc(genome_list,condition_dict)
     os.chdir(output_dir)
     with open("Pipeline.txt","w") as o:

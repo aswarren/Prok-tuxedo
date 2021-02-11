@@ -103,6 +103,7 @@ def setup_shared_config_sections():
                 SPACE+"- subsystems",
                 SPACE+"- htseq",
                 SPACE+"- samtools",
+                SPACE+"- differential_expression",
                 SPACE+"- custom_content",
                 SPACE+"- samstat",
                 SPACE+"- references"

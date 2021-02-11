@@ -103,7 +103,8 @@ for (i in 5:length(args))
 #dev.off()
 
 ###Output SVG
-grid_svg = paste("Volcano_Plots_mqc.svg",sep="")
+#grid_svg = paste("Volcano_Plots_mqc.svg",sep="")
+grid_svg = paste("Volcano_Plots.svg",sep="")
 #svg(grid_svg,width=svg_width,height=svg_height)
 svglite(grid_svg,width=svg_width,height=svg_height)
 do.call("grid.arrange",c(plot_list,ncol=2))

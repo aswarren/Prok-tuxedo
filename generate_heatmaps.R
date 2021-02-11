@@ -114,7 +114,8 @@ sp_list <- lapply(1:length(sp.labels),function(i){
 sp_legend = Legend(labels = uniq_sp, title = "Specialty Genes", graphics = sp_list)
 
 ###Create heatmap: SVG
-out_svg = paste("Normalized_Top_50_Differentially_Expressed_Genes_mqc.svg",sep="")
+#out_svg = paste("Normalized_Top_50_Differentially_Expressed_Genes_mqc.svg",sep="")
+out_svg = paste("Normalized_Top_50_Differentially_Expressed_Genes.svg",sep="")
 ht = Heatmap(expression.mtx,name="Normalized-Counts",cluster_columns=FALSE,row_names_max_width = unit(8, "cm"),show_row_dend = FALSE,row_names_gp = gpar(fontsize=8,col=colors.list),column_names_gp = gpar(fontsize=8),column_names_rot = 45, column_split = sample_split, border=TRUE)
 #svg(out_svg,width=svg_width)
 svglite(out_svg,width=svg_width)
