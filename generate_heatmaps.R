@@ -106,7 +106,7 @@ sp.index = which(rownames(expression.mtx) %in% specialty.genes$Patric_ID)
 sub_legend = Legend(labels = uniq_subsystems, title = "Subsystem Genes", legend_gp = gpar(fill=sub.colors))
 ###Create specialty genes legend
 #eval(substitute()) exchanges the value of i for the integer at that step when evaluating the function call in draw()
-#otherwise, sp.labels[i] uses the last value of i in the loop, which sets the icons in the legend ot the same value
+#Warning: not using eval(substitute()) causes sp.labels[i] uses the last value of i in the loop, which sets the icons in the legend ot the same value
 sp_list <- lapply(1:length(sp.labels),function(i){
     retval <- function(x,y,w,h) grid.text(eval(substitute(sp.labels[i],list(f=as.name(i)))),x,y)
     retval

@@ -58,6 +58,7 @@ def run_multiqc(genome_list,condition_dict):
         os.chdir(genome["output"])
         report_name = os.path.basename(genome["output"])+"_report.html"
         multiqc_cmd = ["multiqc","--flat","-o",".","-n",report_name,"-t","simple",".","-c",config_path_list[index]]
+        #multiqc_cmd = ["multiqc","--flat","-o",".","-n",report_name,"-t","sections",".","-c",config_path_list[index]]
         if remove_data_dir:
             multiqc_cmd += ["--no-data-dir"]
         if force_overwrite:

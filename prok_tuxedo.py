@@ -13,7 +13,7 @@ import alignment
 import quantification
 import cufflinks_pipeline
 import prep_diffexp_files
-import subsystems
+import pathways
 import multiqc_report
 import multiqc_module_output as mmo
 
@@ -279,15 +279,14 @@ def main(genome_list, condition_dict, parameters_str, output_dir, gene_matrix=Fa
     
     ###Setup dictionaries for the multiqc modules: use json dump to put these files at the top of each genome directory
     dge_dict = {}
-    subsystem_dict = {}
+    pathway_dict = {}
 
     ###write the introduction to the multiqc report based on the recipe, number of samples, conditions, and contrasts
     for genome in genome_list:
         os.chdir(genome["output"])
-        num_samples = len(job_data.get("single_end_libs",[])) + len(job_data.get("paired_end_libs",[])) 
+        num_samples = len(job_data.get("single_end_libs",[])) + len(job_data.get("paired_end_libs",[])) + len(job_data.get("srr_libs",[]))
         mmo.write_introduction_pipeline(job_data.get("recipe","None"),str(num_samples),str(len(job_data.get("experimental_conditions","0"))),str(len(job_data.get("contrasts","0"))))
     #pipeline_log holds the commands at each step of the pipeline and prints it to an output file Pipeline.txt
-    #TODO: should it contain the json dump of the input parameters? 
     pipeline_log = []
     #TRUE: runs cufflinks then cuffdiff if differential expression is turned on
     #FALSE: runs either htseq-count or stringtie
@@ -309,7 +308,8 @@ def main(genome_list, condition_dict, parameters_str, output_dir, gene_matrix=Fa
             prep_diffexp_files.create_counts_table(genome_list,condition_dict,job_data)
     #TODO: reorganize queries to occur in one script instead of creating a dependency between different query functions and their order
     if not run_cuffdiff_pipeline and job_data.get("recipe","RNA-Rocket") == "RNA-Rocket":
-        subsystems.run_subsystem_analysis(genome_list,job_data)
+        pathways.run_subsystem_analysis(genome_list,job_data,pathway_dict)
+        pathways.run_kegg_analysis(genome_list,job_data,pathway_dict)
     
     if len(condition_dict.keys()) > 1 and not job_data.get("novel_features",False):
         #If running cuffdiff pipeline, terminated after running expression import
@@ -326,7 +326,7 @@ def main(genome_list, condition_dict, parameters_str, output_dir, gene_matrix=Fa
         except:
             print("Expression import failed")
         #get amr and specialty genes for labeling the heatmap
-        subsystems.setup_specialty_genes(genome_list)
+        pathways.setup_specialty_genes(genome_list)
         #generate heatmaps 
         top_diffexp_genes(genome_list) 
         generate_heatmaps(genome_list,job_data,dge_dict)
@@ -337,6 +337,8 @@ def main(genome_list, condition_dict, parameters_str, output_dir, gene_matrix=Fa
         #output dge_dict
         with open("differential_expression.json","w") as dge_handle:
             dge_handle.write(json.dumps(dge_dict))
+        with open("pathways.json","w") as pathway_handle:
+            pathway_handle.write(json.dumps(pathway_dict))
     multiqc_report.run_multiqc(genome_list,condition_dict)
     os.chdir(output_dir)
     with open("Pipeline.txt","w") as o:
