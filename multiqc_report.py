@@ -4,14 +4,34 @@ import sys,os,subprocess
 
 SPACE = "    " #multiqc does not like the tab character, using a 4-space macro
 
+def run_multiqc(genome_list,condition_dict,job_data,dge_flag=False):
+    #config_path = "/homes/clarkc/RNASeq_Pipeline/Prok-tuxedo/Multiqc/multiqc_config.yaml"
+    config_path_list = setup_multiqc_configs(genome_list,condition_dict,job_data,dge_flag=dge_flag) 
+    debug_multiqc = False
+    remove_data_dir = False
+    force_overwrite = True
+    for index,genome in enumerate(genome_list):
+        os.chdir(genome["output"])
+        report_name = os.path.basename(genome["output"])+"_report.html"
+        multiqc_cmd = ["multiqc","--flat","-o",".","-n",report_name,"-t","simple",".","-c",config_path_list[index]]
+        #multiqc_cmd = ["multiqc","--flat","-o",".","-n",report_name,"-t","sections",".","-c",config_path_list[index]]
+        if remove_data_dir:
+            multiqc_cmd += ["--no-data-dir"]
+        if force_overwrite:
+            multiqc_cmd += ["-f"]
+        if debug_multiqc:
+            multiqc_cmd += ["--lint"]
+        print(" ".join(multiqc_cmd))
+        subprocess.check_call(multiqc_cmd)
+
 # The easiest way to get the report in to the correct order
 # is to write a config file and setup the sections
 # based on each run
 # - function for creating config file
 # - base section names on the files: example, sections for each of the samstat reports then setup the order
-def setup_multiqc_configs(genome_list,condition_dict):
-    section_order = ["title","logo","sp","module_order","section_comments","remove_sections","custom_content"]
-    config_dict = setup_shared_config_sections() 
+def setup_multiqc_configs(genome_list,condition_dict,job_data,dge_flag=False):
+    section_order = ["title","logo","sp","module_order","exclude_modules","section_comments","remove_sections","custom_content"]
+    config_dict = setup_shared_config_sections(job_data.get("recipe","RNA-Rocket"),job_data.get("feature_count","htseq"),dge_flag=dge_flag) 
     config_list = []
     for genome in genome_list:
         os.chdir(genome["output"])
@@ -48,28 +68,8 @@ def add_to_config_section(config_dict,section,index,entry):
         config_dict[section].insert(index,entry)  
     return config_dict
 
-def run_multiqc(genome_list,condition_dict):
-    #config_path = "/homes/clarkc/RNASeq_Pipeline/Prok-tuxedo/Multiqc/multiqc_config.yaml"
-    config_path_list = setup_multiqc_configs(genome_list,condition_dict) 
-    debug_multiqc = False
-    remove_data_dir = False
-    force_overwrite = True
-    for index,genome in enumerate(genome_list):
-        os.chdir(genome["output"])
-        report_name = os.path.basename(genome["output"])+"_report.html"
-        multiqc_cmd = ["multiqc","--flat","-o",".","-n",report_name,"-t","simple",".","-c",config_path_list[index]]
-        #multiqc_cmd = ["multiqc","--flat","-o",".","-n",report_name,"-t","sections",".","-c",config_path_list[index]]
-        if remove_data_dir:
-            multiqc_cmd += ["--no-data-dir"]
-        if force_overwrite:
-            multiqc_cmd += ["-f"]
-        if debug_multiqc:
-            multiqc_cmd += ["--lint"]
-        print(" ".join(multiqc_cmd))
-        subprocess.check_call(multiqc_cmd)
-
 #returns a dictionary with strings for the sections contained in this function
-def setup_shared_config_sections():
+def setup_shared_config_sections(recipe,feature_count,dge_flag=False):
     config_dict = {}
     title_list = [
                 "title: \"BVBRC Transcriptomic Service\"",
@@ -95,21 +95,9 @@ def setup_shared_config_sections():
                 SPACE+SPACE+"fn: \'*.counts\'"
                 ]
     config_dict["sp"] = sp_list
-    module_list = [
-                "module_order:",
-                SPACE+"- introduction",
-                SPACE+"- fastqc",
-                SPACE+"- bowtie2",
-                SPACE+"- hisat2",
-                SPACE+"- subsystems",
-                SPACE+"- htseq",
-                SPACE+"- samtools",
-                SPACE+"- differential_expression",
-                SPACE+"- custom_content",
-                SPACE+"- samstat",
-                SPACE+"- references"
-                ]
-    config_dict["module_order"] = module_list
+    #module order and exclude modules 
+    config_dict["module_order"] = get_module_order(recipe,feature_count,dge_flag=dge_flag) 
+    config_dict["exclude_modules"] = get_exclude_modules(recipe,feature_count)
     comments_list = [
         "section_comments:",
         SPACE+"general_stats: \""+get_general_stats_intro()+"\""
@@ -144,3 +132,37 @@ def get_general_stats_intro():
     gs_string = gs_string + " <b>M Total seqs</b>: Total sequences in the bam file (millions), calculated by Samtools"
     gs_string = gs_string + "</p>"
     return gs_string
+
+def get_module_order(recipe,feature_count,dge_flag=False):
+    module_list = ["module_order:",
+                SPACE+"- introduction",
+                SPACE+"- fastqc"
+                ]
+    #excluding bowtie and hisat instead: redundant information
+    #if recipe == "Host":
+    #    module_list += [SPACE+"- hisat2"]
+    #else:
+    #    module_list += [SPACE+"- bowtie2"]
+    #TODO: create recipes for htseq, stringtie, and cufflinks
+    if feature_count == "htseq":
+        module_list += [SPACE+"- htseq"]
+    else:
+        module_list += [SPACE+"- samtools"]
+    #TODO: need to rename module subsystems to pathways: will show up as pathways in report at the moment 
+    module_list += [SPACE+"- subsystems"]
+    if dge_flag:
+        module_list += [SPACE+"- differential_expression"]
+    #Final three modules should be the same for each run case 
+    module_list += [
+                SPACE+"- custom_content",
+                SPACE+"- samstat",
+                SPACE+"- references"
+                ]
+    return module_list
+
+def get_exclude_modules(recipe,feature_count):
+    exclude_list = ["exclude_modules:"]
+    if feature_count == "htseq":
+        exclude_list += [SPACE+"- samtools"]
+    exclude_list += [SPACE+"- bowtie2",SPACE+"- hisat2"]
+    return exclude_list

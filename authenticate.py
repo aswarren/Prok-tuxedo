@@ -9,12 +9,16 @@ requests.packages.urllib3.disable_warnings(InsecureRequestWarning)
 
 #TODO: figure out KB_authentication procedure
 
-def createTSVGet(api_url=None):
+LOG = sys.stderr
+
+PatricUser = None
+
+def createQueryGet(api_url=None):
     if api_url == None:
         api_url="https://www.patricbrc.org/api/"
     Session = requests.Session()
-    Session.headers.update({ 'accept': "text/tsv" })
-    Session.headers.update({ "Content-Type": "application/rqlquery+x-www-form-urlencoded" })
+    #Session.headers.update({ 'accept': "text/tsv" })
+    #Session.headers.update({ "Content-Type": "application/rqlquery+x-www-form-urlencoded" })
     if not authenticateByEnv(Session):
         authenticateByFile(None, Session)
     return Session

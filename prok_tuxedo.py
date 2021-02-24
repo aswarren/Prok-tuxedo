@@ -210,10 +210,17 @@ def generate_heatmaps(genome_list,job_data,dge_dict):
         os.chdir(genome["output"])
         if not "heatmap_genes" in genome:
             continue
-        #<heatmap_script.R> <gene_counts.txt> <metaata.txt> <heatmap_genes.txt> <output_prefix> <feature_count> <specialty_genes)
+        #<heatmap_script.R> <gene_counts.txt> <metaata.txt> <heatmap_genes.txt> <output_prefix> <feature_count> <specialty_genes> <subsystem_genes>
         #Test_Htseq_four_cond/83333.13/Normalized_Top_50_Differentially_Expressed_Genes_mqc.svg
-        heatmap_cmd = ["generate_heatmaps.R",genome["gene_matrix"],genome["deseq_metadata"],genome["heatmap_genes"],os.path.basename(genome["output"]),feature_count,genome["specialty_genes_map"],genome["superclass_map"]]
-        #genome["heatmap_svg"] = os.path.join(genome["output"],"Normalized_Top_50_Differentially_Expressed_Genes_mqc.svg")
+        heatmap_cmd = ["generate_heatmaps.R",genome["gene_matrix"],genome["deseq_metadata"],genome["heatmap_genes"],os.path.basename(genome["output"]),feature_count]
+        if "specialty_genes_map" in genome:
+            heatmap_cmd += [genome["specialty_genes_map"]]
+        else:
+            heatmap_cmd += ["NONE"]
+        if "superclass_map" in genome:
+            heatmap_cmd += [genome["superclass_map"]]
+        else:
+            heatmap_cmd += ["NONE"]
         genome["heatmap_svg"] = os.path.join(genome["output"],"Normalized_Top_50_Differentially_Expressed_Genes.svg")
         print(" ".join(heatmap_cmd))
         subprocess.check_call(heatmap_cmd)
@@ -280,12 +287,14 @@ def main(genome_list, condition_dict, parameters_str, output_dir, gene_matrix=Fa
     ###Setup dictionaries for the multiqc modules: use json dump to put these files at the top of each genome directory
     dge_dict = {}
     pathway_dict = {}
+    ref_dict = {}
+    ref_dict["recipe"] = job_data.get("recipe","RNA-Rocket")
 
     ###write the introduction to the multiqc report based on the recipe, number of samples, conditions, and contrasts
     for genome in genome_list:
         os.chdir(genome["output"])
         num_samples = len(job_data.get("single_end_libs",[])) + len(job_data.get("paired_end_libs",[])) + len(job_data.get("srr_libs",[]))
-        mmo.write_introduction_pipeline(job_data.get("recipe","None"),str(num_samples),str(len(job_data.get("experimental_conditions","0"))),str(len(job_data.get("contrasts","0"))))
+        mmo.write_introduction_pipeline(job_data.get("recipe","RNA-Rocket"),job_data.get("feature_count","htseq"),str(num_samples),str(len(job_data.get("experimental_conditions","0"))),str(len(job_data.get("contrasts","0"))))
     #pipeline_log holds the commands at each step of the pipeline and prints it to an output file Pipeline.txt
     pipeline_log = []
     #TRUE: runs cufflinks then cuffdiff if differential expression is turned on
@@ -311,7 +320,9 @@ def main(genome_list, condition_dict, parameters_str, output_dir, gene_matrix=Fa
         pathways.run_subsystem_analysis(genome_list,job_data,pathway_dict)
         pathways.run_kegg_analysis(genome_list,job_data,pathway_dict)
     
+    dge_flag = False #used for multiqc_report
     if len(condition_dict.keys()) > 1 and not job_data.get("novel_features",False):
+        dge_flag = True
         #If running cuffdiff pipeline, terminated after running expression import
         if run_cuffdiff_pipeline:
             cufflinks_pipeline.run_cuffdiff(genome_list, condition_dict, parameters, output_dir, gene_matrix, contrasts, job_data, map_args, diffexp_json)
@@ -339,7 +350,10 @@ def main(genome_list, condition_dict, parameters_str, output_dir, gene_matrix=Fa
             dge_handle.write(json.dumps(dge_dict))
         with open("pathways.json","w") as pathway_handle:
             pathway_handle.write(json.dumps(pathway_dict))
-    multiqc_report.run_multiqc(genome_list,condition_dict)
+        with open("references.json","w") as ref_handle:
+            ref_handle.write(json.dumps(ref_dict))
+            
+    multiqc_report.run_multiqc(genome_list,condition_dict,job_data,dge_flag=dge_flag)
     os.chdir(output_dir)
     with open("Pipeline.txt","w") as o:
         o.write("\n".join(pipeline_log))

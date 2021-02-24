@@ -22,7 +22,7 @@ def run_alignment(genome_list, condition_dict, parameters, output_dir, job_data,
     #modifies condition_dict sub replicates to include 'bowtie' dict recording output files
     for genome in genome_list:
         genome_link = genome["genome_link"]
-        ###TODO: testing samstat dict for putting the samstat reports in the same portion in the multiqc report
+        #samstat dict for putting the samstat reports in the same portion in the multiqc report
         samstat_dict = {}
         samstat_dict["reports"] = []
         final_cleanup=[]
@@ -114,7 +114,6 @@ def run_alignment(genome_list, condition_dict, parameters, output_dir, job_data,
                 print " ".join(samstat_cmd)
                 stats_cmd = ["samtools","stats","--threads",str(samtools_threads),bam_file]
                 stats_outfile = bam_file.replace("bam","samtools_stats")
-                #TODO: issue with the -@ in stats cmd???
                 if not os.path.exists(stats_outfile):
                     pipeline_log.append(" ".join(stats_cmd))
                     with open(stats_outfile,"w") as o:

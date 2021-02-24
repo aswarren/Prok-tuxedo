@@ -20,8 +20,10 @@ class MultiqcModule(BaseMultiqcModule):
         kegg_grid = None
         with open(path_file,"r") as pf:
             path_json = json.load(pf)
-            superclass_grid = path_json["subsystem_grid"]
-            kegg_grid = path_json["kegg_grid"]
+            if "subsystem_grid" in path_json:
+                superclass_grid = path_json["subsystem_grid"]
+            if "kegg_grid" in path_json:
+                kegg_grid = path_json["kegg_grid"]
             
         #self.add_section(plot=None,content="/homes/clarkc/RNASeq_Pipeline/SRP220530_Ecoli_Single/Test_Htseq_four_cond_new_structure/83333.113/Superclass_Subsystem_Distribution_subsystems.html")  
         img_list = []
