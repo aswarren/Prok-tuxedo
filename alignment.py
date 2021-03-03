@@ -38,7 +38,6 @@ def run_alignment(genome_list, condition_dict, parameters, output_dir, job_data,
             print (" ".join(tar_cmd))
             subprocess.check_call(tar_cmd)
             index_prefix = os.path.join(output_dir, os.path.basename(genome["hisat_index"]).replace(".ht2.tar","")) #somewhat fragile convention. tar prefix is underlying index prefix
-            genome["index_prefix"] = index_prefix
             if not os.path.exists(index_prefix+".1.ht2"):
                 print("hisant indices were not unpacked correctly: %s"%index_prefix)
                 sys.exit()
@@ -57,12 +56,6 @@ def run_alignment(genome_list, condition_dict, parameters, output_dir, job_data,
                 os.exit(1)
             cmd=["bowtie2", "-x", genome_link]
             thread_count= parameters.get("bowtie2",{}).get("-p",0)
-        ###
-        # strandedness determination requires a bam file, so inserting here since the above creates the hisat/bowtie indices
-        #get strandedness parameter: returns FALSE if single end. 
-        #If paired-end: returns TRUE and stores strand parameter in the condition dictionary 
-        assign_strandedness_parameter(genome,condition_dict,parameters)
-        ###
         if thread_count == 0:
             thread_count=2 #multiprocessing.cpu_count()
         cmd+=["-p",str(thread_count)]
@@ -78,7 +71,7 @@ def run_alignment(genome_list, condition_dict, parameters, output_dir, job_data,
                 samstat_cmd=["samstat"]
                 cur_cmd=list(cmd)
                 if "read2" in r:
-                    cur_cmd+=["-1",link_space(r["read1"]),"-2",link_space(r["read2"])]
+                    cur_cmd+=["-1",link_space(r["read1"])," -2",link_space(r["read2"])]
                     name1=os.path.splitext(os.path.basename(r["read1"]))[0].replace(" ","")
                     name2=os.path.splitext(os.path.basename(r["read2"]))[0].replace(" ","")
                     sam_file=os.path.join(target_dir,name1+"_"+name2+".sam")
@@ -95,23 +88,14 @@ def run_alignment(genome_list, condition_dict, parameters, output_dir, job_data,
                 r[genome["genome"]]["bam"]=bam_file
                 r[genome["genome"]]["fastqc"] = bam_file.replace(".bam","_fastqc.html") 
                 cur_cmd+=["-S",sam_file]
-                #add strandedness parameter
-                #different specification for bowtie2 vs hisat2
-                #TODO: for some reason an error occurs when calling bowtie2 with the strand parameter
-                if "strand_param" in r:
-                    if cur_cmd[0] == "hisat2":
-                        cur_cmd.insert["--rna_strandedness",r["strand_param"]]    
-                    else: #bowtie2
-                        cur_cmd.insert(1,"--"+r["strand_param"].lower())
                 if not os.path.exists(r[genome["genome"]]["fastqc"]):
                     print " ".join(fastqc_cmd)
                     pipeline_log.append(" ".join(fastqc_cmd))
-                    #subprocess.check_call(fastqc_cmd)
+                    subprocess.check_call(fastqc_cmd)
                 if os.path.exists(bam_file):
-                    print(" ".join(cur_cmd))
                     sys.stderr.write(bam_file+" alignments file already exists. skipping\n")
                 else:
-                    print(" ".join(cur_cmd))
+                    print cur_cmd
                     if job_data.get("recipe","RNA-Rocket") == "Host":
                         alignment_log = bam_file.replace("bam","hisat") 
                     else:
@@ -164,80 +148,7 @@ def get_average_read_length_per_file(stats_file):
                 line = line.strip().split()
                 avg_length = line[-1]
                 return avg_length
-
-#Only applies to paired-end data
-#TODO: Install RSeqc and test bam -> bed utility in samtools
-def assign_strandedness_parameter(genome,condition_dict,parameters):
-    #generate bed files for each genome
-    generate_bed_from_gff(genome)
-    #TODO: check length of fastq file to make sure sampling will work and not return an error
-    remove_list = []
-    for condition in condition_dict:
-        for r in condition_dict[condition]["replicates"]:
-            #skip if not paired end reads
-            if "read2" not in r:
-                continue
-            #skip if already determined somehow: probably only likely to happen during dualRNASeq, which is not implemented yet
-            if "strand_param" in r:
-                continue
-            #sample fastq files using seqtk
-            #TESTING: do I need to make sure the same reads have been sampled??
-            sample1_file = os.path.join(r["target_dir"],".".join(os.path.basename(r["read1"]).split(".")[:-1]) + ".s1.fastq")
-            sample2_file = os.path.join(r["target_dir"],".".join(os.path.basename(r["read1"]).split(".")[:-1]) + ".s2.fastq")
-            remove_list.append(sample1_file)
-            remove_list.append(sample2_file)
-            #setting default sampling to 1000 reads
-            num_sample = "1000"
-            sample1_cmd = " ".join(["seqtk","sample","-s","42",r["read1"],num_sample,">",sample1_file])
-            sample2_cmd = " ".join(["seqtk","sample","-s","42",r["read2"],num_sample,">",sample2_file])
-            print(sample1_cmd)
-            ###shell=True?? for redirecting the output to a file
-            if not os.path.exists(sample1_file):
-                subprocess.check_call(sample1_cmd,shell=True)
-            print(sample2_cmd)
-            if not os.path.exists(sample2_file):
-                subprocess.check_call(sample2_cmd,shell=True)
-            ###run bowtie2 or hisat2 on sampled files
-            sample_align_cmd = []
-            sam_file = os.path.join(r["target_dir"],".".join(os.path.basename(r["read1"]).split(".")[:-1]) + ".sample.sam")
-            remove_list.append(sam_file)
-            if len(genome["hisat_index"]) > 0:
-                sample_align_cmd += ["hisat2","-x",genome["index_prefix"],"-1",sample1_file,"-2",sample2_file,"--mp","1,0","--pen_noncansplice","20","-S",sam_file,"-p",parameters.get("hisat2",{}).get("-p","1")] 
-            else: #bowtie
-                sample_align_cmd += ["bowtie2","-x",genome["genome_link"],"-1",sample1_file,"-2",sample2_file,"-S",sam_file,"-p",parameters.get("bowtie2",{}).get("-p","1")]
-            if not os.path.exists(sam_file):
-                subprocess.check_call(sample_align_cmd)
-            ###generate RSEQc strandedness file using infer_experiment.py
-            infer_cmd = ["infer_experiment.py","-i",sam_file,"-r",genome["bed"],"-s",num_sample]
-            infer_file = os.path.join(r["target_dir"],os.path.basename(r["read1"]).split(".")[0]+".infer") 
-            remove_list.append(infer_file)
-            print(" ".join(infer_cmd))
-            with open(infer_file,"w") as o:
-                subprocess.check_call(infer_cmd,stdout=o)
-            ###assess infer_file and set strandedness parameter for replicate
-            with open(infer_file,"r") as i:
-                for x in range(0,3): #skip first 3 lines
-                    next(i)    
-                undetermined = float(next(i).split(":")[1].strip()) 
-                rf_stranded = float(next(i).split(":")[1].strip())
-                fr_stranded = float(next(i).split(":")[1].strip())
-                if undetermined > fr_stranded and undetermined > rf_stranded:
-                    r["strand_param"] = "undetermined"
-                elif abs(fr_stranded - rf_stranded) <= 0.1: #subjective threshold: should work in most cases
-                    r["strand_param"] = "undetermined"
-                else:
-                    r["strand_param"] = "FR" if fr_stranded > rf_stranded else "RF"
-    ###TODO: remove all files in the remove_list
-    ###TODO: write out experiment geometry file at top level of directory structure 
-                  
-#genome = one of the genome dictionaries in the genome_list variable
-def generate_bed_from_gff(genome):
-    bed_file = genome["annotation_link"].replace(".gff",".bed")
-    genome["bed"] = bed_file
-    bed_cmd = "gff2bed --do-not-sort < " + genome["annotation_link"] + " > " + bed_file 
-    if not os.path.exists(bed_file):
-        subprocess.check_call(bed_cmd,shell=True) 
-
+#
 #Pass in a samstat html file to remove portion that conflicts with the multiqc report
 #Uses sed to remove the block of css code that clashes with multiqc
 #Then goes through and removes all content other than the intro statistics and base quality distribution by position

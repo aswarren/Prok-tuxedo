@@ -65,6 +65,7 @@ def run_kegg_analysis(genome_list,job_data,pathway_json):
             subprocess.check_call(kegg_plot_cmd)
             pathway_json["kegg_grid"] = wrap_svg_in_html(output_kegg_grid_file)
 
+#TODO: incorporate KB_Auth token check
 def get_subsystem_mapping(genome):
     genome_url = "https://patricbrc.org/api/subsystem/?eq(genome_id,"+os.path.basename(genome["output"])+")&limit(10000000)&http_accept=application/solr+json"
     req = requests.Request('GET',genome_url)

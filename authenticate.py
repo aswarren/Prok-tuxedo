@@ -7,6 +7,8 @@ import json
 from requests.packages.urllib3.exceptions import InsecureRequestWarning
 requests.packages.urllib3.disable_warnings(InsecureRequestWarning)
 
+#TODO: figure out KB_authentication procedure
+
 LOG = sys.stderr
 
 PatricUser = None
