@@ -30,8 +30,10 @@ class MultiqcModule(BaseMultiqcModule):
             img_list = []
             report_list = path_json["reports"] 
             for report in report_list:
+                img_list.append("<div>")
                 with open(report,"r") as r:
                     img_list.append(r.read())
+                img_list.append("</div>")
             ###Add in collapsible section
             #collapse_prefix = "<button type=\"button\" onclick=\"click_collapse_samstat()\">Open Collapsible</button>\n<div class=\"samstat_block\">"
             #collapse_suffix = "</div>"
