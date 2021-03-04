@@ -2,7 +2,13 @@ StringTie==2.1.1
 HTSeq==0.12.4
 multiqc==1.10.dev0
 RSeQC==4.0.0
-bedtools==v2.24.0
+bedtools==2.24.0
+hisat2==2.1.0
+bowtie2==2.4.2
+SAMstat==1.5.1
+FastQC==0.11.7
+cufflinks==2.2.2
+samtools==1.11
 R==3.6.1
     - DESeq2
     - ggplot2
