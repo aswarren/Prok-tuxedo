@@ -89,7 +89,8 @@ for (i in 1:length(systems)) {
     if (is.null(legend)) {
         legend <- g_legend(vln_plot)
     }
-    vln_plot = vln_plot + theme(axis.text.x = element_text(size=8,angle=45,vjust=0.5), legend.position = "none")
+    #vln_plot = vln_plot + theme(axis.text.x = element_text(size=8,angle=45,vjust=0.5), legend.position = "none")
+    vln_plot = vln_plot + theme(axis.text.x = element_text(size=4,angle=315,vjust=0.5), legend.position = "none")
     plot_list[[i]] <- vln_plot
 }
 plot_list[[length(systems)+1]] <- legend
@@ -105,6 +106,7 @@ plot_list[[length(systems)+1]] <- legend
 #vln_svg = paste(system.level,"_Pathway_Distribution_mqc.svg",sep="")
 vln_svg = paste(system.level,"_Pathway_Distribution.svg",sep="")
 #svg(vln_svg,width=svg_width,height=svg_height)
-svglite(vln_svg,width=svg_width,height=svg_height)
+#svglite(vln_svg,width=svg_width,height=svg_height)
+svglite(vln_svg,width=12,height=10)
 do.call("grid.arrange",c(plot_list,ncol=num_columns))
 dev.off()

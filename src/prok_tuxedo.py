@@ -145,12 +145,6 @@ def write_gmx_file(genome_list):
                         o.write("\t0")
                 o.write("\n")
 
-#TODO: might not need function
-#Function that checks the genes from the host pipeline 
-#removes genes that arent in the system 
-def validate_host_genes():
-    print("need to write function")
-
 #TODO: what if they don't do differential expression
 #TODO: should we care about the p-value?
 #TODO: maybe two heatmaps: 50 upregulated and 50 downregulated?
@@ -237,17 +231,30 @@ def wrap_svg_in_html(svg_file):
         hf.write("%s"%"".join(html_lines))
     return html_file
 
+###eventually if dual-RNASeq is enabled in the pipeline, need to adjust target_dir
+#since it only references one genome directory, and a few function implementations depend on target_dir
+# - assign_stradedness_parameter() in alignment.py
 def setup(genome_list, condition_dict, parameters, output_dir, job_data):
     for genome in genome_list:
         genome_link=os.path.join(output_dir, os.path.basename(genome["genome"]))
+        annotation_link = os.path.join(output_dir, os.path.basename(genome["annotation"]))
         genome["genome_link"]=genome_link
+        genome["annotation_link"] = annotation_link
         genome["host"] = ("hisat_index" in genome and genome["hisat_index"])
         if not os.path.exists(genome_link):
             subprocess.check_call(["ln","-s",genome["genome"],genome_link])
+        if not os.path.exists(annotation_link):
+            subprocess.check_call(["ln","-s",genome["annotation"],annotation_link])
         make_directory_names(genome, condition_dict)
         for condition in condition_dict:
             rcount=0
             for r in condition_dict[condition]["replicates"]:
+                ###assign name key in replicate dictionary
+                r_name = os.path.basename(r["read1"]).split(".")[0]
+                if "read2" in r:
+                    r_name = r_name + "_" + os.path.basename(r["read2"]).split(".")[0]
+                r["name"] = r_name
+                ###
                 target_dir=r["target_dir"]
                 rcount+=1
                 subprocess.call(["mkdir","-p",target_dir])

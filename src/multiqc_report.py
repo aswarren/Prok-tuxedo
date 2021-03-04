@@ -77,7 +77,7 @@ def setup_shared_config_sections(recipe,feature_count,dge_flag=False):
                 ]
     config_dict["title"] = title_list
     logo_list = [
-                "custom_logo: \'/homes/clarkc/RNASeq_Pipeline/Prok-tuxedo/Multiqc/BV_BRC.png\'",
+                "custom_logo: \'/homes/clarkc/RNASeq_Pipeline/Prok-tuxedo/lib/Multiqc/BV_BRC.png\'",
                 "custom_logo_title: \'BV-BRC\'"
                 ]
     config_dict["logo"] = logo_list
@@ -123,7 +123,15 @@ def setup_shared_config_sections(recipe,feature_count,dge_flag=False):
 #Returns a string used in the introduction of the general_stats section of the multiqc report
 #strings in this section are read using a markup interpreter 
 def get_general_stats_intro():
+    ##TODO: Remove % Failed from general statistics table
     gs_string = "<p style=font-size:60%;>Column Descriptors (hover over headers for detail):<br />"    
+    gs_string = gs_string + "<b>% Dups</b>: Percentage of duplicate reads (FastQC)"
+    gs_string = gs_string + ";<b>% GC</b>: Average Percentage of GC content (FastQC)"
+    gs_string = gs_string + ";<b>Length</b>: Average Sequence Length (FastQC)"
+    gs_string = gs_string + ";<b>M Seqs</b>: Total Sequences (FastQC)"
+    gs_string = gs_string + ";<b>% Assigned</b>: Percentage Assigned Reads (HTSeq)"
+    gs_string = gs_string + ";<b>M Assigned</b>: Total assigned reads in millions of reads (HTSeq)"
+    '''
     gs_string = gs_string + "<b>%Assigned</b>: Percentage of sample reads HTSeq attributes to genomic feature abundance"
     gs_string = gs_string + " <b>M Assigned</b>: Number of reads (millions) HTSeq attributes to genomic feature abundance"
     gs_string = gs_string + " <b>Error rate</b>: mismatches (NM) / bases mapped (CIGAR), calculated by Samtools;"
@@ -131,12 +139,14 @@ def get_general_stats_intro():
     gs_string = gs_string + " <b>% Mapped</b>: Percentage of sample reads mapped in the bam file, calculated by Samtools;"
     gs_string = gs_string + " <b>M Total seqs</b>: Total sequences in the bam file (millions), calculated by Samtools"
     gs_string = gs_string + "</p>"
+    '''
     return gs_string
 
 def get_module_order(recipe,feature_count,dge_flag=False):
     module_list = ["module_order:",
                 SPACE+"- introduction",
-                SPACE+"- fastqc"
+                SPACE+"- fastqc",
+                SPACE+"- rseqc"
                 ]
     #excluding bowtie and hisat instead: redundant information
     #if recipe == "Host":

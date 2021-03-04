@@ -1,0 +1,14 @@
+StringTie==2.1.1
+HTSeq==0.12.4
+multiqc==1.10.dev0
+RSeQC==4.0.0
+bedtools==v2.24.0
+R==3.6.1
+    - DESeq2
+    - ggplot2
+    - ComplexHeatmap
+    - EnhancedVolcano
+    - svglite    
+    - gridExtra
+    - reshape2
+mscorefonts==0.0.1

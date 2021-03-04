@@ -65,7 +65,6 @@ def run_kegg_analysis(genome_list,job_data,pathway_json):
             subprocess.check_call(kegg_plot_cmd)
             pathway_json["kegg_grid"] = wrap_svg_in_html(output_kegg_grid_file)
 
-#TODO: incorporate KB_Auth token check
 def get_subsystem_mapping(genome):
     genome_url = "https://patricbrc.org/api/subsystem/?eq(genome_id,"+os.path.basename(genome["output"])+")&limit(10000000)&http_accept=application/solr+json"
     req = requests.Request('GET',genome_url)
@@ -199,6 +198,9 @@ def get_kegg_genes_mapping(genome):
     #quick distribution check for 208964.12 shows >100 pathway_name categories and around 15 for pathway_class
     #using pathway_class
     for entry in response.json()['response']['docs']:
+        #some kegg pathway genes do not have corresponding PATRIC IDs: skipping those genes for now
+        if "patric_id" not in entry:
+            continue
         kegg_dict[entry["patric_id"]] = {}
         kegg_dict[entry["patric_id"]]["pathway_class"] = entry["pathway_class"]
     return kegg_dict
