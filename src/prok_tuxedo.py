@@ -17,6 +17,7 @@ import pathways
 import multiqc_report
 import multiqc_module_output as mmo
 
+
 #take genome data structure and condition_dict and make directory names. processses condition to ensure no special characters, or whitespace
 def make_directory_names(genome, condition_dict):
     if genome["dir"].endswith('/'):
@@ -66,7 +67,7 @@ def run_diff_exp_import(genome_list, condition_dict, parameters, output_dir, con
 
 #Gets the lists of contrasts and runs DESeq2
 #Runs DESeq2 once for each genome
-def run_deseq2(genome_list,contrasts,job_data,dge_dict):
+def run_deseq2(genome_list,contrasts,job_data,dge_dict,output_dir):
     #Get list of contrasts to pass into deseq2 R script
     contrast_cmd = []
     for pair in contrasts:
@@ -103,12 +104,12 @@ def run_deseq2(genome_list,contrasts,job_data,dge_dict):
             print("%s\n"%" ".join(diffexp_cmd))
             subprocess.check_call(diffexp_cmd)
             #wrap_svg_in_html("Volcano_Plots_mqc.svg")
-            dge_dict["volcano"] = wrap_svg_in_html("Volcano_Plots.svg")
+            dge_dict["volcano"] = wrap_svg_in_html("Volcano_Plots.svg",output_dir)
             for pair in contrasts:
                 pair = [x.replace(",","_") for x in pair]
                 pair = "_vs_".join(pair) 
                 #diffexp_file = genome_prefix + "_" + pair + ".txt"
-                diffexp_output = pair+"."+diffexp_params[2]+"."+diffexp_params[1]+".deseq2"
+                diffexp_output = pair+"."+diffexp_params[2]+"."+diffexp_params[1]+".deseq2.tsv"
                 genome["diff_exp_contrasts"].append(os.path.join(genome["output"],diffexp_output))
             
          
@@ -124,7 +125,7 @@ def write_gmx_file(genome_list):
             #when creating gene_exp.gmx, ignore transcripts
             if "Transcript" in contrast_file:
                 continue
-            contrast_name = os.path.basename(contrast_file).replace(".txt","")
+            contrast_name = os.path.basename(contrast_file).replace(".tsv","")
             contrast_list.append(contrast_name)
             gene_count_dict[contrast_name] = {}
             with open(contrast_file,"r") as cf:
@@ -198,7 +199,7 @@ def top_diffexp_genes(genome_list):
             for gene in heatmap_genes:
                 o.write("%s\n"%gene[0]) 
 
-def generate_heatmaps(genome_list,job_data,dge_dict):
+def generate_heatmaps(genome_list,job_data,dge_dict,output_dir):
     feature_count = "htseq" if job_data.get("feature_count","htseq") == "htseq" else "stringtie"
     for genome in genome_list:
         os.chdir(genome["output"])
@@ -218,18 +219,44 @@ def generate_heatmaps(genome_list,job_data,dge_dict):
         genome["heatmap_svg"] = os.path.join(genome["output"],"Normalized_Top_50_Differentially_Expressed_Genes.svg")
         print(" ".join(heatmap_cmd))
         subprocess.check_call(heatmap_cmd)
-        dge_dict["heatmap"] = wrap_svg_in_html(genome["heatmap_svg"])
+        dge_dict["heatmap"] = wrap_svg_in_html(genome["heatmap_svg"],output_dir)
 
-#Places <DOCTYPE> and <html>/</html> around svg code
+#Places <DOCTYPE> and <html></html> around svg code
 #Returns html string, replacing svg with html from the svg_file parameter
-def wrap_svg_in_html(svg_file):
+def wrap_svg_in_html(svg_file,output_dir):
     html_file = svg_file.replace(".svg",".html")
+    print("Wrapping %s in html: %s"%(svg_file,html_file))
     with open(svg_file,"r") as sf:
         svg_lines = sf.readlines()
     html_lines = ["<!DOCTYPE html>\n","<html>\n"]+svg_lines+["</html>"]
     with open(html_file,"w") as hf:
         hf.write("%s"%"".join(html_lines))
-    return html_file
+    move_svg(svg_file,output_dir)
+    return move_html(html_file,output_dir)
+
+#calls the list of svg files and moves them to one directory
+#necessary for structure in the user workspace
+def move_svg(svg,output_dir):
+    svg_dir = os.path.join(output_dir,"report_images")
+    if not os.path.exists(svg_dir):
+        os.mkdir(svg_dir)
+    out_svg = os.path.join(svg_dir,os.path.basename(svg))
+    os.rename(svg,out_svg) 
+
+def move_html(html,output_dir):
+    html_dir = os.path.join(output_dir,"html_images")
+    if not os.path.exists(html_dir):
+        os.mkdir(html_dir)
+    out_html = os.path.join(html_dir,os.path.basename(html))
+    os.rename(html,out_html)
+    return out_html
+
+#removes html files 
+#part of cleanup before sending files to user workspace
+def remove_html_dir(output_dir):
+    html_dir = os.path.join(output_dir,"html_images")
+    if os.path.exists(html_dir):
+        subprocess.check_call(["rm","-r",html_dir])
 
 ###eventually if dual-RNASeq is enabled in the pipeline, need to adjust target_dir
 #since it only references one genome directory, and a few function implementations depend on target_dir
@@ -292,6 +319,7 @@ def main(genome_list, condition_dict, parameters_str, output_dir, gene_matrix=Fa
     setup(genome_list, condition_dict, parameters, output_dir, job_data)
     
     ###Setup dictionaries for the multiqc modules: use json dump to put these files at the top of each genome directory
+    #TODO: rewrite in terms of the genomes
     dge_dict = {}
     pathway_dict = {}
     ref_dict = {}
@@ -323,9 +351,9 @@ def main(genome_list, condition_dict, parameters_str, output_dir, gene_matrix=Fa
         else:
             prep_diffexp_files.create_counts_table(genome_list,condition_dict,job_data)
     #TODO: reorganize queries to occur in one script instead of creating a dependency between different query functions and their order
-    if not run_cuffdiff_pipeline and job_data.get("recipe","RNA-Rocket") == "RNA-Rocket":
-        pathways.run_subsystem_analysis(genome_list,job_data,pathway_dict)
-        pathways.run_kegg_analysis(genome_list,job_data,pathway_dict)
+    if not run_cuffdiff_pipeline:
+        pathways.run_subsystem_analysis(genome_list,job_data,pathway_dict,output_dir)
+        pathways.run_kegg_analysis(genome_list,job_data,pathway_dict,output_dir)
     
     dge_flag = False #used for multiqc_report
     if len(condition_dict.keys()) > 1 and not job_data.get("novel_features",False):
@@ -336,7 +364,7 @@ def main(genome_list, condition_dict, parameters_str, output_dir, gene_matrix=Fa
             run_diff_exp_import(genome_list, condition_dict, parameters, output_dir, contrasts, job_data, map_args, diffexp_json)
             sys.exit(0)
         #volcano plots are generated in the same script that runs deseq2
-        run_deseq2(genome_list,contrasts,job_data,dge_dict)
+        run_deseq2(genome_list,contrasts,job_data,dge_dict,output_dir)
         write_gmx_file(genome_list)
         #TODO: differential expression import will fail for host, fix by getting valid genes 
         try:
@@ -347,23 +375,27 @@ def main(genome_list, condition_dict, parameters_str, output_dir, gene_matrix=Fa
         pathways.setup_specialty_genes(genome_list)
         #generate heatmaps 
         top_diffexp_genes(genome_list) 
-        generate_heatmaps(genome_list,job_data,dge_dict)
+        generate_heatmaps(genome_list,job_data,dge_dict,output_dir)
     #write out any of the json files to the top level of the genomes
     #TODO: rewrite dictionaries to be in the context of genomes
     for genome in genome_list:
         os.chdir(genome["output"])
         #output dge_dict
+        genome_dge = dict(dge_dict)
+        genome_dge["genome_id"] = os.path.basename(genome["genome"]).replace(".fna","")
         with open("differential_expression.json","w") as dge_handle:
-            dge_handle.write(json.dumps(dge_dict))
+            dge_handle.write(json.dumps(genome_dge))
         with open("pathways.json","w") as pathway_handle:
             pathway_handle.write(json.dumps(pathway_dict))
         with open("references.json","w") as ref_handle:
             ref_handle.write(json.dumps(ref_dict))
             
     multiqc_report.run_multiqc(genome_list,condition_dict,job_data,dge_flag=dge_flag)
+    ###output pipeline txt file and run cleanup functions
     os.chdir(output_dir)
     with open("Pipeline.txt","w") as o:
         o.write("\n".join(pipeline_log))
+    #remove_html_dir(output_dir)
         
 
 if __name__ == "__main__":

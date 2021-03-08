@@ -148,6 +148,12 @@ if (!is.null(specialty.genes))
     legend.list[[num_legends]] <- sp_legend
 }
 
+###Testing: take out "fig|" from gene names in heatmap so the legend doesn't overlap with the genes
+for (i in 1:length(rownames(expression.mtx))) {
+    split_gene = unlist(strsplit(rownames(expression.mtx)[i],"\\."))
+    rownames(expression.mtx)[i] = paste("*",split_gene[length(split_gene)],sep=".")
+}
+
 ###Create heatmap: SVG
 #out_svg = paste("Normalized_Top_50_Differentially_Expressed_Genes_mqc.svg",sep="")
 out_svg = paste("Normalized_Top_50_Differentially_Expressed_Genes.svg",sep="")

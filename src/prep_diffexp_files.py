@@ -41,8 +41,8 @@ def create_counts_table_host(genome_list,condition_dict,job_data):
         genome_id = os.path.basename(genome_dir)
         #Delimeter: , (csv files)
         delim = "\t"
-        gene_counts_mtx = genome_id+"."+feature_count+".gene_counts"
-        transcript_counts_mtx = genome_id+"."+feature_count+".transcript_counts"
+        gene_counts_mtx = genome_id+"."+feature_count+".gene_counts.tsv"
+        transcript_counts_mtx = genome_id+"."+feature_count+".transcript_counts.tsv"
         with open(gene_counts_mtx,"w") as gcm:
             #write headers
             gcm.write("Feature")
@@ -112,7 +112,7 @@ def create_counts_table(genome_list,condition_dict,job_data):
         genome_id = os.path.basename(genome_dir)
         #Delimeter: , (csv files)
         delim = "\t"
-        genome_counts_mtx = genome_id+"."+feature_count+".gene_counts"
+        genome_counts_mtx = genome_id+"."+feature_count+".gene_counts.tsv"
         with open(genome_counts_mtx,"w") as gcm:
             #write headers
             gcm.write("Feature")
@@ -190,11 +190,11 @@ def prep_stringtie_diffexp(genome_list,condition_dict,host_bool,pipeline_log):
         genome_dir = genome["output"]
         genome_id = os.path.basename(genome_dir)
         os.chdir(genome_dir)
-        genome_counts_mtx = genome_id+".stringtie.gene_counts" 
+        genome_counts_mtx = genome_id+".stringtie.gene_counts.csv" 
         genome["gene_matrix"] = os.path.join(genome["output"],genome_counts_mtx)
         prep_cmd = ["prepDE.py","-i",genome["prepDE_input"],"-l",avg_length,"-g",genome_counts_mtx]
         if host_bool:
-            transcript_counts_mtx = genome_id+".stringtie.transcript_counts"
+            transcript_counts_mtx = genome_id+".stringtie.transcript_counts.csv"
             genome["transcript_matrix"] = os.path.join(genome["output"],transcript_counts_mtx)
             prep_cmd+=["-t",transcript_counts_mtx]
         if not os.path.exists(genome_counts_mtx):

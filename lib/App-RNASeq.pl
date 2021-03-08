@@ -767,8 +767,15 @@ sub save_output_files
               nwk => 'nwk',
               out => 'txt',
               err => 'txt',
+              tsv => 'tsv',
+              csv => 'csv',
+              bam => 'bam',
+              bai => 'bai',
+              gtf => 'gff',
+              _tracking => 'txt',
+              gmx => 'diffexp_input_data',
               html => 'html');
-
+           
     my @suffix_map = map { ("--map-suffix", "$_=$suffix_map{$_}") } keys %suffix_map;
 
     if (opendir(my $dh, $output))

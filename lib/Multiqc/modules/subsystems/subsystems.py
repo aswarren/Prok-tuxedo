@@ -4,7 +4,7 @@ import json
 class MultiqcModule(BaseMultiqcModule):
     def __init__(self):
         # Initialise the parent object
-        super(MultiqcModule, self).__init__(name='Pathways', anchor='mymod',
+        super(MultiqcModule, self).__init__(name='Section: Pathways', anchor='mymod',
         href="",
         info="")
         self.mod_data = dict()
