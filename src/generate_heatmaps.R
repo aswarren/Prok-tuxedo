@@ -2,8 +2,6 @@
 
 args = commandArgs(trailingOnly=TRUE)
 
-#TODO: adjust so if specialty genes or other features aren't past in the script will still run
-#TODO: as in, make the coloring of genes and such on the heatmap optional
 #check argument length
 counts.file = args[1]
 metadata.file = args[2]
