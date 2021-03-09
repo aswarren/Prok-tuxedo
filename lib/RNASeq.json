@@ -172,7 +172,7 @@
             "id":"feature_count",
             "label":"feature quantification",
             "required": 0,
-            "default":"htseq"
+            "default":"htseq",
             "desc":"temporary until recipe names are finalized: switch between htseq, stringtie, and cufflinks",
             "type":"string"
         }
