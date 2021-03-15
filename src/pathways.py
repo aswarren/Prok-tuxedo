@@ -6,7 +6,7 @@ import json
 from prok_tuxedo import wrap_svg_in_html
 from authenticate import authenticateByEnv
 
-def run_subsystem_analysis(genome_list,job_data,pathway_json,output_dir):
+def run_subsystem_analysis(genome_list,job_data,pathway_dict,output_dir):
     for genome in genome_list:
         #retrieve subsystem information
         subsystem_dict = get_subsystem_mapping(genome)
@@ -37,10 +37,10 @@ def run_subsystem_analysis(genome_list,job_data,pathway_json,output_dir):
             output_grid_file = os.path.join(genome["output"],level + "_Pathway_Distribution.svg")
             print(" ".join(subsystem_plot_cmd))
             subprocess.check_call(subsystem_plot_cmd)
-            pathway_json["subsystem_grid"] = wrap_svg_in_html(output_grid_file,output_dir)
+            pathway_dict[genome["genome"]]["subsystem_grid"] = wrap_svg_in_html(output_grid_file,output_dir)
             #subsystem_violin_plot(subsystem_dict,genome["gene_matrix"],genome["deseq_metadata"],level,feature_count)
             
-def run_kegg_analysis(genome_list,job_data,pathway_json,output_dir):
+def run_kegg_analysis(genome_list,job_data,pathway_dict,output_dir):
     for genome in genome_list:
         kegg_dict = get_kegg_genes_mapping(genome) 
         if not kegg_dict:
@@ -63,7 +63,7 @@ def run_kegg_analysis(genome_list,job_data,pathway_json,output_dir):
             output_kegg_grid_file = os.path.join(genome["output"],level + "_Pathway_Distribution.svg") 
             print(" ".join(kegg_plot_cmd))
             subprocess.check_call(kegg_plot_cmd)
-            pathway_json["kegg_grid"] = wrap_svg_in_html(output_kegg_grid_file,output_dir)
+            pathway_dict[genome["genome"]]["kegg_grid"] = wrap_svg_in_html(output_kegg_grid_file,output_dir)
 
 def get_subsystem_mapping(genome):
     genome_url = "https://patricbrc.org/api/subsystem/?eq(genome_id,"+os.path.basename(genome["output"])+")&limit(10000000)&http_accept=application/solr+json"

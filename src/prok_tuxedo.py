@@ -104,7 +104,7 @@ def run_deseq2(genome_list,contrasts,job_data,dge_dict,output_dir):
             print("%s\n"%" ".join(diffexp_cmd))
             subprocess.check_call(diffexp_cmd)
             #wrap_svg_in_html("Volcano_Plots_mqc.svg")
-            dge_dict["volcano"] = wrap_svg_in_html("Volcano_Plots.svg",output_dir)
+            dge_dict[genome["genome"]]["volcano"] = wrap_svg_in_html("Volcano_Plots.svg",output_dir)
             for pair in contrasts:
                 pair = [x.replace(",","_") for x in pair]
                 pair = "_vs_".join(pair) 
@@ -219,7 +219,7 @@ def generate_heatmaps(genome_list,job_data,dge_dict,output_dir):
         genome["heatmap_svg"] = os.path.join(genome["output"],"Normalized_Top_50_Differentially_Expressed_Genes.svg")
         print(" ".join(heatmap_cmd))
         subprocess.check_call(heatmap_cmd)
-        dge_dict["heatmap"] = wrap_svg_in_html(genome["heatmap_svg"],output_dir)
+        dge_dict[genome["genome"]]["heatmap"] = wrap_svg_in_html(genome["heatmap_svg"],output_dir)
 
 #Places <DOCTYPE> and <html></html> around svg code
 #Returns html string, replacing svg with html from the svg_file parameter
@@ -319,12 +319,16 @@ def main(genome_list, condition_dict, parameters_str, output_dir, gene_matrix=Fa
     setup(genome_list, condition_dict, parameters, output_dir, job_data)
     
     ###Setup dictionaries for the multiqc modules: use json dump to put these files at the top of each genome directory
-    #TODO: rewrite in terms of the genomes
     dge_dict = {}
     pathway_dict = {}
     ref_dict = {}
     ref_dict["recipe"] = job_data.get("recipe","RNA-Rocket")
-
+    for genome in genome_list:
+        dge_dict[genome["genome"]] = {}
+        dge_dict[genome["genome"]]["genome_id"] = os.path.basename(genome["genome"]).replace(".fna","")
+        pathway_dict[genome["genome"]] = {}
+        pathway_dict[genome["genome"]]["genome_id"] = os.path.basename(genome["genome"]).replace(".fna","")
+    
     ###write the introduction to the multiqc report based on the recipe, number of samples, conditions, and contrasts
     for genome in genome_list:
         os.chdir(genome["output"])
@@ -377,16 +381,12 @@ def main(genome_list, condition_dict, parameters_str, output_dir, gene_matrix=Fa
         top_diffexp_genes(genome_list) 
         generate_heatmaps(genome_list,job_data,dge_dict,output_dir)
     #write out any of the json files to the top level of the genomes
-    #TODO: rewrite dictionaries to be in the context of genomes
     for genome in genome_list:
         os.chdir(genome["output"])
-        #output dge_dict
-        genome_dge = dict(dge_dict)
-        genome_dge["genome_id"] = os.path.basename(genome["genome"]).replace(".fna","")
         with open("differential_expression.json","w") as dge_handle:
-            dge_handle.write(json.dumps(genome_dge))
+            dge_handle.write(json.dumps(dge_dict[genome["genome"]]))
         with open("pathways.json","w") as pathway_handle:
-            pathway_handle.write(json.dumps(pathway_dict))
+            pathway_handle.write(json.dumps(pathway_dict[genome["genome"]]))
         with open("references.json","w") as ref_handle:
             ref_handle.write(json.dumps(ref_dict))
             
