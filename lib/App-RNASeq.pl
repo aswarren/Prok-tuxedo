@@ -76,7 +76,9 @@ sub process_rnaseq {
     my $recipe = $params->{recipe};
     
     # my $tmpdir = File::Temp->newdir();
-    my $tmpdir = File::Temp->newdir( CLEANUP => 1 );
+    #TODO: remove cleanup => 0
+    #my $tmpdir = File::Temp->newdir( CLEANUP => 1 );
+    my $tmpdir = File::Temp->newdir( CLEANUP => 0 );
     # my $tmpdir = "/tmp/RNApubref";
     # my $tmpdir = "/tmp/RNAuser";
     system("chmod", "755", "$tmpdir");
@@ -168,7 +170,8 @@ sub process_rnaseq {
 sub run_rna_rocket {
     my ($params, $tmpdir, $host, $parallel) = @_;
 
-    $parallel //= 1;
+    #$parallel //= 1;
+    $parallel //= 8;
     
     my $cwd = getcwd();
     
@@ -187,7 +190,8 @@ sub run_rna_rocket {
 	cuffmerge => {-p => $parallel},
 	hisat2 => {-p => $parallel},
 	bowtie2 => {-p => $parallel},
-	stringtie => {-p => $parallel}
+	stringtie => {-p => $parallel},
+    htseq => {-p => $parallel}
     };
     #
     # no pretty, ensure it's on one line
@@ -277,14 +281,7 @@ sub run_rna_rocket {
 		{
 		    my $base = basename($f);
 		    my $nf = "$outdir/${ref_id}/${set}_${rep}_${base}";
-		    if (rename($f, $nf))
-		    {
-			push(@outputs, [$nf, $type]);
-		    }
-		    else
-		    {
-			warn "Error renaming $f to $nf\n";
-		    }
+			push(@outputs, [$f, $type]);
 		}
 	    }
 	}
@@ -772,6 +769,7 @@ sub save_output_files
               bam => 'bam',
               bai => 'bai',
               gtf => 'gff',
+              gff => 'gff',
               _tracking => 'txt',
               gmx => 'diffexp_input_data',
               html => 'html');

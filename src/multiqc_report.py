@@ -123,7 +123,6 @@ def setup_shared_config_sections(recipe,feature_count,dge_flag=False):
 #Returns a string used in the introduction of the general_stats section of the multiqc report
 #strings in this section are read using a markup interpreter 
 def get_general_stats_intro():
-    ##TODO: Remove % Failed from general statistics table
     gs_string = "<p style=font-size:60%;>Column Descriptors (hover over headers for detail):<br />"    
     gs_string = gs_string + "<b>% Dups</b>: Percentage of duplicate reads (FastQC)"
     gs_string = gs_string + ";<b>% GC</b>: Average Percentage of GC content (FastQC)"

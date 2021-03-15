@@ -156,7 +156,6 @@ def run_alignment(genome_list, condition_dict, parameters, output_dir, job_data,
 def assign_strandedness_parameter(genome,condition_dict,parameters):
     #generate bed files for genome
     generate_bed_from_gff(genome)
-    #TODO: check length of fastq file to makre sure sampling will work and not return an error
     remove_list = []
     for condition in condition_dict:
         for r in condition_dict[condition]["replicates"]:
@@ -166,6 +165,16 @@ def assign_strandedness_parameter(genome,condition_dict,parameters):
             #skip if already determined somehow: probably only likely to happend during dualRNASeq, which is not implemented yet
             if "strand_param" in r:
                 continue
+            #if the number of reads is less than 1000, skip file:
+            num_sample = "1000"
+            r_count = 0
+            with open(r["read1"],"r") as r1:
+                for line in r1:
+                    r_count = r_count + 1  
+                    if r_count == int(num_sample):
+                        break
+            if r_count < int(num_sample):
+                continue
             #sample fastq files using seqtk
             #TESTING: do I need to make sure the same reads have been sampled??
             sample1_file = os.path.join(r["target_dir"],".".join(os.path.basename(r["read1"]).split(".")[:-1]) + ".s1.fastq")
@@ -173,7 +182,6 @@ def assign_strandedness_parameter(genome,condition_dict,parameters):
             remove_list.append(sample1_file)
             remove_list.append(sample2_file)
             #setting defulat sampling to 1000 reads
-            num_sample = "1000"
             sample1_cmd = " ".join(["seqtk","sample","-s","42",r["read1"],num_sample,">",sample1_file])
             sample2_cmd = " ".join(["seqtk","sample","-s","42",r["read2"],num_sample,">",sample2_file])
             ###TODO: replace shell=True for redirecting the output to a file
@@ -187,11 +195,13 @@ def assign_strandedness_parameter(genome,condition_dict,parameters):
             sample_align_cmd = []
             sam_file = os.path.join(r["target_dir"],".".join(os.path.basename(r["read1"]).split(".")[:-1]) + ".sample.sam")
             remove_list.append(sam_file)
+            ###TODO: replace hisat_index implementation with something more robust
             if len(genome["hisat_index"]) > 0:
-                sample_align_cmd += ["hisat2","-x",genome["index_prefix"],"-1",sample1_file,"-2",sample2_file,"--mp","1,0","--pen_noncansplice","20","-S",sam_file,"-p",parameters.get("hisat2",{}).get("-p","1")] 
+                sample_align_cmd = ["hisat2","-x",genome["index_prefix"],"-1",sample1_file,"-2",sample2_file,"--mp","1,0","--pen_noncansplice","20","-S",sam_file,"-p",str(parameters.get("hisat2",{}).get("-p","1"))] 
             else: #bowtie
-                sample_align_cmd += ["bowtie2","-x",genome["genome_link"],"-1",sample1_file,"-2",sample2_file,"-S",sam_file,"-p",parameters.get("bowtie2",{}).get("-p","1")]
-            if not os.path.exists(sam_file):
+                sample_align_cmd = ["bowtie2","-x",genome["genome_link"],"-1",sample1_file,"-2",sample2_file,"-S",sam_file,"-p",str(parameters.get("bowtie2",{}).get("-p","1"))]
+            if not os.path.exists(sam_file) and len(sample_align_cmd) > 0:
+                print(sample_align_cmd)
                 subprocess.check_call(sample_align_cmd)
             ###generate RSEQc strandedness file using infer_experiment.py
             infer_cmd = ["infer_experiment.py","-i",sam_file,"-r",genome["bed"],"-s",num_sample]
@@ -265,8 +275,9 @@ def modify_samstat_for_multiqc(samstat_filename,count):
         if "</footer>" in line:
             end_remove = index
     ###Need to rename canvas element variables since they have the same name across samstat reports and cause problems
-    ###in the multiqc report. Also only uses variable names canvas<1-4> in samstat report 
-    canvas_vars = ["canvas1","canvas2","canvas3","canvas4"] 
+    ###in the multiqc report. Number of canvas divs is a function of the sequence length: set to a high threshold 
+    #canvas_vars = ["canvas1","canvas2","canvas3","canvas4"] 
+    canvas_vars = ["canvas"+str(i) for i in range(1,20)] 
     canvas_replace = [x[:len(x)-1]+str(count)+x[len(x)-1] for x in canvas_vars]
     output_lines = samstat_lines[:start_remove] + samstat_lines[end_remove:]
     output_lines = "".join(output_lines) 
