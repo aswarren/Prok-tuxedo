@@ -84,7 +84,7 @@ for (i in 1:length(systems)) {
         melt.df[melt.df$Sample %in% subset(metadata,subset=Condition==c)$Sample,]$Condition = c
     }
     x_axis_label = paste(toString(length(curr.mtx$Genes))," Genes",sep="")
-    vln_plot <- ggplot(melt.df,aes(x=Sample,y=LogCounts,fill=Condition))+geom_violin(trim=FALSE)+ylim(log_min,log_max)+ggtitle(curr.system)+ylab("Log-Counts")+xlab(x_axis_label) 
+    vln_plot <- ggplot(melt.df,aes(x=Sample,y=LogCounts,fill=Condition))+geom_violin(trim=FALSE)+ylim(log_min,log_max)+ggtitle(curr.system)+ylab("TPM")+xlab(x_axis_label) 
     vln_plot = vln_plot + geom_boxplot(width=0.1,fill="white")
     if (is.null(legend)) {
         legend <- g_legend(vln_plot)

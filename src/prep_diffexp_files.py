@@ -212,4 +212,77 @@ def average_read_length_total(condition_dict,genome):
     avg_length = int(total_length/num_replicates)
     return avg_length
 
+#TODO: do we want TPM matrices for transcripts in HOST?
 
+def create_tpm_matrix_htseq(genome_list):
+    tpm_lines = []
+    for genome in genome_list:
+        counts_matrix = genome["gene_matrix"]
+        with open(counts_matrix,"r") as cm_handle: 
+            tpm_lines.append(next(cm_handle).strip()) #header
+            for line in cm_handle:
+                line = line.strip().split("\t")
+                gene = line[0]
+                count_list = line[1:]
+                kb_length = float(genome["gene_lengths"][gene])/1000.0
+                rpk_line = [gene] + [float(x)/kb_length for x in count_list]
+                tpm_lines.append(rpk_line)
+        #get the rkp sum of each sample and divide this number by 1,000,000
+        sum_rpk = [0]*(len(tpm_lines[0])-1)
+        for idx,elem in enumerate(tpm_lines): #skip header
+            if idx == 0:
+                continue
+            sum_rpk = [x + y for x,y in zip(sum_rpk,tpm_lines[idx][1:])] #go through tpm values and add to each column value
+        scale_rpk = [float(x)/1000000.0 for x in sum_rpk]
+        #divide each value by its column's scaling factor to get the tpms
+        out_tpms = []                 
+        for idx,tpm_list in enumerate(tpm_lines):
+            if idx == 0:
+                out_tpms.append(tpm_list) #append header
+                continue
+            gene = tpm_list[0]
+            tpms = [str(x/y) for x,y in zip(tpm_list[1:],scale_rpk)]
+            out_tpm_line = [gene] + tpms
+            out_tpms.append("\t".join(out_tpm_line))
+        #write out tpm matrix and store in genome dictionary entry
+        tpm_file = counts_matrix.replace("gene_counts","tpms")
+        genome["genes_tpm_matrix"] = tpm_file
+        with open(tpm_file,"w") as o:
+            o.write("\n".join(out_tpms))
+
+
+def create_tpm_matrix_stringtie(genome_list,condition_dict):
+    for genome in genome_list:
+        tpm_dict = {}
+        tpm_file = counts_matrix.replace("gene_counts","tpms")
+        rep_order = []
+        gene_set = set()
+        for condition in condition_dict: 
+            for rep in condition_dict[condition]["replicates"]:
+                rep_id = os.path.basename(replicate[genome["genome"]]["bam"]).replace(".bam","")
+                rep_order.append(rep)
+                tpm_dict[rep_id] = {}
+                rep_gtf = r[genome["genome"]]["gtf"] 
+                with open(rep_gtf,"r") as gtf_handle:
+                    for line in gtf_handle:
+                        if line[0] == "#":
+                            continue
+                        line = line.strip().split("\t")  
+                        if line[2] == "transcript":
+                            features = line[-1].split(";")
+                            if "gene_id" in features[0] and "TPM" in features[-2]:
+                                gene_id = features[0].replace("gene_id ","").replace("\"","")
+                                gene_set.add(gene_id)
+                                tpm_val = features[-2].replace("TPM ","").replace("\"","") 
+                                tpm_dict[rep_id][gene_id] = tpm_val
+        with open(tpm_file,"w") as o:
+            o.write("Gene")
+            for rep in tpm_dict:
+                o.write("\t%s"%rep)
+            o.write("\n")
+            for gene in gene_set:
+                o.write("%s"%gene)
+                for rep_id in rep_order:
+                    o.write("\t%s"%(tpm_dict[rep_id][gene]))
+                o.write("\n")
+        genome["genes_tpm_matrix"] = tpm_file 

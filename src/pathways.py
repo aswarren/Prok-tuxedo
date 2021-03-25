@@ -32,7 +32,7 @@ def run_subsystem_analysis(genome_list,job_data,pathway_dict,output_dir):
             continue
         for i,level in enumerate(subsystem_levels):
             #subsystem_plot_cmd = ["subsystem_violin_plots.R",genome[subsystem_map[i]],genome["gene_matrix"],genome["deseq_metadata"],level,feature_count]    
-            subsystem_plot_cmd = ["grid_violin_plots.R",genome[subsystem_map[i]],genome["gene_matrix"],genome["deseq_metadata"],level,feature_count]    
+            subsystem_plot_cmd = ["grid_violin_plots.R",genome[subsystem_map[i]],genome["genes_tpm_matrix"],genome["deseq_metadata"],level,feature_count]    
             #output_grid_file = level + "_Pathway_Distribution_mqc.svg"
             output_grid_file = os.path.join(genome["output"],level + "_Pathway_Distribution.svg")
             print(" ".join(subsystem_plot_cmd))
@@ -59,7 +59,7 @@ def run_kegg_analysis(genome_list,job_data,pathway_dict,output_dir):
         if not "kegg_map" in genome:
             continue
         for i,level in enumerate(kegg_levels):
-            kegg_plot_cmd = ["grid_violin_plots.R",genome[kegg_map[i]],genome["gene_matrix"],genome["deseq_metadata"],level,feature_count]
+            kegg_plot_cmd = ["grid_violin_plots.R",genome[kegg_map[i]],genome["genes_tpm_matrix"],genome["deseq_metadata"],level,feature_count]
             output_kegg_grid_file = os.path.join(genome["output"],level + "_Pathway_Distribution.svg") 
             print(" ".join(kegg_plot_cmd))
             subprocess.check_call(kegg_plot_cmd)

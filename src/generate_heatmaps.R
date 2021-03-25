@@ -47,7 +47,7 @@ if (subsystem.file == "NONE") {
 }
 
 #normalize: put into the standard normal space 
-counts.mtx = scale(counts.mtx) 
+#counts.mtx = scale(counts.mtx) 
 
 ###Calculate picture widtth based on the number of samples
 #heatmap width and offset are set in the draw() method at the bottom
@@ -155,7 +155,7 @@ for (i in 1:length(rownames(expression.mtx))) {
 ###Create heatmap: SVG
 #out_svg = paste("Normalized_Top_50_Differentially_Expressed_Genes_mqc.svg",sep="")
 out_svg = paste("Normalized_Top_50_Differentially_Expressed_Genes.svg",sep="")
-ht = Heatmap(expression.mtx,name="Z-score",cluster_columns=FALSE,row_names_max_width = unit(8, "cm"),show_row_dend = FALSE,row_names_gp = gpar(fontsize=8,col=colors.list),column_names_gp = gpar(fontsize=8),column_names_rot = 45, column_split = sample_split, border=TRUE, column_title = "Normalized Top 50 Differentially Expressed Genes")
+ht = Heatmap(expression.mtx,name="TPM",cluster_columns=FALSE,row_names_max_width = unit(8, "cm"),show_row_dend = FALSE,row_names_gp = gpar(fontsize=8,col=colors.list),column_names_gp = gpar(fontsize=8),column_names_rot = 45, column_split = sample_split, border=TRUE, column_title = "Normalized Top 50 Differentially Expressed Genes")
 #svg(out_svg,width=svg_width)
 #svglite(out_svg,width=svg_width)
 svglite(out_svg)

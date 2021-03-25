@@ -4,6 +4,7 @@ import os,sys,glob,math,shutil,subprocess
 
 #Run the feature count program specified in json input, or run htseq-count by default
 def run_featurecount(genome_list, condition_dict, parameters, output_dir, job_data, pipeline_log):
+    get_gene_lengths_from_annotation_bacterial(genome_list)
     #check parameters for stringtie option. Assuming htseq2
     program = job_data.get("feature_count","htseq")
     if program == "htseq":
@@ -229,3 +230,22 @@ def run_htseq_count(genome_list, condition_dict, parameters, job_data, output_di
                     #prints to stdout, so redirect output to file
                     with open(counts_file,"w") as cf:
                         subprocess.check_call(htseq_cmd,stdout=cf)
+
+def get_gene_lengths_from_annotation_bacterial(genome_list):
+    for genome in genome_list:
+        gene_length_dict = {}
+        #check if genome is host or not
+        annotation_file = genome["annotation_link"]
+        with open(annotation_file,"r") as af:
+            for line in af:
+                if line[0] == "#":
+                    continue 
+                line = line.strip().split("\t") 
+                if line[2] != "gene":
+                    continue
+                feature_list = line[8].split(";") 
+                gene_length = int(line[4]) - int(line[3])
+                gene_id = feature_list[0].replace("ID=","")
+                gene_length_dict[gene_id] = str(gene_length)
+        genome["gene_lengths"] = gene_length_dict
+

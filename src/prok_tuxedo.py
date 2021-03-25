@@ -207,7 +207,7 @@ def generate_heatmaps(genome_list,job_data,dge_dict,output_dir):
             continue
         #<heatmap_script.R> <gene_counts.txt> <metaata.txt> <heatmap_genes.txt> <output_prefix> <feature_count> <specialty_genes> <subsystem_genes>
         #Test_Htseq_four_cond/83333.13/Normalized_Top_50_Differentially_Expressed_Genes_mqc.svg
-        heatmap_cmd = ["generate_heatmaps.R",genome["gene_matrix"],genome["deseq_metadata"],genome["heatmap_genes"],os.path.basename(genome["output"]),feature_count]
+        heatmap_cmd = ["generate_heatmaps.R",genome["genes_tpm_matrix"],genome["deseq_metadata"],genome["heatmap_genes"],os.path.basename(genome["output"]),feature_count]
         if "specialty_genes_map" in genome:
             heatmap_cmd += [genome["specialty_genes_map"]]
         else:
@@ -257,6 +257,44 @@ def remove_html_dir(output_dir):
     html_dir = os.path.join(output_dir,"html_images")
     if os.path.exists(html_dir):
         subprocess.check_call(["rm","-r",html_dir])
+
+def cleanup_files(genome_list,output_dir):
+    os.chdir(output_dir)
+    cleanup_list = []
+    #cleanup genome files
+    for gff_file in glob.glob("*gff"):
+        cleanup_list.append(os.path.abspath(gff_file))
+    for bowtie_file in glob.glob("*bt2"):
+        cleanup_list.append(os.path.abspath(bowtie_file))
+    for fasta_file in glob.glob("*fna"):
+        cleanup_list.append(os.path.abspath(fasta_file))
+    for bed_file in glob.glob("*bed"):
+        cleanup_list.append(os.path.abspath(bed_file))
+    for hisat_file in glob.glob("*ht2"):
+        cleanup_list.append(os.path.abspath(hisat_file))
+    #cleanup html images
+    cleanup_list.append(os.path.abspath("html_images"))
+    #cleanup files in each genome directory
+    for genome in genome_list:
+        os.chdir(genome["output"])
+        #extra R plot pdf is generated: haven't figured out how to remove yet
+        if os.path.exists("Rplots.pdf"):
+            cleanup_list.append(os.path.abspath("Rplots.pdf"))
+        for map_file in glob.glob("*mapping"):
+            cleanup_list.append(os.path.abspath(map_file))
+        for genes_file in glob.glob("*genes"):
+            cleanup_list.append(os.path.abspath(genes_file))
+        for json_file in glob.glob("*json"):
+            cleanup_list.append(os.path.abspath(json_file))
+        #TODO: rename this file with json extension and remove this part
+        for intro_file in glob.glob("*pipeline"):
+            cleanup_list.append(os.path.abspath(intro_file))
+        for yaml_file in glob.glob("*yaml"): #multiqc config file
+            cleanup_list.append(os.path.abspath(yaml_file))
+    #remove all files in cleanup_list
+    for rm_file in cleanup_list:
+        subprocess.check_call(["rm","-r",rm_file])
+        
 
 ###eventually if dual-RNASeq is enabled in the pipeline, need to adjust target_dir
 #since it only references one genome directory, and a few function implementations depend on target_dir
@@ -352,8 +390,10 @@ def main(genome_list, condition_dict, parameters_str, output_dir, gene_matrix=Fa
     elif not run_cuffdiff_pipeline and job_data.get("feature_count","htseq") == "htseq": #htseq
         if job_data.get("recipe","RNA-Rocket") == "Host":
             prep_diffexp_files.create_counts_table_host(genome_list,condition_dict,job_data)
+            #TODO: create function for tpms for host
         else:
             prep_diffexp_files.create_counts_table(genome_list,condition_dict,job_data)
+            prep_diffexp_files.create_tpm_matrix_htseq(genome_list)
     #TODO: reorganize queries to occur in one script instead of creating a dependency between different query functions and their order
     if not run_cuffdiff_pipeline:
         pathways.run_subsystem_analysis(genome_list,job_data,pathway_dict,output_dir)
@@ -395,7 +435,7 @@ def main(genome_list, condition_dict, parameters_str, output_dir, gene_matrix=Fa
     os.chdir(output_dir)
     with open("Pipeline.txt","w") as o:
         o.write("\n".join(pipeline_log))
-    #remove_html_dir(output_dir)
+    cleanup_files(genome_list,output_dir)
         
 
 if __name__ == "__main__":

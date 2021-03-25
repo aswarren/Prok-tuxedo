@@ -83,7 +83,10 @@ sub process_rnaseq {
     # my $tmpdir = "/tmp/RNAuser";
     system("chmod", "755", "$tmpdir");
     print STDERR "$tmpdir\n";
-    $params = localize_params($tmpdir, $params);
+    ###localize_params for regular script
+    #localize_params_local for testing: will not download files
+    #$params = localize_params($tmpdir, $params);
+    $params = localize_params_local($tmpdir, $params);
     
     my @outputs;
     my $prefix = $recipe;
@@ -163,7 +166,8 @@ sub process_rnaseq {
 	}
     }
     my $time2 = `date`;
-    save_output_files($app,$tmpdir);
+    my $outdir = "$tmpdir/Rocket";
+    save_output_files($app,$outdir);
     write_output("Start: $time1"."End:   $time2", "$tmpdir/DONE");
 }
 
@@ -280,7 +284,6 @@ sub run_rna_rocket {
 		for my $f (glob("$path/*$suffix"))
 		{
 		    my $base = basename($f);
-		    my $nf = "$outdir/${ref_id}/${set}_${rep}_${base}";
 			push(@outputs, [$f, $type]);
 		}
 	    }
@@ -675,6 +678,11 @@ sub localize_params {
     return $params;
 }
 
+sub localize_params_local {
+    my ($tmpdir, $params) = @_;
+    return $params;
+}
+
 sub count_params_files {
     my ($params) = @_;
     my $count = 0;
@@ -757,7 +765,7 @@ sub save_output_files
 {
     my($app, $output) = @_;
     
-    my %suffix_map = (fastq => 'reads',
+    my %suffix_map = (
               txt => 'txt',
               png => 'png',
               svg => 'svg',

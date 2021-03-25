@@ -54,7 +54,7 @@ def run_alignment(genome_list, condition_dict, parameters, output_dir, job_data,
                 subprocess.check_call(["bowtie2-build", genome_link, genome_link])
             except Exception as err:
                 sys.stderr.write("bowtie build failed: %s %s\n"%(err, genome_link))
-                os.exit(1)
+                sys.exit(1)
             cmd=["bowtie2", "-x", genome_link]
             thread_count= parameters.get("bowtie2",{}).get("-p",0)
         ###
