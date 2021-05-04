@@ -130,15 +130,6 @@ def get_general_stats_intro():
     gs_string = gs_string + ";<b>M Seqs</b>: Total Sequences (FastQC)"
     gs_string = gs_string + ";<b>% Assigned</b>: Percentage Assigned Reads (HTSeq)"
     gs_string = gs_string + ";<b>M Assigned</b>: Total assigned reads in millions of reads (HTSeq)"
-    '''
-    gs_string = gs_string + "<b>%Assigned</b>: Percentage of sample reads HTSeq attributes to genomic feature abundance"
-    gs_string = gs_string + " <b>M Assigned</b>: Number of reads (millions) HTSeq attributes to genomic feature abundance"
-    gs_string = gs_string + " <b>Error rate</b>: mismatches (NM) / bases mapped (CIGAR), calculated by Samtools;"
-    gs_string = gs_string + " <b>M Reads Mapped</b>: Number of reads (millions) mapped in the bam file, calculated by Samtools;"
-    gs_string = gs_string + " <b>% Mapped</b>: Percentage of sample reads mapped in the bam file, calculated by Samtools;"
-    gs_string = gs_string + " <b>M Total seqs</b>: Total sequences in the bam file (millions), calculated by Samtools"
-    gs_string = gs_string + "</p>"
-    '''
     return gs_string
 
 def get_module_order(recipe,feature_count,dge_flag=False):
@@ -152,12 +143,10 @@ def get_module_order(recipe,feature_count,dge_flag=False):
     #    module_list += [SPACE+"- hisat2"]
     #else:
     #    module_list += [SPACE+"- bowtie2"]
-    #TODO: create recipes for htseq, stringtie, and cufflinks
     if feature_count == "htseq":
         module_list += [SPACE+"- htseq"]
     else:
         module_list += [SPACE+"- samtools"]
-    #TODO: need to rename module subsystems to pathways: will show up as pathways in report at the moment 
     module_list += [SPACE+"- subsystems"]
     if dge_flag:
         module_list += [SPACE+"- differential_expression"]

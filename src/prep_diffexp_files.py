@@ -1,6 +1,6 @@
 #!/usr/bin/env python
 
-import os,sys,subprocess
+import os,sys,glob,subprocess,concurrent.futures
 
 def create_counts_table_host(genome_list,condition_dict,job_data):
     #Remove the last 5 lines from htseq-count output
@@ -15,8 +15,8 @@ def create_counts_table_host(genome_list,condition_dict,job_data):
         gene_set = set()
         transcript_set = set()
         replicate_list = []
-        gc_dict = {}
-        tc_dict = {}
+        gc_dict = {} #gene count dictionary
+        tc_dict = {} #transcript count dictionary
         for condition in condition_dict:
             for replicate in condition_dict[condition]["replicates"]:
                 gc_file = replicate[genome["genome"]]["gene_counts"]
@@ -212,57 +212,119 @@ def average_read_length_total(condition_dict,genome):
     avg_length = int(total_length/num_replicates)
     return avg_length
 
-#TODO: do we want TPM matrices for transcripts in HOST?
-
-def create_tpm_matrix_htseq(genome_list):
-    tpm_lines = []
+def create_tpm_matrix_htseq(genome_list,condition_dict,host_flag,num_threads):
+    #TPMCalculator -g ~/Genomes/9606/GCF_000001405.39_GRCh38.p13_genomic.mod.gtf -b Test_Htseq/9606/avirulent/replicate1/SRR10307420.bam -e
+    #might need -a flag to output genes/transcripts with 0 counts
+    #tpm_calc_cmd = ["TPMCalculator","-g",<genome_gtf>,"-b",<rep_bam>,<transcript_flag>]
     for genome in genome_list:
+        os.chdir(genome["output"])
+        genome_file=genome["genome"]
+        genome_gff = genome["annotation_link"]
+        genome_gtf_tmp = genome_gff.replace("gff","temp.gtf")
+        genome_gtf = genome_gff.replace("gff","gtf")
+        genome["gtf"] = genome_gtf
+        gff_to_gtf_cmd = ["gffread",genome_gff,"-T","-o",genome_gtf_tmp]
+        print(" ".join(gff_to_gtf_cmd))
+        if not os.path.exists(genome_gtf_tmp):
+            subprocess.check_call(gff_to_gtf_cmd)
+        if not os.path.exists(genome_gtf):
+            gtf_lines = []
+            with open(genome_gtf_tmp,"r") as tmp_g:
+                for line in tmp_g:
+                    if line[0] == "#":
+                        gtf_lines.append(line.strip())
+                    else:
+                        if "gene_id" not in line and "gene_name" in line:
+                            line = line.replace("gene_name","gene_id")
+                        #TPMCalculator only works wth exon
+                        #skip this if using bacterial annotations
+                        if not host_flag:
+                            line = line.replace("CDS","exon")
+                        gtf_lines.append(line.strip())
+            with open(genome_gtf,"w") as o:
+                o.write("\n".join(gtf_lines))
+        rm_tmp_gff = ["rm",genome_gtf_tmp]
+        subprocess.check_call(rm_tmp_gff)
+        ###Sometimes the gene_id field is not present: switch gene_name to gene_id if not present
+        tpm_calc_list = []
+        for condition in condition_dict: 
+            for replicate in condition_dict[condition]["replicates"]:
+                rep_bam = replicate[genome_file]["bam"]
+                rep_id = os.path.basename(replicate[genome_file]["bam"]).replace(".bam","")
+                rep_outdir = os.path.dirname(rep_bam)
+                tpm_calc_cmd = ["TPMCalculator","-g",genome_gtf,"-b",rep_bam]
+                if host_flag:
+                    tpm_calc_cmd += ["-e"]
+                tpm_stdout = os.path.join(os.path.dirname(replicate[genome_file]["bam"]),rep_id+"_tpm_calculator.out")
+                tpm_stderr = os.path.join(os.path.dirname(replicate[genome_file]["bam"]),rep_id+"_tpm_calculator.err")
+                #TPMCalculator takes too long and is single threaded, try to use the Pool api to run concurrently
+                tpm_calc_tuple = (tpm_calc_cmd,tpm_stdout,tpm_stderr)
+                if True:
+                    tpm_calc_list.append(tpm_calc_tuple)
+        ###Run using a pool thread
+        #calcs the run_tpm_calc function for executing the TPMCalculator program with a single thread
+        tpm_dir = os.path.join(genome["output"],"TPMCalculator_Output")
+        if not os.path.exists(tpm_dir):
+            os.mkdir(tpm_dir)
+        os.chdir(tpm_dir)
+        with concurrent.futures.ThreadPoolExecutor(max_workers=num_threads) as pool:
+            pool.map(run_tpm_calc,tpm_calc_list)
+        ###Create the tpm matrix
+        #assuming current directory is genome["output"]/TPMCalculator_Output
+        tpm_dict = {}
+        gene_set = set()
+        for calc_file in glob.glob("*_genes.out"): 
+            rep_id = calc_file.replace("_genes.out","")
+            tpm_dict[rep_id] = {}
+            with open(calc_file,"r") as cf:
+                next(cf) 
+                for line in cf:
+                    line = line.strip().split()
+                    gene = line[0]
+                    gene = gene.replace("gene-","",).replace("rna-","")
+                    if "#" in gene:
+                        continue
+                    gene_set.add(gene)
+                    tpm_val = line[6]
+                    tpm_dict[rep_id][gene] = tpm_val
+        #write out tpm file and add to genome dictionary
+        os.chdir(genome["output"])
         counts_matrix = genome["gene_matrix"]
-        with open(counts_matrix,"r") as cm_handle: 
-            tpm_lines.append(next(cm_handle).strip()) #header
-            for line in cm_handle:
-                line = line.strip().split("\t")
-                gene = line[0]
-                count_list = line[1:]
-                kb_length = float(genome["gene_lengths"][gene])/1000.0
-                rpk_line = [gene] + [float(x)/kb_length for x in count_list]
-                tpm_lines.append(rpk_line)
-        #get the rkp sum of each sample and divide this number by 1,000,000
-        sum_rpk = [0]*(len(tpm_lines[0])-1)
-        for idx,elem in enumerate(tpm_lines): #skip header
-            if idx == 0:
-                continue
-            sum_rpk = [x + y for x,y in zip(sum_rpk,tpm_lines[idx][1:])] #go through tpm values and add to each column value
-        scale_rpk = [float(x)/1000000.0 for x in sum_rpk]
-        #divide each value by its column's scaling factor to get the tpms
-        out_tpms = []                 
-        for idx,tpm_list in enumerate(tpm_lines):
-            if idx == 0:
-                out_tpms.append(tpm_list) #append header
-                continue
-            gene = tpm_list[0]
-            tpms = [str(x/y) for x,y in zip(tpm_list[1:],scale_rpk)]
-            out_tpm_line = [gene] + tpms
-            out_tpms.append("\t".join(out_tpm_line))
-        #write out tpm matrix and store in genome dictionary entry
         tpm_file = counts_matrix.replace("gene_counts","tpms")
         genome["genes_tpm_matrix"] = tpm_file
         with open(tpm_file,"w") as o:
-            o.write("\n".join(out_tpms))
+            o.write("Gene")
+            for rep_id in tpm_dict:
+                o.write("\t%s"%rep_id)
+            o.write("\n")
+            for gene in gene_set:
+                o.write("%s"%gene)
+                for rep_id in tpm_dict:
+                    tpm_val = tpm_dict[rep_id][gene] if gene in tpm_dict[rep_id] else "0"
+                    o.write("\t%s"%tpm_val)
+                o.write("\n")
+            
+def run_tpm_calc(job):
+    print(" ".join(job[0]))
+    with open(job[1],"w") as out, open(job[2],"w") as err:
+        subprocess.check_call(job[0],stdout=out,stderr=err)
 
-
-def create_tpm_matrix_stringtie(genome_list,condition_dict):
+#either map them correctly or make the identifiers consisten (merge gtfs and rerun)
+def create_tpm_matrix_stringtie(genome_list,condition_dict,host_flag):
     for genome in genome_list:
         tpm_dict = {}
+        counts_matrix = genome["gene_matrix"]
+        #counts_matrix = genome["transcript_matrix"]
         tpm_file = counts_matrix.replace("gene_counts","tpms")
+        feature_field = "gene_id"
         rep_order = []
-        gene_set = set()
+        feature_set = set()
         for condition in condition_dict: 
             for rep in condition_dict[condition]["replicates"]:
-                rep_id = os.path.basename(replicate[genome["genome"]]["bam"]).replace(".bam","")
-                rep_order.append(rep)
+                rep_id = os.path.basename(rep[genome["genome"]]["bam"]).replace(".bam","")
+                rep_order.append(rep_id)
                 tpm_dict[rep_id] = {}
-                rep_gtf = r[genome["genome"]]["gtf"] 
+                rep_gtf = rep[genome["genome"]]["gtf"] 
                 with open(rep_gtf,"r") as gtf_handle:
                     for line in gtf_handle:
                         if line[0] == "#":
@@ -270,19 +332,28 @@ def create_tpm_matrix_stringtie(genome_list,condition_dict):
                         line = line.strip().split("\t")  
                         if line[2] == "transcript":
                             features = line[-1].split(";")
-                            if "gene_id" in features[0] and "TPM" in features[-2]:
-                                gene_id = features[0].replace("gene_id ","").replace("\"","")
-                                gene_set.add(gene_id)
-                                tpm_val = features[-2].replace("TPM ","").replace("\"","") 
+                            gene_id = features[0].replace("gene_id ","").replace("transcript_id ","").replace("\"","").replace("gene-","")
+                            transcript_id = features[1].replace("gene_id ","").replace("transcript_id ","").replace("\"","").replace(" ","").replace("rna-","")
+                            if "STRG" in gene_id: #stringtie can label some genes with STRG, which provides no information in looking up the gene/transcript later
+                                gene_id = transcript_id
+                            tpm_val = features[-2].replace("TPM ","").replace("\"","") 
+                            if feature_field == "gene_id":
+                                feature_set.add(gene_id)
                                 tpm_dict[rep_id][gene_id] = tpm_val
+                            else:
+                                feature_set.add(transcript_id)
+                                tpm_dict[rep_id][transcript_id] = tpm_val
         with open(tpm_file,"w") as o:
             o.write("Gene")
             for rep in tpm_dict:
                 o.write("\t%s"%rep)
             o.write("\n")
-            for gene in gene_set:
+            for gene in feature_set:
                 o.write("%s"%gene)
                 for rep_id in rep_order:
-                    o.write("\t%s"%(tpm_dict[rep_id][gene]))
+                    if gene not in tpm_dict[rep_id]:
+                        o.write("\t0")
+                    else:
+                        o.write("\t%s"%(tpm_dict[rep_id][gene]))
                 o.write("\n")
         genome["genes_tpm_matrix"] = tpm_file 

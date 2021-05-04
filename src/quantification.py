@@ -4,7 +4,6 @@ import os,sys,glob,math,shutil,subprocess
 
 #Run the feature count program specified in json input, or run htseq-count by default
 def run_featurecount(genome_list, condition_dict, parameters, output_dir, job_data, pipeline_log):
-    get_gene_lengths_from_annotation_bacterial(genome_list)
     #check parameters for stringtie option. Assuming htseq2
     program = job_data.get("feature_count","htseq")
     if program == "htseq":
@@ -50,7 +49,7 @@ def run_stringtie(genome_list, condition_dict, parameters, job_data, output_dir,
         #TODO: set as based on a run condition
         skip_merged_annotation = True
         if skip_merged_annotation:
-            return
+            continue 
         #merge reconstructed transcriptomes
         ##stringtie --merge -G <reference annotation> -o <merged annotation> <gtf list>
         os.chdir(genome["output"])
@@ -76,6 +75,35 @@ def run_stringtie(genome_list, condition_dict, parameters, job_data, output_dir,
                     subprocess.check_call(stringtie_cmd)
                 else:
                     sys.stderr.write(merge_gtf+" stringtie file already exists. skipping\n")
+    create_stringtie_gene_transcript_dict(genome_list,condition_dict,False)
+
+#Sometimes strintie puts in STRG genes 
+#Put a dictionary for each replicate into the condition_dict
+#Swap STRG genes with transcript names when appropriate
+def create_stringtie_gene_transcript_dict(genome_list,condition_dict,merged_flag):
+    gtf_key = "merged_gtf" if merged_flag else "gtf"
+    for genome in genome_list:
+        genome_file=genome["genome"]
+        genome_link = genome["genome_link"]
+        for library in condition_dict:
+            for rep in condition_dict[library]["replicates"]:
+                gtf_file = rep[genome_file][gtf_key]
+                gtf_dict = {} 
+                gtf_dict["gene_to_transcript"] = [] 
+                gtf_dict["transcript_to_gene"] = {} 
+                with open(gtf_file,"r") as gtf_handle:
+                    for line in gtf_handle:
+                        if line[0] == "#":
+                            continue
+                        line = line.strip().split("\t")
+                        if line[2] == "transcript": #transcript line is the only one with TPM values, which is mainly what this dictionary is used for
+                            features = line[-1].split(";")
+                            gene_id = features[0].replace("gene_id ","").replace("transcript_id ","").replace("\"","").replace("gene-","")
+                            transcript_id = features[1].replace("gene_id ","").replace("transcript_id ","").replace("\"","").replace(" ","").replace("rna-","")
+                            gtf_dict["gene_to_transcript"][gene_id].append(transcript_id)  
+                            gtf_dict["transcript_to_gene"][transcript_id] = gene_id
+                rep[genome_file]["gtf_dict"] = gtf_dict
+                        
 
 def split_bam_file(replicate_bam,threads,pipeline_log):
     print("Splitting %s into %s files for parallel htseq-count"%(replicate_bam,str(threads)))
@@ -231,21 +259,4 @@ def run_htseq_count(genome_list, condition_dict, parameters, job_data, output_di
                     with open(counts_file,"w") as cf:
                         subprocess.check_call(htseq_cmd,stdout=cf)
 
-def get_gene_lengths_from_annotation_bacterial(genome_list):
-    for genome in genome_list:
-        gene_length_dict = {}
-        #check if genome is host or not
-        annotation_file = genome["annotation_link"]
-        with open(annotation_file,"r") as af:
-            for line in af:
-                if line[0] == "#":
-                    continue 
-                line = line.strip().split("\t") 
-                if line[2] != "gene":
-                    continue
-                feature_list = line[8].split(";") 
-                gene_length = int(line[4]) - int(line[3])
-                gene_id = feature_list[0].replace("ID=","")
-                gene_length_dict[gene_id] = str(gene_length)
-        genome["gene_lengths"] = gene_length_dict
 

@@ -96,14 +96,11 @@ def run_deseq2(genome_list,contrasts,job_data,dge_dict,output_dir):
         if not os.path.exists(metadata_file):
             print("%s: file doesn't exist"%metadata_file)
             continue
-        #diffexp_cmd_gene = ["run_deseq2.R",genome["gene_matrix"],metadata_file,genome_prefix+".genes"]+contrast_cmd
-        #diffexp_cmd_transcript = ["run_deseq2.R",genome["transcript_matrix"],metadata_file,genome_prefix+".transcripts"]+contrast_cmd
         genome["diff_exp_contrasts"] = []
         for diffexp_params in diffexp_list:
             diffexp_cmd = ["run_deseq2.R",diffexp_params[0],metadata_file,diffexp_params[1],diffexp_params[2]]+contrast_cmd
             print("%s\n"%" ".join(diffexp_cmd))
             subprocess.check_call(diffexp_cmd)
-            #wrap_svg_in_html("Volcano_Plots_mqc.svg")
             dge_dict[genome["genome"]]["volcano"] = wrap_svg_in_html("Volcano_Plots.svg",output_dir)
             for pair in contrasts:
                 pair = [x.replace(",","_") for x in pair]
@@ -146,17 +143,15 @@ def write_gmx_file(genome_list):
                         o.write("\t0")
                 o.write("\n")
 
-#TODO: what if they don't do differential expression
-#TODO: should we care about the p-value?
-#TODO: maybe two heatmaps: 50 upregulated and 50 downregulated?
 #Strategy: 
 #   - go through and keep two sorted lists: upregulated and downregulated
 #   - pass top 50(?) into heatmap program 
 #Returns: number of genes in the heatmap, skip heatmap if 0
-def top_diffexp_genes(genome_list): 
-    #TODO: log_threshold = 1
-    #pval_threshold = 0.05
-    pval_threshold = 1.0
+def top_diffexp_genes(genome_list,dge_dict): 
+    #report number of genes that are significant in the heatmap and in the overall report
+    pval_threshold = 0.05
+    num_sig_genes = 0
+    sig_genes = set()
     for genome in genome_list:
         os.chdir(genome["output"])
         contrast_file_list = genome["diff_exp_contrasts"]
@@ -168,20 +163,26 @@ def top_diffexp_genes(genome_list):
         down_log_list = []
         #grab all signification genes
         for contrast_file in contrast_file_list:
+            if "Transcripts" in contrast_file:
+                continue
             with open(contrast_file,"r") as cf:
                 next(cf) #skip header
                 for line in cf:
                     gene,baseMean,logFC,lfcSE,stat,pvalue,padj = line.strip().split("\t") 
-                    #TODO: check that skipping over padj == "NA" is correct
+                    #do not include genes with these label
                     if padj == "NA":
                         continue
+                    if "STRG" in gene:
+                        continue
                     if float(padj) < pval_threshold:
-                        if float(logFC) < 0 and gene not in down_genes_list and gene not in up_genes_list:
-                            down_genes_list.append(gene)
-                            down_log_list.append(float(logFC))
-                        elif float(logFC) > 0 and gene not in up_genes_list and gene not in down_genes_list:
-                            up_genes_list.append(gene)
-                            up_log_list.append(float(logFC))
+                        num_sig_genes = num_sig_genes + 1   
+                        sig_genes.add(gene)
+                    if float(logFC) < 0 and gene not in down_genes_list and gene not in up_genes_list:
+                        down_genes_list.append(gene)
+                        down_log_list.append(float(logFC))
+                    elif float(logFC) > 0 and gene not in up_genes_list and gene not in down_genes_list:
+                        up_genes_list.append(gene)
+                        up_log_list.append(float(logFC))
         #zip and sort lists 
         up_sorted = sorted(tuple(zip(up_genes_list,up_log_list)),key=lambda x:x[1],reverse=True)
         down_sorted = sorted(tuple(zip(down_genes_list,down_log_list)),key=lambda x:x[1])
@@ -189,6 +190,10 @@ def top_diffexp_genes(genome_list):
         num_up = 25 if len(up_sorted) > 25 else len(up_sorted)
         num_down = 25 if len(down_sorted) > 25 else len(down_sorted)
         heatmap_genes = list(up_sorted)[:num_up]+list(down_sorted)[:num_down]
+        num_sig_heatmap_genes = 0
+        for g in heatmap_genes:
+            if g in sig_genes:
+                num_sig_heatmap_genes = num_sig_heatmap_genes + 1
         if len(heatmap_genes) == 0:
             sys.stderr.write("No significant genes found in differential expression file: no heatmap output\n")
             continue 
@@ -198,6 +203,8 @@ def top_diffexp_genes(genome_list):
         with open(heatmap_genes_file,"w") as o:
             for gene in heatmap_genes:
                 o.write("%s\n"%gene[0]) 
+        dge_dict[genome["genome"]]["significant_genes"] = str(num_sig_genes)
+        dge_dict[genome["genome"]]["heatmap_significant_genes"] = str(num_sig_heatmap_genes)
 
 def generate_heatmaps(genome_list,job_data,dge_dict,output_dir):
     feature_count = "htseq" if job_data.get("feature_count","htseq") == "htseq" else "stringtie"
@@ -286,7 +293,6 @@ def cleanup_files(genome_list,output_dir):
             cleanup_list.append(os.path.abspath(genes_file))
         for json_file in glob.glob("*json"):
             cleanup_list.append(os.path.abspath(json_file))
-        #TODO: rename this file with json extension and remove this part
         for intro_file in glob.glob("*pipeline"):
             cleanup_list.append(os.path.abspath(intro_file))
         for yaml_file in glob.glob("*yaml"): #multiqc config file
@@ -315,9 +321,12 @@ def setup(genome_list, condition_dict, parameters, output_dir, job_data):
             rcount=0
             for r in condition_dict[condition]["replicates"]:
                 ###assign name key in replicate dictionary
-                r_name = os.path.basename(r["read1"]).split(".")[0]
-                if "read2" in r:
-                    r_name = r_name + "_" + os.path.basename(r["read2"]).split(".")[0]
+                if "bam" in r:
+                    r_name = os.path.basename(r["bam"]).replace(".bam","")
+                else:
+                    r_name = os.path.basename(r["read1"]).split(".")[0]
+                    if "read2" in r:
+                        r_name = r_name + "_" + os.path.basename(r["read2"]).split(".")[0]
                 r["name"] = r_name
                 ###
                 target_dir=r["target_dir"]
@@ -387,15 +396,15 @@ def main(genome_list, condition_dict, parameters_str, output_dir, gene_matrix=Fa
     if not run_cuffdiff_pipeline and job_data.get("feature_count","htseq") == "stringtie":
         prep_diffexp_files.write_gtf_list(genome_list,condition_dict) #function that writes the input for prepDE.py, which is a list of samples and paths to their gtf files. Do this for each genome
         prep_diffexp_files.prep_stringtie_diffexp(genome_list,condition_dict,job_data.get("recipe","RNA-Rocket") == "Host",pipeline_log)   
+        prep_diffexp_files.create_tpm_matrix_stringtie(genome_list,condition_dict,host_flag=job_data.get("recipe","RNA-Rocket") == "Host")
     elif not run_cuffdiff_pipeline and job_data.get("feature_count","htseq") == "htseq": #htseq
         if job_data.get("recipe","RNA-Rocket") == "Host":
             prep_diffexp_files.create_counts_table_host(genome_list,condition_dict,job_data)
-            #TODO: create function for tpms for host
+            prep_diffexp_files.create_tpm_matrix_htseq(genome_list,condition_dict,True,8) #true for host_flag
         else:
             prep_diffexp_files.create_counts_table(genome_list,condition_dict,job_data)
-            prep_diffexp_files.create_tpm_matrix_htseq(genome_list)
-    #TODO: reorganize queries to occur in one script instead of creating a dependency between different query functions and their order
-    if not run_cuffdiff_pipeline:
+            prep_diffexp_files.create_tpm_matrix_htseq(genome_list,condition_dict,False,8) #false for host_flag
+    if not run_cuffdiff_pipeline and not job_data.get("recipe","RNA-Rocket") == "Host":
         pathways.run_subsystem_analysis(genome_list,job_data,pathway_dict,output_dir)
         pathways.run_kegg_analysis(genome_list,job_data,pathway_dict,output_dir)
     
@@ -410,15 +419,16 @@ def main(genome_list, condition_dict, parameters_str, output_dir, gene_matrix=Fa
         #volcano plots are generated in the same script that runs deseq2
         run_deseq2(genome_list,contrasts,job_data,dge_dict,output_dir)
         write_gmx_file(genome_list)
-        #TODO: differential expression import will fail for host, fix by getting valid genes 
         try:
-            run_diff_exp_import(genome_list, condition_dict, parameters, output_dir, contrasts, job_data, map_args, diffexp_json)
+            if not job_data.get("recipe","RNA-Rocket") == "Host":
+                run_diff_exp_import(genome_list, condition_dict, parameters, output_dir, contrasts, job_data, map_args, diffexp_json)
         except:
             print("Expression import failed")
         #get amr and specialty genes for labeling the heatmap
-        pathways.setup_specialty_genes(genome_list)
+        if not job_data.get("recipe","RNA-Rocket") == "Host":
+            pathways.setup_specialty_genes(genome_list)
         #generate heatmaps 
-        top_diffexp_genes(genome_list) 
+        top_diffexp_genes(genome_list,dge_dict) 
         generate_heatmaps(genome_list,job_data,dge_dict,output_dir)
     #write out any of the json files to the top level of the genomes
     for genome in genome_list:
@@ -508,6 +518,17 @@ if __name__ == "__main__":
         #store the condition index if it doesn't exist
         condition_dict[condition_id].setdefault("condition_index",condition_index)
         count+=1
+    ###add bam files to library dictionary
+    bam_count = 0
+    for bam in job_data.get("bam_libs",[]):
+        condition_index = int(bam.get("condition", count+1))-1 #copying condition position from read loop above
+        condition_id = condition_list[condition_index] if got_conditions else "results"
+        if "replicates" not in condition_dict[condition_id]:
+            condition_dict[condition_id].setdefault("replicates",[])
+        condition_dict[condition_id]["replicates"].append(bam)
+        if "condition_index" not in condition_dict[condition_id]:
+            condition_dict[condition_id].setdefault("condition_index",condition_index)
+        bam_count = bam_count + 1
     genome_dirs=map_args.g.strip().split(',')
     genome_list=[]
     for g in genome_dirs:

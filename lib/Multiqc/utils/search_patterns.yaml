@@ -550,7 +550,7 @@ rseqc/read_distribution:
 rseqc/read_duplication_pos:
   fn: "*.pos.DupRate.xls"
 rseqc/infer_experiment:
-  - fn: "*infer_experiment.txt"
+  - fn: "*infer"
   - contents: "Fraction of reads explained by"
     max_filesize: 500000
 salmon/meta:
@@ -681,8 +681,8 @@ verifybamid/selfsm:
   fn: "*.selfSM"
 introduction/pipeline:
   fn: "introduction.pipeline"
-subsystems/vln_grid:
-  fn: "subsystems.json"
+pathways/vln_grid:
+  fn: "pathways.json"
 samstat/report:
   fn: "samstat.json"
 references/json:

@@ -26,15 +26,17 @@ system.level = args[4]
 feature.count = args[5]
 
 #check files and extensions
-if (grepl("htseq",feature.count)) {
-    count_sep = "\t"
-} else if (grepl("stringtie",feature.count)) {
-    count_sep = ","
-} else {
-    print("Error in grid_violin_plots.R: can't determine counts file delimeter")
-    print(counts.file)
-    stop()
-}
+#if (grepl("htseq",feature.count)) {
+#    count_sep = "\t"
+#} else if (grepl("stringtie",feature.count)) {
+#    count_sep = ","
+#} else {
+#    print("Error in grid_violin_plots.R: can't determine counts file delimeter")
+#    print(counts.file)
+#    stop()
+#}
+#TPM matrix (replacing counts matrix) only uses tab delimeter at the moment
+count_sep = "\t"
 
 #load libraries quietly
 library(ggplot2,quietly=TRUE)
@@ -52,8 +54,10 @@ system.map = system.map[!grepl("NONE",system.map[,2]),]
 counts.mtx = counts.mtx[system.map[,1],]
 
 #Testing: min and max values
-log_min = log(min(counts.mtx)+1)
-log_max = log(max(counts.mtx))
+#log_min = log(min(counts.mtx)+1)
+#log_max = log(max(counts.mtx))
+min_val = min(counts.mtx)
+max_val = max(counts.mtx)
 
 #Get all unique systems and conditions
 conditions = unique(metadata$Condition)
@@ -67,6 +71,7 @@ png_width = (num_columns + num_samples)*100
 png_height = num_rows*200 
 svg_width = num_columns + num_samples
 svg_height = num_rows + 5
+
 
 #create each plot and ad dit to a list of plots: do not render at this step: occurs when calling svglite() and do.call()
 legend <- NULL 
@@ -84,7 +89,8 @@ for (i in 1:length(systems)) {
         melt.df[melt.df$Sample %in% subset(metadata,subset=Condition==c)$Sample,]$Condition = c
     }
     x_axis_label = paste(toString(length(curr.mtx$Genes))," Genes",sep="")
-    vln_plot <- ggplot(melt.df,aes(x=Sample,y=LogCounts,fill=Condition))+geom_violin(trim=FALSE)+ylim(log_min,log_max)+ggtitle(curr.system)+ylab("TPM")+xlab(x_axis_label) 
+    #vln_plot <- ggplot(melt.df,aes(x=Sample,y=LogCounts,fill=Condition))+geom_violin(trim=FALSE)+ylim(min_val,max_val)+ggtitle(curr.system)+ylab("TPM")+xlab(x_axis_label) 
+    vln_plot <- ggplot(melt.df,aes(x=Sample,y=LogCounts,fill=Condition))+geom_violin(trim=FALSE)+ggtitle(curr.system)+ylab("TPM")+xlab(x_axis_label) 
     vln_plot = vln_plot + geom_boxplot(width=0.1,fill="white")
     if (is.null(legend)) {
         legend <- g_legend(vln_plot)

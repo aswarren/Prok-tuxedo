@@ -12,15 +12,17 @@ specialty_genes.file = args[6]
 subsystem.file = args[7]
 
 #check file extensions
-if (grepl("htseq",feature.count)) {
-    count_sep = "\t"
-} else if (grepl("stringtie",feature.count)) {
-    count_sep = ","
-} else {
-    print("Error in generate_heatmaps.R: can't determine counts file delimeter")
-    print(counts.file)
-    stop()
-}
+#if (grepl("htseq",feature.count)) {
+#    count_sep = "\t"
+#} else if (grepl("stringtie",feature.count)) {
+#    count_sep = ","
+#} else {
+#    print("Error in generate_heatmaps.R: can't determine counts file delimeter")
+#    print(counts.file)
+#    stop()
+#}
+#TPM matrix always is tqb delimited
+count_sep = "\t"
 
 #load libraries quietly
 library(ComplexHeatmap,quietly=TRUE)
@@ -46,8 +48,10 @@ if (subsystem.file == "NONE") {
     subsystem.map <- read.table(subsystem.file,sep="\t",header=T,stringsAsFactors=FALSE)
 }
 
-#normalize: put into the standard normal space 
-#counts.mtx = scale(counts.mtx) 
+#Usually doesn't happen, but sometimes for host there heatmap genes and counts table do not share all genes
+if (!all(genes.list$Genes %in% rownames(counts.mtx))) {
+    genes.list = subset(genes.list,subset=Genes %in% rownames(counts.mtx))
+}
 
 ###Calculate picture widtth based on the number of samples
 #heatmap width and offset are set in the draw() method at the bottom
@@ -147,20 +151,28 @@ if (!is.null(specialty.genes))
 }
 
 ###Testing: take out "fig|" from gene names in heatmap so the legend doesn't overlap with the genes
-for (i in 1:length(rownames(expression.mtx))) {
-    split_gene = unlist(strsplit(rownames(expression.mtx)[i],"\\."))
-    rownames(expression.mtx)[i] = paste("*",split_gene[length(split_gene)],sep=".")
+if (length(legend.list) > 0) {
+    for (i in 1:length(rownames(expression.mtx))) {
+        split_gene = unlist(strsplit(rownames(expression.mtx)[i],"\\."))
+        rownames(expression.mtx)[i] = paste("*",split_gene[length(split_gene)],sep=".")
+    }
 }
 
 ###Create heatmap: SVG
 #out_svg = paste("Normalized_Top_50_Differentially_Expressed_Genes_mqc.svg",sep="")
 out_svg = paste("Normalized_Top_50_Differentially_Expressed_Genes.svg",sep="")
 ht = Heatmap(expression.mtx,name="TPM",cluster_columns=FALSE,row_names_max_width = unit(8, "cm"),show_row_dend = FALSE,row_names_gp = gpar(fontsize=8,col=colors.list),column_names_gp = gpar(fontsize=8),column_names_rot = 45, column_split = sample_split, border=TRUE, column_title = "Normalized Top 50 Differentially Expressed Genes")
+if (length(legend.list) > 0) { #if not specialty genes or subsystems legends, just write out heatmap: always for Host 
+    svglite(out_svg)
+    draw(ht,heatmap_legend_list=legend.list,padding=unit(c(1,1,1,15),"mm"))
+    dev.off()
+} else {
+    svglite(out_svg)
+    draw(ht,padding=unit(c(1,1,1,15),"mm"))
+    dev.off()
+}
 #svg(out_svg,width=svg_width)
 #svglite(out_svg,width=svg_width)
-svglite(out_svg)
-draw(ht,heatmap_legend_list=legend.list,padding=unit(c(1,1,1,15),"mm"))
-dev.off()
 
 ###Name of output png: must end with "_mqc" in order to multiqc to recognize it
 #out_png = paste("Normalized_Top_50_Differentially_Expressed_Genes_mqc.png",sep="")

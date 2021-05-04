@@ -19,13 +19,8 @@ def run_subsystem_analysis(genome_list,job_data,pathway_dict,output_dir):
     #Run subsytem plotting R script
     #grid_violin_plots.R <subsystem_map.txt> <counts_file.txt|csv> <metadata.txt>  <subsystem_level> <feature_count>
     feature_count = "htseq" if job_data.get("feature_count","htseq") == "htseq" else "stringtie"
-    add_class = False
-    if add_class:
-        subsystem_levels = ["Superclass","Class"]
-        subsystem_map = ["superclass_map","class_map"]
-    else:
-        subsystem_levels = ["Superclass"]
-        subsystem_map = ["superclass_map"]
+    subsystem_levels = ["Superclass"]
+    subsystem_map = ["superclass_map"]
     for genome in genome_list:
         os.chdir(genome["output"])
         if not "superclass_map" in genome:
@@ -74,7 +69,6 @@ def get_subsystem_mapping(genome):
     response = s.send(prepared)
     subsystem_dict = {}
     superclass_set = set()
-    class_set = set()
     print("Retrieving subsystem ids for genome_id %s"%(os.path.basename(genome["output"])))
     print(genome_url)
     if not response.ok:
@@ -88,10 +82,6 @@ def get_subsystem_mapping(genome):
         subsystem_dict[entry['patric_id']] = {}
         subsystem_dict[entry['patric_id']]['Superclass'] = entry['superclass'] if len(entry['superclass']) > 0 else 'NONE'
         superclass_set.add(entry['superclass'])
-        subsystem_dict[entry['patric_id']]['Class'] = entry['class'] if len(entry['class']) > 0 else 'NONE'
-        class_set.add(entry['class'])
-    #subsystem_dict["superclass_set"] = superclass_set
-    #subsystem_dict["class_set"] = class_set
     return subsystem_dict
 
 def write_subsystem_mapping_files(genome_list):
@@ -104,20 +94,12 @@ def write_subsystem_mapping_files(genome_list):
         superclass_map = os.path.basename(genome["output"])+".superclass_mapping"
         superclass_path = os.path.join(genome["output"],superclass_map)
         genome["superclass_map"] = superclass_path
-        #TODO: remove class map
-        class_map = os.path.basename(genome["output"])+".class_mapping"
-        class_path = os.path.join(genome["output"],class_map)
-        genome["class_map"] = class_path
         #write superclass file
-        with open(superclass_map,"w") as sm, open(class_map,"w") as cm:
+        with open(superclass_map,"w") as sm:
             #write headers
             sm.write("Patric_ID\tSuperclass\n")
-            if "class_map" in genome:
-                cm.write("Patric_ID\tClass\n")
             for patric_id in subsystem_dict:
                 sm.write("%s\t%s\n"%(patric_id,subsystem_dict[patric_id]["Superclass"])) 
-                if "class_map" in genome:
-                    cm.write("%s\t%s\n"%(patric_id,subsystem_dict[patric_id]["Class"])) 
 
 def write_kegg_mapping_files(genome_list):
     for genome in genome_list:
@@ -204,28 +186,4 @@ def get_kegg_genes_mapping(genome):
         kegg_dict[entry["patric_id"]] = {}
         kegg_dict[entry["patric_id"]]["pathway_class"] = entry["pathway_class"]
     return kegg_dict
-
-#TODO: write this function
-#TODO: url does not result in a list of amr genes, just an empty list
-#https://patricbrc.org/api/genome_amr/?in(genome_id,(242231.10))&in(resistant_phenotype,(Resistant,Susceptible,Intermediate))&limit(1)&facet((pivot,(antibiotic,resistant_phenotype,genome_id)),(mincount,1),(limit,-1))&json(nl,map)
-def get_amr_mapping(genome):
-    prefix_url = "https://patricbrc.org/api/genome_amr/?in(genome_id,("
-    suffix_url = "))&in(resistant_phenotype,(Resistant,Susceptible,Intermediate))&limit(1)&facet((pivot,(antibiotic,resistant_phenotype,genome_id)),(mincount,1),(limit,-1))&json(nl,map)"
-    amr_url = prefix_url + os.path.basename(genome["output"]) + suffix_url
-    print("Retrieving amr ids for genome_id %s\n"%(os.path.basename(genome["output"])))
-    print(amr_url)
-    req = requests.Request('GET',amr_url)
-    authenticateByEnv(req)
-    prepared = req.prepare()
-    s = requests.Session()
-    response = s.send(prepared)
-    print(response)
-    amr_dict = {}
-    if not response.ok:
-        sys.stderr.write("Failed to retrieve amr ids for genome_id %s"%os.path.basename(genome["output"]))
-        return None
-    for entry in response.json()['response']['docs']:
-        print(entry)
-        return None
-
 

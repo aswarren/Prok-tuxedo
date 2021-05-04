@@ -33,7 +33,8 @@ exit $rc;
 sub preflight
 {
     my($app, $app_def, $raw_params, $params) = @_;
-
+    my $mem_req = check_memory_requirements($raw_params,$params);
+    print STDERR "preflight check--------\n";
     my $pf = {
 	cpu => 8,
 	memory => "128G",
@@ -44,11 +45,19 @@ sub preflight
     return $pf;
 }
 
-
+sub check_memory_requirements 
+{
+   my ($raw_params,$params) = @_;
+   print "raw_params ", Dumper($raw_params);
+   print "params ", Dumper($params); 
+   exit;
+}
 
 sub process_rnaseq {
     my ($app, $app_def, $raw_params, $params) = @_;
-
+    print "raw_params ", Dumper($raw_params);
+    print "params ", Dumper($params); 
+    exit;
     print "Proc RNASeq ", Dumper($app_def, $raw_params, $params);
     my $time1 = `date`;
 
