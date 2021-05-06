@@ -33,11 +33,10 @@ exit $rc;
 sub preflight
 {
     my($app, $app_def, $raw_params, $params) = @_;
-    my $mem_req = check_memory_requirements($raw_params,$params);
-    print STDERR "preflight check--------\n";
+    my $mem_req = check_memory_requirements($app,$params);
     my $pf = {
 	cpu => 8,
-	memory => "128G",
+	memory => $mem_req,
 	runtime => 0,
 	storage => 0,
 	is_control_task => 0,
@@ -45,19 +44,40 @@ sub preflight
     return $pf;
 }
 
+#check memory requirements for preflight
+#if above a certain threshold, set to 128GB
+#otherwise, set memory requirements to 32GB
 sub check_memory_requirements 
 {
-   my ($raw_params,$params) = @_;
-   print "raw_params ", Dumper($raw_params);
-   print "params ", Dumper($params); 
-   exit;
+   my ($app,$params) = @_;
+   my $mem_threshold = 50000000000; #50GB 
+   my $total_mem = 0;
+   my $ws = $app->workspace;
+   #paired_end libs
+   foreach my $item (@{$params->{paired_end_libs}}) {
+      my $r1 = $ws->stat($item->{read1});
+      my $r2 = $ws->stat($item->{read2});
+      $total_mem = $total_mem + $r1->size + $r1->size;
+   }
+   #single_end libs
+   foreach my $item (@{$params->{single_end_libs}}) { 
+      my $r = $ws->stat($item->{read});
+      $total_mem = $total_mem + $r->size;
+   }
+   #bam libs
+   foreach my $item (@{$params->{bam_libs}}) {
+      my $b = $ws->stat($item->{bam});
+      $total_mem = $total_mem + $b->size;
+   }
+   if ($total_mem >= $mem_threshold) {
+      return "128GB";     
+   } else {
+      return "32GB";
+   }
 }
 
 sub process_rnaseq {
     my ($app, $app_def, $raw_params, $params) = @_;
-    print "raw_params ", Dumper($raw_params);
-    print "params ", Dumper($params); 
-    exit;
     print "Proc RNASeq ", Dumper($app_def, $raw_params, $params);
     my $time1 = `date`;
 
