@@ -147,7 +147,7 @@ def get_module_order(recipe,feature_count,dge_flag=False):
         module_list += [SPACE+"- htseq"]
     else:
         module_list += [SPACE+"- samtools"]
-    module_list += [SPACE+"- subsystems"]
+    module_list += [SPACE+"- pathways"]
     if dge_flag:
         module_list += [SPACE+"- differential_expression"]
     #Final three modules should be the same for each run case 

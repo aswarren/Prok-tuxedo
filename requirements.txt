@@ -1,8 +1,9 @@
 StringTie==2.1.1
 HTSeq==0.12.4
-multiqc==1.10.dev0
+multiqc==1.10.1
 RSeQC==4.0.0
 bedtools==2.24.0
+bedops==2.4.39
 hisat2==2.1.0
 bowtie2==2.4.2
 SAMstat==1.5.1

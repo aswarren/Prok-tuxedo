@@ -445,7 +445,7 @@ def main(genome_list, condition_dict, parameters_str, output_dir, gene_matrix=Fa
     os.chdir(output_dir)
     with open("Pipeline.txt","w") as o:
         o.write("\n".join(pipeline_log))
-    cleanup_files(genome_list,output_dir)
+    #cleanup_files(genome_list,output_dir)
         
 
 if __name__ == "__main__":
