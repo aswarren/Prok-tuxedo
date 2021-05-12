@@ -9,7 +9,7 @@ from math import log
 def main(init_args, output_file):
     output_handle=open(output_file, 'w')
     if(len(init_args)<1):
-        print "Usage cuffdiff_to_genematrix.py  <cuffdiff files>"
+        print ("Usage cuffdiff_to_genematrix.py  <cuffdiff files>")
         exit(0)
     master_list_genes=set()
     master_list_comparisons=set()
@@ -62,14 +62,14 @@ def main(init_args, output_file):
     genes.sort()
     output_handle.write('\t'.join(headers)+"\n")
     for g in genes:
-	value_list=[]
-	for c in comparisons:
-	    try:
-		current_val = str(log_lookup[c][g])
-	    except:
-		current_val='NaN'
-	    value_list.append(current_val)
-	output_handle.write('\t'.join([g]+value_list)+"\n")
+	    value_list=[]
+	    for c in comparisons:
+	        try:
+		        current_val = str(log_lookup[c][g])
+	        except:
+		        current_val='NaN'
+	        value_list.append(current_val)
+	    output_handle.write('\t'.join([g]+value_list)+"\n")
     output_handle.close()
 
 if __name__ == "__main__":

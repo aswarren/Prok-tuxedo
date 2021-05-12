@@ -38,13 +38,12 @@ def run_cufflinks(genome_list, condition_dict, parameters, output_dir):
                 try:
                     bam_tmp = os.tempnam("/dev/shm", "CUFFL")
                     shutil.copy(bam_file, bam_tmp)
-                    print "Copy succeeded to %s" % (bam_tmp)
+                    print ("Copy succeeded to %s" % (bam_tmp))
                     bam_to_use = bam_tmp
-                    
                 except IOError as err:
                     os.unlink(bam_tmp)
                     bam_to_use = None
-		    bam_tmp = None
+                    bam_tmp = None
                     sys.stderr.write("Can't copy %s to %s: %s\n" % (bam_file, bam_tmp, err))
 
                 if bam_to_use == None:
@@ -56,32 +55,31 @@ def run_cufflinks(genome_list, condition_dict, parameters, output_dir):
                     except IOError as err:
                         os.unlink(bam_tmp)
                         bam_to_use = None
-			bam_tmp = None
+                        bam_tmp = None
                         sys.stderr.write("Can't copy %s to %s: %s\n" % (bam_file, bam_tmp, err))
                     
                 if bam_to_use == None:
                     sys.stderr.write("Can't copy %s to tmp space\n" % (bam_file))
                     bam_to_use = bam_file
-		    bam_tmp = None
+                    bam_tmp = None
                 
                 cur_cmd += [bam_to_use]
                 cuff_gtf=os.path.join(cur_dir,"transcripts.gtf")
                 if not os.path.exists(cuff_gtf):
-                    print " ".join(cur_cmd)
-		    try:
+                    print (" ".join(cur_cmd))
+                    try:
                         sys.stderr.write("Invoke cufflinks: %s\n" % (cur_cmd))
-			subprocess.check_call(cur_cmd)
-		    except Exception as e:
-		    	if bam_tmp != None:
-			    sys.stderr.write("remove temp %s in exception handler\n" % (bam_tmp))
-			    os.unlink(bam_tmp)
-                        sys.stderr.write("Cufflinks error: %s\n" % (e))
-			raise
+                        subprocess.check_call(cur_cmd)
+                    except Exception as e:
+                        if bam_tmp != None:
+                            sys.stderr.write("remove temp %s in exception handler\n" % (bam_tmp))
+                            os.unlink(bam_tmp)
+                            sys.stderr.write("Cufflinks error: %s\n" % (e))
                 else:
                     sys.stderr.write(cuff_gtf+" cufflinks file already exists. skipping\n")
-		if bam_tmp != None:
-		    sys.stderr.write("remove temp %s\n" % (bam_tmp))
-		    os.unlink(bam_tmp)
+                if bam_tmp != None:
+                    sys.stderr.write("remove temp %s\n" % (bam_tmp))
+                    os.unlink(bam_tmp)
 
 #Differential expression pipeline using the cufflinks protocol 
 def run_cuffdiff(genome_list, condition_dict, parameters, output_dir, gene_matrix, contrasts, job_data, map_args, diffexp_json):
@@ -92,7 +90,7 @@ def run_cuffdiff(genome_list, condition_dict, parameters, output_dir, gene_matri
         is_host=genome.get("host",False)
         merge_manifest=os.path.join(genome["output"],"gtf_manifest.txt")
         merge_folder=os.path.join(genome["output"],"merged_annotation")
-    	subprocess.call(["mkdir","-p",merge_folder])
+        subprocess.call(["mkdir","-p",merge_folder])
         merge_file=os.path.join(merge_folder,"merged.gtf")
         if is_host:
             merge_cmd=["stringtie","--merge","-g","0","-G",genome["annotation"],"-o", merge_file]
@@ -110,7 +108,7 @@ def run_cuffdiff(genome_list, condition_dict, parameters, output_dir, gene_matri
         merge_cmd+=[merge_manifest]
 
         if not os.path.exists(merge_file):
-            print " ".join(merge_cmd)
+            print (" ".join(merge_cmd))
             subprocess.check_call(merge_cmd)
         else:
             sys.stderr.write(merge_file+" cuffmerge file already exists. skipping\n")
@@ -144,7 +142,7 @@ def run_cuffdiff(genome_list, condition_dict, parameters, output_dir, gene_matri
                 if not os.path.exists(quant_file):
                     subprocess.check_call(quant_cmd)
                 else:
-                    print " ".join(quant_cmd)
+                    print (" ".join(quant_cmd))
                     sys.stderr.write(quant_file+" cuffquant file already exists. skipping\n")
             diff_cmd.append(",".join(quant_list))
 
@@ -152,7 +150,7 @@ def run_cuffdiff(genome_list, condition_dict, parameters, output_dir, gene_matri
         os.chdir(cur_dir)
         cds_tracking=os.path.join(cur_dir,"cds.fpkm_tracking")
         if not os.path.exists(cds_tracking):
-            print " ".join(diff_cmd)
+            print (" ".join(diff_cmd))
             subprocess.check_call(diff_cmd)
         else:
             sys.stderr.write(cds_tracking+" cuffdiff file already exists. skipping\n")

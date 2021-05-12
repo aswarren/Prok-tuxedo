@@ -16,6 +16,7 @@ import prep_diffexp_files
 import pathways
 import multiqc_report
 import multiqc_module_output as mmo
+import unit_tests
 
 
 #take genome data structure and condition_dict and make directory names. processses condition to ensure no special characters, or whitespace
@@ -53,7 +54,7 @@ def run_diff_exp_import(genome_list, condition_dict, parameters, output_dir, con
             with open(params_file, 'w') as params_handle:
                 params_handle.write(json.dumps(transform_params))
             convert_cmd=[transform_script, "--ufile", params_file, "--sstring", map_args.sstring, "--output_path",experiment_path,"--xfile",gmx_file]
-            print " ".join(convert_cmd)
+            print (" ".join(convert_cmd))
             try:
                subprocess.check_call(convert_cmd)
             except(subprocess.CalledProcessError):
@@ -445,7 +446,11 @@ def main(genome_list, condition_dict, parameters_str, output_dir, gene_matrix=Fa
     os.chdir(output_dir)
     with open("Pipeline.txt","w") as o:
         o.write("\n".join(pipeline_log))
-    #cleanup_files(genome_list,output_dir)
+    ###check if unit testing is enabled
+    if map_args.unit_test:
+        unit_tests.run_unit_test(map_args.unit_test,genome_list,condition_dict,output_dir,contrasts,job_data)
+    ###cleanup files not to be submitted to the user workspace
+    cleanup_files(genome_list,output_dir)
         
 
 if __name__ == "__main__":
@@ -468,6 +473,10 @@ if __name__ == "__main__":
     parser.add_argument('-p', help='JSON formatted parameter list for tuxedo suite keyed to program', default="{}", required=False)
     parser.add_argument('-o', help='output directory. defaults to current directory.', required=False, default=None)
     parser.add_argument('-d', help='name of the folder for differential expression job folder where files go', required=True) 
+    parser.add_argument('-u','--unit_test',
+            help='follow with \'basic\' or a filename:\
+                    \t- basic: checks the subdirectory structures and output files. PASSED means all files and structure are correct\
+                    \t- filename: file containing N genes is checked against the genes with the greatest abundance and differential expression (if flagged)',required=False)
     #parser.add_argument('-x', action="store_true", help='run the gene matrix conversion and create a patric expression object', required=False)
     #parser.add_argument('readfiles', nargs='+', help="whitespace sep list of read files. shoudld be \
     #        in corresponding order as library list. ws separates libraries,\

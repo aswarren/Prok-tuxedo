@@ -78,7 +78,6 @@ def run_alignment(genome_list, condition_dict, parameters, output_dir, job_data,
             for r in condition_dict[condition]["replicates"]:
                 if "bam" not in r:
                     continue
-                ###TODO: here, figuring out logic for placing output files in correct directory after getting bam files
                 scount+=1
                 if genome["genome"] not in r:
                     r[genome["genome"]] = {}
@@ -250,7 +249,7 @@ def assign_strandedness_parameter(genome,condition_dict,parameters):
                 subprocess.check_call(sample_align_cmd)
             ###generate RSEQc strandedness file using infer_experiment.py
             infer_cmd = ["infer_experiment.py","-i",sam_file,"-r",genome["bed"],"-s",num_sample]
-            infer_file = os.path.join(r["target_dir"],os.path.basename(r["read1"]).split(".")[0]+".infer") 
+            infer_file = os.path.join(r["target_dir"],r["name"]+".infer") 
             print(" ".join(infer_cmd))
             with open(infer_file,"w") as o:
                 subprocess.check_call(infer_cmd,stdout=o)
