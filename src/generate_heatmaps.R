@@ -1,4 +1,5 @@
-#!/homes/clarkc/miniconda3/bin/Rscript
+#!/homes/clarkc/RNASeq_Pipeline/Dev_Bin/Rscript
+###!/opt/patric-common/runtime/bin/Rscript
 
 args = commandArgs(trailingOnly=TRUE)
 
@@ -27,6 +28,7 @@ count_sep = "\t"
 #load libraries quietly
 library(ComplexHeatmap,quietly=TRUE)
 library(svglite)
+library(graphics)
 
 ###TODO: add units to the heatmap (TPM, TPKM, etc)
 

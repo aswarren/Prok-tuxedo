@@ -89,7 +89,7 @@ def create_stringtie_gene_transcript_dict(genome_list,condition_dict,merged_flag
             for rep in condition_dict[library]["replicates"]:
                 gtf_file = rep[genome_file][gtf_key]
                 gtf_dict = {} 
-                gtf_dict["gene_to_transcript"] = [] 
+                gtf_dict["gene_to_transcript"] = {} 
                 gtf_dict["transcript_to_gene"] = {} 
                 with open(gtf_file,"r") as gtf_handle:
                     for line in gtf_handle:
@@ -100,6 +100,8 @@ def create_stringtie_gene_transcript_dict(genome_list,condition_dict,merged_flag
                             features = line[-1].split(";")
                             gene_id = features[0].replace("gene_id ","").replace("transcript_id ","").replace("\"","").replace("gene-","")
                             transcript_id = features[1].replace("gene_id ","").replace("transcript_id ","").replace("\"","").replace(" ","").replace("rna-","")
+                            if gene_id not in gtf_dict["gene_to_transcript"]:
+                                gtf_dict["gene_to_transcript"][gene_id] = []
                             gtf_dict["gene_to_transcript"][gene_id].append(transcript_id)  
                             gtf_dict["transcript_to_gene"][transcript_id] = gene_id
                 rep[genome_file]["gtf_dict"] = gtf_dict

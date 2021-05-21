@@ -132,7 +132,7 @@ def write_gmx_file(genome_list):
                     gene,baseMean,log2FC,lfcSE,stat,pvalue,padj = line.strip().split("\t")
                     gene_set.add(gene.replace("gene-",""))
                     gene_count_dict[contrast_name][gene] = log2FC
-
+        genome["gmx"] = os.path.join(genome["output"],"gene_exp.gmx")
         with open("gene_exp.gmx","w") as o:
             o.write("Gene_ID\t%s\n"%"\t".join(contrast_list))
             for gene in gene_set:
@@ -266,6 +266,7 @@ def remove_html_dir(output_dir):
     if os.path.exists(html_dir):
         subprocess.check_call(["rm","-r",html_dir])
 
+#Cleanup all remaining files not to be submitted to the users workspace
 def cleanup_files(genome_list,output_dir):
     os.chdir(output_dir)
     cleanup_list = []
@@ -318,6 +319,7 @@ def setup(genome_list, condition_dict, parameters, output_dir, job_data):
         if not os.path.exists(annotation_link):
             subprocess.check_call(["ln","-s",genome["annotation"],annotation_link])
         make_directory_names(genome, condition_dict)
+        rep_names = []
         for condition in condition_dict:
             rcount=0
             for r in condition_dict[condition]["replicates"]:
@@ -328,6 +330,11 @@ def setup(genome_list, condition_dict, parameters, output_dir, job_data):
                     r_name = os.path.basename(r["read1"]).split(".")[0]
                     if "read2" in r:
                         r_name = r_name + "_" + os.path.basename(r["read2"]).split(".")[0]
+                if r_name in rep_names: #shouldn't happen but just in case
+                    sys.stderr.write("Error, duplicate sample names: %s. Check json file or rename a sample\n"%(r_name))
+                    sys.exit(-1)
+                else:
+                    rep_names.append(r_name)
                 r["name"] = r_name
                 ###
                 target_dir=r["target_dir"]
@@ -442,15 +449,21 @@ def main(genome_list, condition_dict, parameters_str, output_dir, gene_matrix=Fa
             ref_handle.write(json.dumps(ref_dict))
             
     multiqc_report.run_multiqc(genome_list,condition_dict,job_data,dge_flag=dge_flag)
-    ###output pipeline txt file and run cleanup functions
+    ###output pipeline txt file
     os.chdir(output_dir)
     with open("Pipeline.txt","w") as o:
         o.write("\n".join(pipeline_log))
-    ###check if unit testing is enabled
-    if map_args.unit_test:
-        unit_tests.run_unit_test(map_args.unit_test,genome_list,condition_dict,output_dir,contrasts,job_data)
     ###cleanup files not to be submitted to the user workspace
     cleanup_files(genome_list,output_dir)
+    ###Run 'basic' test to check if all expected files exist
+    #run top_n_genes test if parameter and file is included
+    basic_result = unit_tests.run_unit_test("basic",genome_list,condition_dict,output_dir,contrasts,job_data)
+    if map_args.unit_test:
+        unit_tests.run_unit_test(map_args.unit_test,genome_list,condition_dict,output_dir,contrasts,job_data)
+    if basic_result == 0:
+        sys.exit(0) 
+    else:
+        sys.exit(-1) #TODO: exit code specific to 
         
 
 if __name__ == "__main__":
@@ -474,8 +487,7 @@ if __name__ == "__main__":
     parser.add_argument('-o', help='output directory. defaults to current directory.', required=False, default=None)
     parser.add_argument('-d', help='name of the folder for differential expression job folder where files go', required=True) 
     parser.add_argument('-u','--unit_test',
-            help='follow with \'basic\' or a filename:\
-                    \t- basic: checks the subdirectory structures and output files. PASSED means all files and structure are correct\
+            help='follow a filename:\
                     \t- filename: file containing N genes is checked against the genes with the greatest abundance and differential expression (if flagged)',required=False)
     #parser.add_argument('-x', action="store_true", help='run the gene matrix conversion and create a patric expression object', required=False)
     #parser.add_argument('readfiles', nargs='+', help="whitespace sep list of read files. shoudld be \

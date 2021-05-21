@@ -315,7 +315,7 @@ def create_tpm_matrix_stringtie(genome_list,condition_dict,host_flag):
         tpm_dict = {}
         counts_matrix = genome["gene_matrix"]
         #counts_matrix = genome["transcript_matrix"]
-        tpm_file = counts_matrix.replace("gene_counts","tpms")
+        tpm_file = counts_matrix.replace("gene_counts","tpms").replace("csv","tsv")
         feature_field = "gene_id"
         rep_order = []
         feature_set = set()

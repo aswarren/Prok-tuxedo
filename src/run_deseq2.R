@@ -1,4 +1,5 @@
-#!/homes/clarkc/miniconda3/bin/Rscript
+#!/homes/clarkc/RNASeq_Pipeline/Dev_Bin/Rscript
+###!/opt/patric-common/runtime/bin/Rscript
 
 #parameter format: 
 #RunDESeq2.R <counts_file.txt> <metadata_file.txt> <output_prefix> <htseq|stringtiet> <contrast 1> <contrast 2> ... <contrast n>
@@ -44,7 +45,7 @@ library(svglite)
 count.mtx <- read.table(counts.file,sep=count_sep,header=T,row.names=1,stringsAsFactors=FALSE)
 rownames(count.mtx) = gsub("gene-","",rownames(count.mtx))
 rownames(count.mtx) = gsub("rna-","",rownames(count.mtx))
-metadata <- read.table(metadata.file,sep=meta_sep,header=T,row.names=1,stringsAsFactors=FALSE)
+metadata <- read.table(metadata.file,sep=meta_sep,header=T,stringsAsFactors=FALSE)
 
 #calculate png width and height
 png_width = 600
@@ -68,7 +69,7 @@ for (i in 5:length(args))
     curr_contrast = unlist(strsplit(args[i],","))
     #curr_contrast = gsub("-","_",curr_contrast)
     curr.metadata = subset(metadata,(subset=Condition==curr_contrast[1])|(subset=Condition==curr_contrast[2]))
-    curr.count.mtx = count.mtx[,rownames(curr.metadata)] 
+    curr.count.mtx = count.mtx[,curr.metadata$Sample] 
     #Remove all zero rows and add pseudocount to genes: Will not work for some samples otherwise
     curr.count.mtx = curr.count.mtx[rowSums(curr.count.mtx) != 0,]
     curr.count.mtx = curr.count.mtx + 1

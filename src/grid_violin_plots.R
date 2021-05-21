@@ -1,4 +1,11 @@
-#!/homes/clarkc/miniconda3/bin/Rscript
+#!/homes/clarkc/RNASeq_Pipeline/Dev_Bin/Rscript
+###!/opt/patric-common/runtime/bin/Rscript
+
+#load libraries quietly
+library(ggplot2,quietly=TRUE)
+library(gridExtra,quietly=TRUE)
+library(reshape2,quietly=TRUE)
+library(svglite)
 
 ###Functions
 #https://stackoverflow.com/questions/12041042/how-to-plot-just-the-legends-in-ggplot2
@@ -37,12 +44,6 @@ feature.count = args[5]
 #}
 #TPM matrix (replacing counts matrix) only uses tab delimeter at the moment
 count_sep = "\t"
-
-#load libraries quietly
-library(ggplot2,quietly=TRUE)
-library(gridExtra,quietly=TRUE)
-library(reshape2,quietly=TRUE)
-library(svglite)
 
 #read tables
 counts.mtx <- read.table(counts.file,sep=count_sep,header=T,row.names=1,stringsAsFactors=FALSE)

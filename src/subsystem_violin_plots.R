@@ -1,4 +1,5 @@
-#!/homes/clarkc/miniconda3/bin/Rscript
+#!/homes/clarkc/RNASeq_Pipeline/Dev_Bin/Rscript
+###!/opt/patric-common/runtime/bin/Rscript
 
 #parameter format and check parameter inputs
 #subsystem_violin_plots.R <subsystem_map.csv> <counts_file.txt|csv> <subsystem_level>

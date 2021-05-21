@@ -1,6 +1,7 @@
 #!/opt/patric-common/runtime/bin/python3
 
 import os,sys,glob
+import pandas
 
 #NOTE: unit tests are not supporting the cufflinks pipeline at this time 
 #NOTE: does not check for the existence of files that should not exist
@@ -12,11 +13,12 @@ def run_unit_test(test_param,genome_list,condition_dict,output_dir,contrast_list
     if test_param == 'basic':
         result = run_basic_test(genome_list,condition_dict,output_dir,contrast_list,job_data)
     else:
-        result = run_top_genes_test(test_file,genome_list,condition_dict,output_dir,contrast_list,job_data)
+        result = run_top_genes_test(test_param,genome_list,condition_dict,output_dir,contrast_list,job_data)
     if result == 0:
         sys.stderr.write("%s unit test passed with no errors\n"% "BASIC" if test_param == "basic" else "TOP_N_GENES")
     else:
         sys.stderr.write("%s unit test finished with an error\n"%"BASIC" if test_param == "basic" else "TOP_N_GENES")
+    return result
 
 #Go through the actual output directory and confirm everything in the expected files list is found 
 #If everything is found then the test passes, otherwise it fails and outputs the names of files not found
@@ -45,8 +47,12 @@ def get_expected_files(genome_list,condition_dict,output_dir,contrast_list,job_d
     #files at the genome level
     for genome in genome_list:
         #abundance estimages
-        gene_counts = os.path.join(genome["output"],".".join([genome_id,quant_method,"gene_counts","tsv"]))
-        tpm_counts = os.path.join(genome["output"],".".join([genome_id,quant_method,"tpms","tsv"]))
+        if job_data.get("feature_count","htseq") == "htseq": 
+            gene_counts = os.path.join(genome["output"],".".join([genome_id,quant_method,"gene_counts","tsv"]))
+            tpm_counts = os.path.join(genome["output"],".".join([genome_id,quant_method,"tpms","tsv"]))
+        else:
+            gene_counts = os.path.join(genome["output"],".".join([genome_id,quant_method,"gene_counts","csv"]))
+            tpm_counts = os.path.join(genome["output"],".".join([genome_id,quant_method,"tpms","csv"]))
         if job_data.get("recipe","RNA-Rocket") == "Host":
             transcript_counts = os.path.join(genome["output"],".".join([genome_id,quant_method,"transcript_counts","tsv"]))
             expected_files.append(transcript_counts)
@@ -71,20 +77,20 @@ def get_expected_files(genome_list,condition_dict,output_dir,contrast_list,job_d
         for library in condition_dict:
             for rep in condition_dict[library]["replicates"]:
                 rep_name = rep["name"]
-                #strandedness file 
-                rep_strand_file = os.path.join(rep["target_dir"],rep_name+".infer")
-                expected_files.append(rep_strand_file)
                 #check for bam file if bam file was not given as input
                 #bam file would have been generated in pipeline, so if there was not read file then assume bam file 
                 if "read" in rep or "read1" in rep:
+                    #strandedness file 
+                    rep_strand_file = os.path.join(rep["target_dir"],rep_name+".infer")
                     rep_bam_file = os.path.join(rep["target_dir"],rep["name"]+".bam")
                     rep_bam_idx = os.path.join(rep["target_dir"],rep["name"]+".bam.bai")
+                    expected_files.append(rep_strand_file)
                     expected_files.append(rep_bam_file)
                     expected_files.append(rep_bam_idx)
                 if job_data.get("feature_count","htseq") == "htseq": 
                     quant_output_file = os.path.join(rep["target_dir"],rep["name"]+".counts")
                 else:
-                    quant_output_file = os.path.join(rep["target_dir"],rep["name"]+".gtf")
+                    quant_output_file = os.path.join(rep["target_dir"],"transcripts.gtf")
                 rep_samtools_stats = os.path.join(rep["target_dir"],rep["name"]+".samtools_stats")
                 expected_files.append(quant_output_file)
                 expected_files.append(rep_samtools_stats)
@@ -92,7 +98,55 @@ def get_expected_files(genome_list,condition_dict,output_dir,contrast_list,job_d
 
 def run_top_genes_test(test_file,genome_list,condition_dict,output_dir,contrast_list,job_data):
     genes_list = []
+    quant_method = "htseq" if job_data.get("feature_count","htseq") == "htseq" else "stringtie" 
     with open(test_file,"r") as tf:
         for line in tf:
-            genes_list.append(tf.strip())
-    
+            genes_list.append(line.strip())
+    for genome in genome_list:
+        genome_id = job_data.get("reference_genome_id",None)
+        tpm_counts = os.path.join(genome["output"],".".join([genome_id,quant_method,"tpms","tsv"]))
+        tpm_df = pandas.read_csv(tpm_counts,sep="\t",header=0)
+        tpm_headers = list(tpm_df.columns.values) 
+        tpm_headers = tpm_headers[1:len(tpm_headers)] #get rid of gene names column for looping over samples
+        #Loop through the tpm_headers (samples)
+        #get the number of genes at the top of the TPM list that are in the gene list
+        #store that statistic and report for each sample
+        tpm_stat_dict = {}
+        for h in tpm_headers:
+            curr_df = tpm_df.sort(h,ascending=False)
+            top_n_genes = curr_df['Gene'].iloc[0:len(genes_list)].tolist() 
+            tpm_stat_dict[h] = len(list(set(top_n_genes)&set(genes_list)))
+        tpm_stats_out = [] 
+        tpm_stats_out.append("Intersection of "+str(len(genes_list))+" Top Sample Genes with Unit Testing Genes:")
+        for h in tpm_headers:
+            tpm_stats_out.append(h+"\t"+str(tpm_stat_dict[h])) 
+        print("\n".join(tpm_stats_out))
+        #check differential expression results
+        #see if genes in the list are up/down regulated in the top N genes
+        if "gmx" not in genome:
+            return #differential expression results do not exist, unless there was an error making the gmx file
+        gmx_file = genome["gmx"] 
+        gmx_df = pandas.read_csv(gmx_file,sep="\t",header=0)
+        gmx_headers = list(gmx_df.columns.values)
+        gmx_headers = gmx_headers[1:len(gmx_headers)] 
+        #Loop through the gmx_headers (comparisons)
+        #get the number of geens at the top of diff_exp list that are in the gene list
+        #store that statistic and report for each comparison, upregulated and downregulated
+        gmx_stat_dict = {}
+        for h in gmx_headers:
+            up_df = gmx_df.sort(h,ascending=False)
+            down_df = gmx_df.sort(h,ascending=True)
+            up_n_genes = up_df['Gene_ID'].iloc[0:len(genes_list)].tolist()
+            down_n_genes = down_df['Gene_ID'].iloc[0:len(genes_list)].tolist()
+            gmx_stat_dict[h] = {}
+            gmx_stat_dict[h]["up"] = len(list(set(up_n_genes)&set(top_n_genes)))
+            gmx_stat_dict[h]["down"] = len(list(set(down_n_genes)&set(top_n_genes)))
+        gmx_down_stats = []
+        gmx_down_stats.append("Intersection of "+str(len(genes_list))+" Top Downregulated Genes with Unit Testing Genes:")
+        gmx_up_stats = []
+        gmx_up_stats.append("Intersection of "+str(len(genes_list))+" Top Upregulated Genes with Unit Testing Genes:")
+        for h in gmx_headers:
+            gmx_down_stats.append(h+"\t"+str(gmx_stat_dict[h]["down"]))
+            gmx_up_stats.append(h+"\t"+str(gmx_stat_dict[h]["up"]))
+        print("\n".join(gmx_up_stats))
+        print("\n".join(gmx_down_stats))
