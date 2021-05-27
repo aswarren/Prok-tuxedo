@@ -81,7 +81,7 @@ def run_deseq2(genome_list,contrasts,job_data,dge_dict,output_dir):
     #invoking run_deseq2.R: run_deseq2.R <counts_file.txt> <metadata_file.txt> <output_prefix> <feature_count> <contrast_1> <contrast_2> ... <contrast_n>
     for genome in genome_list:
         os.chdir(genome["output"])
-        genome_prefix = os.path.basename(genome["output"])
+        genome_prefix = genome["genome_id"]
         diffexp_list = [] #list of files to run differential expression on 
         diffexp_list.append((genome["gene_matrix"],"Genes",job_data.get("feature_count","htseq")))
         #transcript_matrix doesn't exist for bacterial pipeline
@@ -199,7 +199,7 @@ def top_diffexp_genes(genome_list,dge_dict):
             sys.stderr.write("No significant genes found in differential expression file: no heatmap output\n")
             continue 
         #write genes to file
-        heatmap_genes_file = os.path.join(genome["output"],os.path.basename(genome["output"]+"_heatmap_genes.txt"))    
+        heatmap_genes_file = os.path.join(genome["output"],genome["genome_id"]+"_heatmap_genes.txt")    
         genome["heatmap_genes"] = heatmap_genes_file 
         with open(heatmap_genes_file,"w") as o:
             for gene in heatmap_genes:
@@ -215,7 +215,7 @@ def generate_heatmaps(genome_list,job_data,dge_dict,output_dir):
             continue
         #<heatmap_script.R> <gene_counts.txt> <metaata.txt> <heatmap_genes.txt> <output_prefix> <feature_count> <specialty_genes> <subsystem_genes>
         #Test_Htseq_four_cond/83333.13/Normalized_Top_50_Differentially_Expressed_Genes_mqc.svg
-        heatmap_cmd = ["generate_heatmaps.R",genome["genes_tpm_matrix"],genome["deseq_metadata"],genome["heatmap_genes"],os.path.basename(genome["output"]),feature_count]
+        heatmap_cmd = ["generate_heatmaps.R",genome["genes_tpm_matrix"],genome["deseq_metadata"],genome["heatmap_genes"],genome["genome_id"],feature_count]
         if "specialty_genes_map" in genome:
             heatmap_cmd += [genome["specialty_genes_map"]]
         else:
@@ -380,9 +380,11 @@ def main(genome_list, condition_dict, parameters_str, output_dir, gene_matrix=Fa
     ref_dict["recipe"] = job_data.get("recipe","RNA-Rocket")
     for genome in genome_list:
         dge_dict[genome["genome"]] = {}
-        dge_dict[genome["genome"]]["genome_id"] = os.path.basename(genome["genome"]).replace(".fna","")
+        #dge_dict[genome["genome"]]["genome_id"] = os.path.basename(genome["genome"]).replace(".fna","")
+        dge_dict[genome["genome"]]["genome_id"] = genome["genome_id"]
         pathway_dict[genome["genome"]] = {}
-        pathway_dict[genome["genome"]]["genome_id"] = os.path.basename(genome["genome"]).replace(".fna","")
+        #pathway_dict[genome["genome"]]["genome_id"] = os.path.basename(genome["genome"]).replace(".fna","")
+        pathway_dict[genome["genome"]]["genome_id"] = genome["genome_id"]
     
     ###write the introduction to the multiqc report based on the recipe, number of samples, conditions, and contrasts
     for genome in genome_list:
@@ -463,7 +465,7 @@ def main(genome_list, condition_dict, parameters_str, output_dir, gene_matrix=Fa
     if basic_result == 0:
         sys.exit(0) 
     else:
-        sys.exit(-1) #TODO: exit code specific to 
+        sys.exit(2) #exit code specific to basic test 
         
 
 if __name__ == "__main__":
@@ -554,6 +556,10 @@ if __name__ == "__main__":
     genome_list=[]
     for g in genome_dirs:
         cur_genome={"genome":[],"annotation":[],"dir":g,"hisat_index":[]}
+        cur_genome["genome_id"] = job_data.get("reference_genome_id",None)
+        if not cur_genome["genome_id"]:
+            sys.stderr("Cannot find reference genome ID in job submission json: aborting\n")
+            sys.exit(-1)
         for f in os.listdir(g):
             if f.endswith(".fna") or f.endswith(".fa") or f.endswith(".fasta"):
                 cur_genome["genome"].append(os.path.abspath(os.path.join(g,f)))

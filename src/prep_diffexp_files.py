@@ -38,7 +38,7 @@ def create_counts_table_host(genome_list,condition_dict,job_data):
                             transcript_set.add(feature)
                             tc_dict[replicate_id][feature] = count
         #output counts table
-        genome_id = os.path.basename(genome_dir)
+        genome_id = genome["genome_id"]
         #Delimeter: , (csv files)
         delim = "\t"
         gene_counts_mtx = genome_id+"."+feature_count+".gene_counts.tsv"
@@ -109,7 +109,7 @@ def create_counts_table(genome_list,condition_dict,job_data):
                             feature_set.add(feature)
                             counts_dict[replicate_id][feature] = count
         #output counts table
-        genome_id = os.path.basename(genome_dir)
+        genome_id = genome["genome_id"]
         #Delimeter: , (csv files)
         delim = "\t"
         genome_counts_mtx = genome_id+"."+feature_count+".gene_counts.tsv"
@@ -188,7 +188,7 @@ def prep_stringtie_diffexp(genome_list,condition_dict,host_bool,pipeline_log):
         avg_length = str(average_read_length_total(condition_dict,genome))
         genome_file = genome["genome"]
         genome_dir = genome["output"]
-        genome_id = os.path.basename(genome_dir)
+        genome_id = genome["genome_id"]
         os.chdir(genome_dir)
         genome_counts_mtx = genome_id+".stringtie.gene_counts.csv" 
         genome["gene_matrix"] = os.path.join(genome["output"],genome_counts_mtx)
@@ -267,8 +267,10 @@ def create_tpm_matrix_htseq(genome_list,condition_dict,host_flag,num_threads):
         if not os.path.exists(tpm_dir):
             os.mkdir(tpm_dir)
         os.chdir(tpm_dir)
-        with concurrent.futures.ThreadPoolExecutor(max_workers=num_threads) as pool:
-            pool.map(run_tpm_calc,tpm_calc_list)
+        #TODO: remove
+        if False:
+            with concurrent.futures.ThreadPoolExecutor(max_workers=num_threads) as pool:
+                pool.map(run_tpm_calc,tpm_calc_list)
         ###Create the tpm matrix
         #assuming current directory is genome["output"]/TPMCalculator_Output
         tpm_dict = {}

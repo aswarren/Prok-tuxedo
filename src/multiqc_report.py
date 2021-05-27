@@ -12,7 +12,7 @@ def run_multiqc(genome_list,condition_dict,job_data,dge_flag=False):
     force_overwrite = True
     for index,genome in enumerate(genome_list):
         os.chdir(genome["output"])
-        report_name = os.path.basename(genome["output"])+"_report.html"
+        report_name = genome["genome_id"]+"_report.html"
         multiqc_cmd = ["multiqc","--flat","-o",".","-n",report_name,"-t","simple",".","-c",config_path_list[index]]
         #multiqc_cmd = ["multiqc","--flat","-o",".","-n",report_name,"-t","sections",".","-c",config_path_list[index]]
         if remove_data_dir:
@@ -35,7 +35,7 @@ def setup_multiqc_configs(genome_list,condition_dict,job_data,dge_flag=False):
     config_list = []
     for genome in genome_list:
         os.chdir(genome["output"])
-        config_path = os.path.join(genome["output"],os.path.basename(genome["output"])+"_multiqc_config.yaml")
+        config_path = os.path.join(genome["output"],genome["genome_id"]+"_multiqc_config.yaml")
         config_list.append(config_path)
         ###write config file
         curr_config_list = []

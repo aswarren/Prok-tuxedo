@@ -61,7 +61,7 @@ def run_kegg_analysis(genome_list,job_data,pathway_dict,output_dir):
             pathway_dict[genome["genome"]]["kegg_grid"] = wrap_svg_in_html(output_kegg_grid_file,output_dir)
 
 def get_subsystem_mapping(genome):
-    genome_url = "https://patricbrc.org/api/subsystem/?eq(genome_id,"+os.path.basename(genome["output"])+")&limit(10000000)&http_accept=application/solr+json"
+    genome_url = "https://patricbrc.org/api/subsystem/?eq(genome_id,"+genome["genome_id"]+")&limit(10000000)&http_accept=application/solr+json"
     req = requests.Request('GET',genome_url)
     authenticateByEnv(req)
     prepared = req.prepare()
@@ -69,14 +69,14 @@ def get_subsystem_mapping(genome):
     response = s.send(prepared)
     subsystem_dict = {}
     superclass_set = set()
-    print("Retrieving subsystem ids for genome_id %s"%(os.path.basename(genome["output"])))
+    print("Retrieving subsystem ids for genome_id %s"%(genome["genome_id"]))
     print(genome_url)
     if not response.ok:
-        sys.stderr.write("Failed to retrieve subsystem ids for genomd_id %s"%os.path.basename(genome["output"]))
+        sys.stderr.write("Failed to retrieve subsystem ids for genomd_id %s"%genome["genome_id"])
         return None
     ###Check if there are any entries for this genome id
     if len(response.json()['response']['docs']) == 0:
-        sys.stderr.write("No subsystem gene ids found for genome_id %s\n"%os.path.basename(genome["output"]))
+        sys.stderr.write("No subsystem gene ids found for genome_id %s\n"%genome["genome_id"])
         return None
     for entry in response.json()['response']['docs']: 
         subsystem_dict[entry['patric_id']] = {}
@@ -91,7 +91,7 @@ def write_subsystem_mapping_files(genome_list):
         subsystem_dict = genome["subsystem_dict"] 
         #put path into genome dictionary before writing the output file
         os.chdir(genome["output"])     
-        superclass_map = os.path.basename(genome["output"])+".superclass_mapping"
+        superclass_map = genome["genome_id"]+".superclass_mapping"
         superclass_path = os.path.join(genome["output"],superclass_map)
         genome["superclass_map"] = superclass_path
         #write superclass file
@@ -108,7 +108,7 @@ def write_kegg_mapping_files(genome_list):
         kegg_dict = genome["kegg_dict"]
         #put path into genome dictionary before writing the output file
         os.chdir(genome["output"])
-        kegg_map = os.path.basename(genome["output"])+".kegg_mapping"
+        kegg_map = genome["genome_id"]+".kegg_mapping"
         kegg_path = os.path.join(genome["output"],kegg_map)
         genome["kegg_map"] = kegg_path
         with open(kegg_map,"w") as km: 
@@ -128,7 +128,7 @@ def write_specialty_genes_mapping_files(genome_list):
             continue 
         sp_dict = genome["specialty_genes_dict"]
         os.chdir(genome["output"])
-        sp_map = os.path.basename(genome["output"])+".specialty_genes"
+        sp_map = genome["genome_id"]+".specialty_genes"
         sp_path = os.path.join(genome["output"],sp_map)
         genome["specialty_genes_map"] = sp_path
         with open(sp_map,"w") as o:
@@ -140,8 +140,8 @@ def write_specialty_genes_mapping_files(genome_list):
 def get_specialty_genes_mapping(genome):
     prefix_url = "https://patricbrc.org/api/sp_gene/?in(genome_id,("
     suffix_url = "))&limit(8000)&select(property,patric_id)&http_accept=application/solr+json"
-    sp_gene_url = prefix_url + os.path.basename(genome["output"]) + suffix_url
-    print("Retrieving specialty gene ids for genome_id %s\n"%(os.path.basename(genome["output"])))
+    sp_gene_url = prefix_url + genome["genome_id"] + suffix_url
+    print("Retrieving specialty gene ids for genome_id %s\n"%(genome["genome_id"]))
     print(sp_gene_url)
     req = requests.Request('GET',sp_gene_url)
     authenticateByEnv(req)
@@ -150,7 +150,7 @@ def get_specialty_genes_mapping(genome):
     response = s.send(prepared)
     sp_dict = {}
     if not response.ok:
-        sys.stderr.write("Failed to retrieve specialty_gene ids for genome_id %s"%os.path.basename(genome["output"]))
+        sys.stderr.write("Failed to retrieve specialty_gene ids for genome_id %s"%genome["genome_id"])
         return None
     for entry in response.json()['response']['docs']:
         sp_dict[entry['patric_id']] = {}
@@ -160,8 +160,8 @@ def get_specialty_genes_mapping(genome):
 def get_kegg_genes_mapping(genome):
     prefix_url = "https://patricbrc.org/api/pathway/?eq(genome_id,"
     suffix_url = ")&limit(10000000)&http_accept=application/solr+json"
-    pathway_url = prefix_url + os.path.basename(genome["output"]) + suffix_url
-    print("Retrieving pathway mapping for genome_id %s\n"%(os.path.basename(genome["output"])))
+    pathway_url = prefix_url + genome["genome_id"] + suffix_url
+    print("Retrieving pathway mapping for genome_id %s\n"%(genome["genome_id"]))
     print(pathway_url) 
     req = requests.Request('GET',pathway_url)
     authenticateByEnv(req)
@@ -170,11 +170,11 @@ def get_kegg_genes_mapping(genome):
     response = s.send(prepared)
     kegg_dict = {}
     if not response.ok:
-        sys.stderr.write("Failed to retrieve kegg gene ids for genome_id %s\n"%os.path.basename(genome["output"]))
+        sys.stderr.write("Failed to retrieve kegg gene ids for genome_id %s\n"%genome["genome_id"])
         return None 
     ###Check if there are any entries for this genome id
     if len(response.json()['response']['docs']) == 0:
-        sys.stderr.write("No kegg gene ids found for genome_id %s\n"%os.path.basename(genome["output"]))
+        sys.stderr.write("No kegg gene ids found for genome_id %s\n"%genome["genome_id"])
         return None
     ###Two options for Kegg categories: pathway_name and pathway_class
     #quick distribution check for 208964.12 shows >100 pathway_name categories and around 15 for pathway_class
