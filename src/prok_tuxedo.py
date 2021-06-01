@@ -456,7 +456,8 @@ def main(genome_list, condition_dict, parameters_str, output_dir, gene_matrix=Fa
     with open("Pipeline.txt","w") as o:
         o.write("\n".join(pipeline_log))
     ###cleanup files not to be submitted to the user workspace
-    cleanup_files(genome_list,output_dir)
+    if False:
+        cleanup_files(genome_list,output_dir)
     ###Run 'basic' test to check if all expected files exist
     #run top_n_genes test if parameter and file is included
     basic_result = unit_tests.run_unit_test("basic",genome_list,condition_dict,output_dir,contrasts,job_data)

@@ -54,7 +54,10 @@ def get_expected_files(genome_list,condition_dict,output_dir,contrast_list,job_d
             gene_counts = os.path.join(genome["output"],".".join([genome_id,quant_method,"gene_counts","csv"]))
         tpm_counts = os.path.join(genome["output"],".".join([genome_id,quant_method,"tpms","tsv"]))
         if job_data.get("recipe","RNA-Rocket") == "Host":
-            transcript_counts = os.path.join(genome["output"],".".join([genome_id,quant_method,"transcript_counts","tsv"]))
+            if job_data.get("feature_count","htseq") == "htseq":
+                transcript_counts = os.path.join(genome["output"],".".join([genome_id,quant_method,"transcript_counts","tsv"]))
+            else:
+                transcript_counts = os.path.join(genome["output"],".".join([genome_id,quant_method,"transcript_counts","csv"]))
             expected_files.append(transcript_counts)
         expected_files.append(gene_counts)
         expected_files.append(tpm_counts)
