@@ -267,10 +267,8 @@ def create_tpm_matrix_htseq(genome_list,condition_dict,host_flag,num_threads):
         if not os.path.exists(tpm_dir):
             os.mkdir(tpm_dir)
         os.chdir(tpm_dir)
-        #TODO: remove
-        if False:
-            with concurrent.futures.ThreadPoolExecutor(max_workers=num_threads) as pool:
-                pool.map(run_tpm_calc,tpm_calc_list)
+        with concurrent.futures.ThreadPoolExecutor(max_workers=num_threads) as pool:
+            pool.map(run_tpm_calc,tpm_calc_list)
         ###Create the tpm matrix
         #assuming current directory is genome["output"]/TPMCalculator_Output
         tpm_dict = {}
