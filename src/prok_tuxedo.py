@@ -460,8 +460,8 @@ def main(genome_list, condition_dict, parameters_str, output_dir, gene_matrix=Fa
     ###Run 'basic' test to check if all expected files exist
     #run top_n_genes test if parameter and file is included
     basic_result = unit_tests.run_unit_test("basic",genome_list,condition_dict,output_dir,contrasts,job_data)
-    if map_args.unit_test:
-        unit_tests.run_unit_test(map_args.unit_test,genome_list,condition_dict,output_dir,contrasts,job_data)
+    if map_args.unit_json: #unit test json is loaded in the pre-main block
+        unit_tests.run_unit_test(map_args.unit_json,genome_list,condition_dict,output_dir,contrasts,job_data)
     if basic_result == 0:
         sys.exit(0) 
     else:
@@ -586,6 +586,11 @@ if __name__ == "__main__":
                 cur_genome["hisat_index"]=cur_genome["hisat_index"][0]
         genome_list.append(cur_genome)
 
+    #check if unit test json
+    if map_args.unit_test:
+        with open(map_args.unit_test,"r") as unit_handle:
+            map_args.unit_json = json.loads(unit_handle.read())  
+    
     #job template for differential expression object
     diffexp_json = json.loads("""                    {
                         "app": {

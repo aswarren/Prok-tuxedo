@@ -175,6 +175,14 @@
             "default":"htseq",
             "desc":"temporary until recipe names are finalized: switch between htseq, stringtie, and cufflinks",
             "type":"string"
+        },
+        {
+            "id":"unit_test",
+            "label":"json file used for the gene set unit test",
+            "required":0,
+            "default": null,
+            "desc": "Path to the json file used for unit testing",
+            "type":"string"
         }
     ]
 }

@@ -69,6 +69,7 @@ sub check_memory_requirements
       my $b = $ws->stat($item->{bam});
       $total_mem = $total_mem + $b->size;
    }
+   #check memory requirement and return 
    if ($total_mem >= $mem_threshold) {
       return "128GB";     
    } else {
@@ -115,6 +116,7 @@ sub process_rnaseq {
     ###localize_params for regular script
     #localize_params_local for testing: will not download files
     #$params = localize_params($tmpdir, $params);
+    #TODO: revert
     $params = localize_params_local($tmpdir, $params);
     
     my @outputs;
@@ -244,6 +246,8 @@ sub run_rna_rocket {
     my $diffexp_folder = "$outdir/.$output_name$dsuffix";
     my $diffexp_file = "$outdir/$output_name$dsuffix";
     my $ref_dir  = prepare_ref_data_rocket($ref_id, $tmpdir, $host, $host_ftp);
+    #TODO :Add unit testing parameter
+    my $unit_test = defined($params->{unit_test}) ? $params->{unit_test} : undef;
     
     print "Run rna_rocket ", Dumper($exps, $labels, $tmpdir);
     
@@ -261,6 +265,10 @@ sub run_rna_rocket {
     push @cmd, ("-d", $diffexp_name);
     push @cmd, ("--jfile", $jdesc);
     push @cmd, ("--sstring", $sstring);
+    #TODO :Add unit testing
+    if ($unit_test) {
+        push @cmd, ("--unit_test",$params->{unit_test});
+    }
     
     #push @cmd, ("-L", join(",", map { s/^\W+//; s/\W+$//; s/\W+/_/g; $_ } @$labels)) if $labels && @$labels;
     #push @cmd, map { my @s = @$_; join(",", map { join("%", @$_) } @s) } @$exps;

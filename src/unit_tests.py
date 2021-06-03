@@ -107,9 +107,9 @@ def get_expected_files(genome_list,condition_dict,output_dir,contrast_list,job_d
                 expected_files.append(rep_samtools_stats)
     return expected_files
 
-def run_gene_set_test(json_file,genome_list,condition_dict,output_dir,contrast_list,job_data):
-    with open(json_file,"r") as tj_handle:
-        test_json = json.loads(tj_handle.read()) 
+def run_gene_set_test(test_json,genome_list,condition_dict,output_dir,contrast_list,job_data):
+    #with open(json_file,"r") as tj_handle:
+    #    test_json = json.loads(tj_handle.read()) 
     gene_list = test_json.get("genes_list",[])
     if len(gene_list) == 0:
         sys.stderr.write("No genes in test genes list, check json file\n")
