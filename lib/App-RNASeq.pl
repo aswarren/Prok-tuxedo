@@ -106,18 +106,16 @@ sub process_rnaseq {
     my $recipe = $params->{recipe};
     
     # my $tmpdir = File::Temp->newdir();
-    #TODO: remove cleanup => 0
-    #my $tmpdir = File::Temp->newdir( CLEANUP => 1 );
-    my $tmpdir = File::Temp->newdir( CLEANUP => 0 );
+    my $tmpdir = File::Temp->newdir( CLEANUP => 1 );
+    #my $tmpdir = File::Temp->newdir( CLEANUP => 0 );
     # my $tmpdir = "/tmp/RNApubref";
     # my $tmpdir = "/tmp/RNAuser";
     system("chmod", "755", "$tmpdir");
     print STDERR "$tmpdir\n";
     ###localize_params for regular script
     #localize_params_local for testing: will not download files
-    #$params = localize_params($tmpdir, $params);
-    #TODO: revert
-    $params = localize_params_local($tmpdir, $params);
+    $params = localize_params($tmpdir, $params);
+    #$params = localize_params_local($tmpdir, $params);
     
     my @outputs;
     my $prefix = $recipe;
@@ -246,7 +244,6 @@ sub run_rna_rocket {
     my $diffexp_folder = "$outdir/.$output_name$dsuffix";
     my $diffexp_file = "$outdir/$output_name$dsuffix";
     my $ref_dir  = prepare_ref_data_rocket($ref_id, $tmpdir, $host, $host_ftp);
-    #TODO :Add unit testing parameter
     my $unit_test = defined($params->{unit_test}) ? $params->{unit_test} : undef;
     
     print "Run rna_rocket ", Dumper($exps, $labels, $tmpdir);
@@ -265,7 +262,6 @@ sub run_rna_rocket {
     push @cmd, ("-d", $diffexp_name);
     push @cmd, ("--jfile", $jdesc);
     push @cmd, ("--sstring", $sstring);
-    #TODO :Add unit testing
     if ($unit_test) {
         push @cmd, ("--unit_test",$params->{unit_test});
     }
