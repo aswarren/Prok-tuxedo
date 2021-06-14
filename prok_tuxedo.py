@@ -78,13 +78,13 @@ def run_alignment(genome_list, condition_dict, parameters, output_dir, job_data)
                 samstat_cmd=["samstat"]
                 cur_cmd=list(cmd)
                 if "read2" in r:
-                    cur_cmd+=["-1",link_space(r["read1"])," -2",link_space(r["read2"])]
+                    cur_cmd+=["-1",link_space(r["read1"]),"-2",link_space(r["read2"])]
                     name1=os.path.splitext(os.path.basename(r["read1"]))[0].replace(" ","")
                     name2=os.path.splitext(os.path.basename(r["read2"]))[0].replace(" ","")
                     sam_file=os.path.join(target_dir,name1+"_"+name2+".sam")
                     fastqc_cmd+=[r["read1"],r["read2"]]
                 else:
-                    cur_cmd+=[" -U",link_space(r["read1"])]
+                    cur_cmd+=["-U",link_space(r["read1"])]
                     name1=os.path.splitext(os.path.basename(r["read1"]))[0].replace(" ","")
                     sam_file=os.path.join(target_dir,name1+".sam")
                     fastqc_cmd+=[r["read1"]]
@@ -151,7 +151,7 @@ def run_cufflinks(genome_list, condition_dict, parameters, output_dir):
         else:
             use_annotation="-g"
         
-        cmd=["cufflinks","-q","-G",genome["annotation"],"-b",genome_link,"-I","50"]
+        cmd=["cufflinks","--quiet","-G",genome["annotation"],"-b",genome_link,"-I","50"]
         thread_count= parameters.get("cufflinks",{}).get("-p",0)
         if thread_count == 0:
             thread_count=2 #multiprocessing.cpu_count()
@@ -254,7 +254,7 @@ def run_diffexp(genome_list, condition_dict, parameters, output_dir, gene_matrix
         thread_count= parameters.get("cuffdiff",{}).get("-p",0)
         if thread_count == 0:
             thread_count=2
-        diff_cmd=["cuffdiff",merge_file,"-p",str(thread_count),"-b",genome_link,"-L",",".join(condition_dict.keys())]
+        diff_cmd=["cuffdiff","--quiet", merge_file,"-p",str(thread_count),"-b",genome_link,"-L",",".join(condition_dict.keys())]
         os.chdir(cur_dir)
         cds_tracking=os.path.join(cur_dir,"cds.fpkm_tracking")
         contrasts_file = os.path.join(cur_dir, "contrasts.txt")
@@ -269,7 +269,7 @@ def run_diffexp(genome_list, condition_dict, parameters, output_dir, gene_matrix
             quant_list=[]
             for r in condition_dict[library]["replicates"]:
                 #quant_cmd=["cuffquant",genome["annotation"],r[genome_file]["bam"]]
-                quant_cmd=["cuffquant",merge_file,r[genome_file]["bam"]]
+                quant_cmd=["cuffquant","--quiet", merge_file,r[genome_file]["bam"]]
                 cur_dir=r[genome_file]["dir"]#directory for this replicate/genome
                 os.chdir(cur_dir)
                 quant_file=os.path.join(cur_dir,"abundances.cxb")
