@@ -68,7 +68,7 @@ def get_expected_files(genome_list,condition_dict,output_dir,contrast_list,job_d
         mqc_report = os.path.join(genome["output"],genome_id + "_report.html")
         expected_files.append(mqc_report)
         #if differential expression, check for contrast files at genome folder level
-        if len(contrast_list) > 0:
+        if len(contrast_list) > 0 and not job_data.get("novel_features",False):
             #gene matrix output
             gmx_file = os.path.join(genome["output"],"gene_exp.gmx")
             expected_files.append(gmx_file)

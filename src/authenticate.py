@@ -35,7 +35,7 @@ def authenticateByFile(tokenFile=None, Session=None):
 
 
 def authenticateByEnv(Session):
-    if os.environ.has_key("KB_AUTH_TOKEN"):
+    if "KB_AUTH_TOKEN" in os.environ:
         LOG.write("reading auth key from environment\n")
         authenticateByString(os.environ.get('KB_AUTH_TOKEN'), Session)
         return True

@@ -18,6 +18,7 @@ def run_stringtie(genome_list, condition_dict, parameters, job_data, output_dir,
     thread_count= parameters.get("stringtie",{}).get("-p",0)
     #defaults to not searching for novel features, adds -e flag
     find_novel_features = job_data.get("novel_features",False) 
+    skip_merged_annotation = False 
     if thread_count == 0:
         thread_count=2 #multiprocessing.cpu_count()
     for genome in genome_list:
@@ -46,8 +47,6 @@ def run_stringtie(genome_list, condition_dict, parameters, job_data, output_dir,
                     sys.stderr.write(cuff_gtf+" stringtie file already exists. skipping\n")
         #True: Skip merged annotation pipeline
         #False: Run merged annotation pipeline
-        #TODO: set as based on a run condition
-        skip_merged_annotation = True
         if skip_merged_annotation:
             continue 
         #merge reconstructed transcriptomes
@@ -75,7 +74,7 @@ def run_stringtie(genome_list, condition_dict, parameters, job_data, output_dir,
                     subprocess.check_call(stringtie_cmd)
                 else:
                     sys.stderr.write(merge_gtf+" stringtie file already exists. skipping\n")
-    create_stringtie_gene_transcript_dict(genome_list,condition_dict,False)
+    create_stringtie_gene_transcript_dict(genome_list,condition_dict,False if skip_merged_annotation else True)
 
 #Sometimes strintie puts in STRG genes 
 #Put a dictionary for each replicate into the condition_dict

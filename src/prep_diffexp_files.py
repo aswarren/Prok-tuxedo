@@ -170,7 +170,7 @@ def write_gtf_list(genome_list,condition_dict):
                 replicate_id = os.path.basename(replicate[genome_file]["bam"]).replace(".bam","")
                 #TODO: set as based on a run condition
                 #Set to false if the stringtie --merge command was run
-                skip_merged_annotation = True
+                skip_merged_annotation = False 
                 if skip_merged_annotation:
                     rep_gtf_file = replicate[genome_file]["gtf"]
                 else:
@@ -193,11 +193,16 @@ def prep_stringtie_diffexp(genome_list,condition_dict,host_bool,pipeline_log):
         genome_counts_mtx = genome_id+".stringtie.gene_counts.csv" 
         genome["gene_matrix"] = os.path.join(genome["output"],genome_counts_mtx)
         prep_cmd = ["prepDE.py","-i",genome["prepDE_input"],"-l",avg_length,"-g",genome_counts_mtx]
+        '''
         if host_bool:
             transcript_counts_mtx = genome_id+".stringtie.transcript_counts.csv"
             genome["transcript_matrix"] = os.path.join(genome["output"],transcript_counts_mtx)
             prep_cmd+=["-t",transcript_counts_mtx]
-        if not os.path.exists(genome_counts_mtx):
+        '''
+        transcript_counts_mtx = genome_id+".stringtie.transcript_counts.csv"
+        genome["transcript_matrix"] = os.path.join(genome["output"],transcript_counts_mtx)
+        prep_cmd+=["-t",transcript_counts_mtx]
+        if not os.path.exists(genome_counts_mtx) or not os.path.exists(transcript_counts_mtx):
             print(" ".join(prep_cmd))
             pipeline_log.append(" ".join(prep_cmd))
             subprocess.check_call(prep_cmd)
@@ -313,10 +318,11 @@ def run_tpm_calc(job):
 def create_tpm_matrix_stringtie(genome_list,condition_dict,host_flag):
     for genome in genome_list:
         tpm_dict = {}
-        counts_matrix = genome["gene_matrix"]
-        #counts_matrix = genome["transcript_matrix"]
-        tpm_file = counts_matrix.replace("gene_counts","tpms").replace("csv","tsv")
-        feature_field = "gene_id"
+        #counts_matrix = genome["gene_matrix"]
+        counts_matrix = genome["transcript_matrix"]
+        tpm_file = counts_matrix.replace("gene_counts","tpms").replace("transcript_counts","tpms").replace("csv","tsv")
+        #feature_field = "gene_id"
+        feature_field = "transcript_id"
         rep_order = []
         feature_set = set()
         for condition in condition_dict: 
@@ -324,7 +330,10 @@ def create_tpm_matrix_stringtie(genome_list,condition_dict,host_flag):
                 rep_id = os.path.basename(rep[genome["genome"]]["bam"]).replace(".bam","")
                 rep_order.append(rep_id)
                 tpm_dict[rep_id] = {}
-                rep_gtf = rep[genome["genome"]]["gtf"] 
+                if "merged_gtf" in rep[genome["genome"]]:
+                    rep_gtf = rep[genome["genome"]]["merged_gtf"]
+                else:
+                    rep_gtf = rep[genome["genome"]]["gtf"] 
                 with open(rep_gtf,"r") as gtf_handle:
                     for line in gtf_handle:
                         if line[0] == "#":

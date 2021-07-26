@@ -1,4 +1,4 @@
-#!/usr/bin/env python
+#!/usr/bin/env python3
 
 #import standard libraries
 import os, sys, subprocess, glob, argparse
@@ -326,6 +326,8 @@ def setup(genome_list, condition_dict, parameters, output_dir, job_data):
                 ###assign name key in replicate dictionary
                 if "bam" in r:
                     r_name = os.path.basename(r["bam"]).replace(".bam","")
+                elif "srr_accession" in r:
+                    r_name = r["srr_accession"]
                 else:
                     r_name = os.path.basename(r["read1"]).split(".")[0]
                     if "read2" in r:
@@ -402,7 +404,6 @@ def main(genome_list, condition_dict, parameters_str, output_dir, gene_matrix=Fa
     else:
         quantification.run_featurecount(genome_list, condition_dict, parameters, output_dir, job_data, pipeline_log)
     prep_diffexp_files.create_metadata_file(genome_list,condition_dict,output_dir)
-    #TODO: change novel_features condition when novel-isoform differential expression is implemented
     if not run_cuffdiff_pipeline and job_data.get("feature_count","htseq") == "stringtie":
         prep_diffexp_files.write_gtf_list(genome_list,condition_dict) #function that writes the input for prepDE.py, which is a list of samples and paths to their gtf files. Do this for each genome
         prep_diffexp_files.prep_stringtie_diffexp(genome_list,condition_dict,job_data.get("recipe","RNA-Rocket") == "Host",pipeline_log)   
@@ -456,11 +457,11 @@ def main(genome_list, condition_dict, parameters_str, output_dir, gene_matrix=Fa
     with open("Pipeline.txt","w") as o:
         o.write("\n".join(pipeline_log))
     ###cleanup files not to be submitted to the user workspace
-    cleanup_files(genome_list,output_dir)
+    #cleanup_files(genome_list,output_dir)
     ###Run 'basic' test to check if all expected files exist
     #run top_n_genes test if parameter and file is included
     basic_result = unit_tests.run_unit_test("basic",genome_list,condition_dict,output_dir,contrasts,job_data)
-    if map_args.unit_json: #unit test json is loaded in the pre-main block
+    if "unit_json" in map_args: #unit test json is loaded in the pre-main block
         unit_tests.run_unit_test(map_args.unit_json,genome_list,condition_dict,output_dir,contrasts,job_data)
     if basic_result == 0:
         sys.exit(0) 

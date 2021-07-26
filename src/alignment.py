@@ -319,9 +319,9 @@ def modify_samstat_for_multiqc(samstat_filename,count):
         if "</footer>" in line:
             end_remove = index
     ###Need to rename canvas element variables since they have the same name across samstat reports and cause problems
-    ###in the multiqc report. Number of canvas divs is a function of the sequence length: set to a high threshold (20)
+    ###in the multiqc report. Number of canvas divs is a function of the sequence length: set to a high threshold (90)
     #canvas_vars = ["canvas1","canvas2","canvas3","canvas4"] 
-    canvas_vars = ["canvas"+str(i) for i in range(1,20)] 
+    canvas_vars = ["canvas"+str(i) for i in range(1,90)] 
     canvas_replace = [x[:len(x)-1]+str(count)+x[len(x)-1] for x in canvas_vars]
     output_lines = samstat_lines[:start_remove] + samstat_lines[end_remove:]
     output_lines = "".join(output_lines) 
