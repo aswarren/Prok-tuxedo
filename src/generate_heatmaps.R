@@ -1,5 +1,4 @@
 #!/opt/patric-common/runtime/bin/Rscript
-###!/homes/clarkc/RNASeq_Pipeline/Dev_Bin/Rscript
 
 args = commandArgs(trailingOnly=TRUE)
 

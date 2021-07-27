@@ -1,5 +1,4 @@
 #!/opt/patric-common/runtime/bin/Rscript
-###!/homes/clarkc/RNASeq_Pipeline/Dev_Bin/Rscript
 
 #parameter format: 
 #RunDESeq2.R <counts_file.txt> <metadata_file.txt> <output_prefix> <htseq|stringtiet> <contrast 1> <contrast 2> ... <contrast n>

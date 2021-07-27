@@ -1,5 +1,4 @@
 #!/opt/patric-common/runtime/bin/Rscript
-###!/homes/clarkc/RNASeq_Pipeline/Dev_Bin/Rscript
 
 #load libraries quietly
 library(ggplot2,quietly=TRUE)

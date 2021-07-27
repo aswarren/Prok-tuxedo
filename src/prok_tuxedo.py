@@ -352,6 +352,7 @@ def setup(genome_list, condition_dict, parameters, output_dir, job_data):
                         for i,f in enumerate(files):
                             if f.endswith("_2.fastq"):
                                 r["read2"]=os.path.join(target_dir, f)
+                                r["name"] = r["srr_accession"]+"_1_"+r["srr_accession"]+"_2"
                             elif f.endswith("_1.fastq"):
                                 r["read1"]=os.path.join(target_dir, f)
                             elif f.endswith(".fastq"):

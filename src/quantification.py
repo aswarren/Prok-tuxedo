@@ -1,4 +1,4 @@
-#!/usr/bin/env python
+#!/usr/bin/env python3
 
 import os,sys,glob,math,shutil,subprocess
 
@@ -141,7 +141,7 @@ def split_bam_file(replicate_bam,threads,pipeline_log):
     for sam in glob.glob("*"): #iterate through all split files and format
         new_sam = sam+".sam"
         with open(new_sam,"w") as ns:
-            ns.write(header)
+            ns.write(header.decode("utf-8"))
             sam_file = open(sam,"r")
             sam_lines = sam_file.readlines()
             ns.write("".join(sam_lines))
@@ -165,7 +165,7 @@ def run_htseq_parallel(genome_annotation,replicate_bam,counts_file,strand,featur
     sys.stdout.flush()
     print("finished communicate(), writing to Output.txt")
     with open("Output.txt","w") as o:
-        o.write(htseq_output)
+        o.write(htseq_output.decode("utf-8"))
     #    subprocess.check_call(htseq_cmd,stdout=o)
     #Combine output into counts file and delete Split_Bams directory
     #TODO: maybe rewrite using a bash command?
