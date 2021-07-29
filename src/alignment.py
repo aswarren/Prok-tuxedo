@@ -144,7 +144,7 @@ def run_alignment(genome_list, condition_dict, parameters, output_dir, job_data,
                 if not os.path.exists(r[genome["genome"]]["fastqc"]):
                     print (" ".join(fastqc_cmd))
                     pipeline_log.append(" ".join(fastqc_cmd))
-                    #subprocess.check_call(fastqc_cmd)
+                    subprocess.check_call(fastqc_cmd)
                 if os.path.exists(bam_file):
                     sys.stderr.write(bam_file+" alignments file already exists. skipping\n")
                 else:
