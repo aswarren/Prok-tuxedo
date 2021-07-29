@@ -60,7 +60,7 @@ png_width = nrow(metadata)*100 + 200
 svg_width = nrow(metadata) + ncol(metadata) 
 
 ###Process specialty genes if they were found
-if (!is.null(specialty.genes)) 
+if ((!is.null(specialty.genes))&(sum(specialty.genes$Patric_ID %in% genes.list$Genes) > 0)) 
 {
     sp.labels = LETTERS 
     specialty.genes = subset(specialty.genes,subset=Patric_ID %in% genes.list$Genes)
@@ -76,7 +76,7 @@ if (!is.null(specialty.genes))
 ###Process subsystem genes if they were found
 #Filter entries with no label and get any included in the heatmap 
 #TODO:total 9 different fields for the moment
-if (!is.null(subsystem.map)) 
+if ((!is.null(subsystem.map))&(sum(subsystem.map$Patric_ID %in% genes.list$Genes) > 0)) 
 {
     sub.colors = c("#E41A1C","#377EB8","#4DAF4A","#984EA3","#FF7F00","#FFFF33","#A65628","#F781BF","#999999")
     subsystem.map = subsystem.map[!grepl("NONE",subsystem.map[,2]),]
@@ -111,7 +111,7 @@ expression.mtx = as.matrix(expression.df[-1])
 
 ###setup the subsystem colors list
 colors.list = rep("black",length.out=length(rownames(expression.mtx)))
-if (!is.null(subsystem.map))
+if ((!is.null(subsystem.map))&(sum(subsystem.map$Patric_ID %in% genes.list$Genes) > 0))
 {
     names(colors.list) = rownames(expression.df)
     colors.list[subsystem.map$Patric_ID] = subsystem.map$Sub_Color
@@ -119,7 +119,7 @@ if (!is.null(subsystem.map))
     sub_legend = Legend(labels = uniq_subsystems, title = "Subsystem Genes", legend_gp = gpar(fill=sub.colors))
 }
 ###setup the specialty genes label additions
-if (!is.null(specialty.genes)) 
+if ((!is.null(specialty.genes))&(sum(specialty.genes$Patric_ID %in% genes.list$Genes) > 0)) 
 {
     for (usp in uniq_sp) {
         usp.genes = specialty.genes[which(specialty.genes$SP_Field == usp),]$Patric_ID
@@ -140,12 +140,12 @@ if (!is.null(specialty.genes))
 ###create legend list from available heatmap legends
 legend.list = list()
 num_legends = 0
-if (!is.null(subsystem.map))
+if ((!is.null(subsystem.map))&(sum(subsystem.map$Patric_ID %in% genes.list$Genes) > 0))
 {
     num_legends = num_legends + 1
     legend.list[[num_legends]] <- sub_legend
 }
-if (!is.null(specialty.genes)) 
+if ((!is.null(specialty.genes))&(sum(specialty.genes$Patric_ID %in% genes.list$Genes) > 0)) 
 {
     num_legends = num_legends + 1
     legend.list[[num_legends]] <- sp_legend

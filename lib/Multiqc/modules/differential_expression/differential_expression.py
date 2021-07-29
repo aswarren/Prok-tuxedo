@@ -18,12 +18,24 @@ class MultiqcModule(BaseMultiqcModule):
         
         if path_json:
             img_list = []
-            heatmap_file = path_json["heatmap"]
-            volcano_file = path_json["volcano"]
-            img_list.append("<div>")
-            with open(volcano_file,"r") as r:
-                img_list.append(r.read())
-            img_list.append("</div>")
+            if "heatmap" in path_json:
+                heatmap_file = path_json["heatmap"]
+            else:
+                heatmap_file = None
+            if "volcano" in path_json:
+                volcano_file = path_json["volcano"]
+            else:
+                volcano_file = None
+
+            #if their exist, return
+            if not volcano_file and not heatmap_file:
+                return
+
+            if volcano_file:
+                img_list.append("<div>")
+                with open(volcano_file,"r") as r:
+                    img_list.append(r.read())
+                img_list.append("</div>")
             ###Add header for the heatmap 
             header_lines = [
                 "This heatmap represents 50 genes that were identified as having the greatest absolute log2FC values.",
@@ -34,10 +46,11 @@ class MultiqcModule(BaseMultiqcModule):
             img_list.append(" ".join(header_lines))
             img_list.append("</div>")
             ###
-            img_list.append("<div>")
-            with open(heatmap_file,"r" )as h:
-                img_list.append(h.read())
-            img_list.append("</div>")
+            if heatmap_file:
+                img_list.append("<div>")
+                with open(heatmap_file,"r" )as h:
+                    img_list.append(h.read())
+                img_list.append("</div>")
             img_html = "\n".join(img_list)
             self.add_section(content=img_html)
 
