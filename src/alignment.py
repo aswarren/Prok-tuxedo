@@ -212,7 +212,7 @@ def assign_strandedness_parameter(genome,condition_dict,parameters):
             #if the number of reads is less than 1000, skip file:
             #skipping gziped files
             num_sample = "1000"
-            if ".gz" not in r["read1"]:
+            if not r["read1"].endswith(".gz"):
                 r_count = 0
                 with open(r["read1"],"r") as r1:
                     for line in r1:
