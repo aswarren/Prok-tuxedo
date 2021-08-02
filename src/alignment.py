@@ -3,7 +3,7 @@
 import os,sys,subprocess
 import shutil
 import tarfile
-import json
+import json,gzip
 
 #hisat2 has problems with spaces in filenames
 #prevent spaces in filenames. if one exists link the file to a no-space version.
@@ -210,13 +210,17 @@ def assign_strandedness_parameter(genome,condition_dict,parameters):
             if "bam" in r:
                 continue
             #if the number of reads is less than 1000, skip file:
+            #skipping gziped files
             num_sample = "1000"
-            r_count = 0
-            with open(r["read1"],"r") as r1:
-                for line in r1:
-                    r_count = r_count + 1  
-                    if r_count == int(num_sample):
-                        break
+            if ".gz" not in r["read1"]:
+                r_count = 0
+                with open(r["read1"],"r") as r1:
+                    for line in r1:
+                        r_count = r_count + 1  
+                        if r_count == int(num_sample):
+                            break
+            else:
+                r_count = 9999
             if r_count < int(num_sample):
                 continue
             #sample fastq files using seqtk

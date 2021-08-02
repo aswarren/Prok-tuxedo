@@ -9,6 +9,7 @@ import math
 
 #import scripts
 import cuffdiff_to_genematrix
+sys.path.insert(1,"/homes/clarkc/RNASeq_Pipeline/Dev_Bin_Updated")
 import alignment
 import quantification
 import cufflinks_pipeline
@@ -99,7 +100,8 @@ def run_deseq2(genome_list,contrasts,job_data,dge_dict,output_dir):
             continue
         genome["diff_exp_contrasts"] = []
         for diffexp_params in diffexp_list:
-            diffexp_cmd = ["run_deseq2.R",diffexp_params[0],metadata_file,diffexp_params[1],diffexp_params[2]]+contrast_cmd
+            #diffexp_cmd = ["run_deseq2.R",diffexp_params[0],metadata_file,diffexp_params[1],diffexp_params[2]]+contrast_cmd
+            diffexp_cmd = ["run_deseq2",diffexp_params[0],metadata_file,diffexp_params[1],diffexp_params[2]]+contrast_cmd
             print("%s\n"%" ".join(diffexp_cmd))
             subprocess.check_call(diffexp_cmd)
             dge_dict[genome["genome"]]["volcano"] = wrap_svg_in_html("Volcano_Plots.svg",output_dir)
@@ -215,7 +217,8 @@ def generate_heatmaps(genome_list,job_data,dge_dict,output_dir):
             continue
         #<heatmap_script.R> <gene_counts.txt> <metaata.txt> <heatmap_genes.txt> <output_prefix> <feature_count> <specialty_genes> <subsystem_genes>
         #Test_Htseq_four_cond/83333.13/Normalized_Top_50_Differentially_Expressed_Genes_mqc.svg
-        heatmap_cmd = ["generate_heatmaps.R",genome["genes_tpm_matrix"],genome["deseq_metadata"],genome["heatmap_genes"],genome["genome_id"],feature_count]
+        #heatmap_cmd = ["generate_heatmaps.R",genome["genes_tpm_matrix"],genome["deseq_metadata"],genome["heatmap_genes"],genome["genome_id"],feature_count]
+        heatmap_cmd = ["generate_heatmaps",genome["genes_tpm_matrix"],genome["deseq_metadata"],genome["heatmap_genes"],genome["genome_id"],feature_count]
         if "specialty_genes_map" in genome:
             heatmap_cmd += [genome["specialty_genes_map"]]
         else:
