@@ -402,7 +402,10 @@ def main(genome_list, condition_dict, parameters_str, output_dir, gene_matrix=Fa
     #TRUE: runs cufflinks then cuffdiff if differential expression is turned on
     #FALSE: runs either htseq-count or stringtie
     run_cuffdiff_pipeline = job_data.get("feature_count","htseq") == "cuffdiff"
-    alignment.run_alignment(genome_list, condition_dict, parameters, output_dir, job_data, pipeline_log)
+    alignment_value = alignment.run_alignment(genome_list, condition_dict, parameters, output_dir, job_data, pipeline_log)
+    if alignment_value != 0:
+        sys.stderr.write("Error in alignment step: look at stderr\n")
+        sys.exit(-1)
     if run_cuffdiff_pipeline:
         cufflinks_pipeline.run_cufflinks(genome_list, condition_dict, parameters, output_dir)
     else:
