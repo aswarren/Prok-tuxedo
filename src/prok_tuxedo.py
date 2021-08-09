@@ -9,7 +9,6 @@ import math
 
 #import scripts
 import cuffdiff_to_genematrix
-sys.path.insert(1,"/homes/clarkc/RNASeq_Pipeline/Dev_Bin_Updated")
 import alignment
 import quantification
 import cufflinks_pipeline
@@ -392,11 +391,6 @@ def main(genome_list, condition_dict, parameters_str, output_dir, gene_matrix=Fa
         #pathway_dict[genome["genome"]]["genome_id"] = os.path.basename(genome["genome"]).replace(".fna","")
         pathway_dict[genome["genome"]]["genome_id"] = genome["genome_id"]
     
-    ###write the introduction to the multiqc report based on the recipe, number of samples, conditions, and contrasts
-    for genome in genome_list:
-        os.chdir(genome["output"])
-        num_samples = len(job_data.get("single_end_libs",[])) + len(job_data.get("paired_end_libs",[])) + len(job_data.get("srr_libs",[]))
-        mmo.write_introduction_pipeline(job_data.get("recipe","RNA-Rocket"),job_data.get("feature_count","htseq"),str(num_samples),str(len(job_data.get("experimental_conditions","0"))),str(len(job_data.get("contrasts","0"))))
     #pipeline_log holds the commands at each step of the pipeline and prints it to an output file Pipeline.txt
     pipeline_log = []
     #TRUE: runs cufflinks then cuffdiff if differential expression is turned on
@@ -404,7 +398,8 @@ def main(genome_list, condition_dict, parameters_str, output_dir, gene_matrix=Fa
     run_cuffdiff_pipeline = job_data.get("feature_count","htseq") == "cuffdiff"
     alignment_value = alignment.run_alignment(genome_list, condition_dict, parameters, output_dir, job_data, pipeline_log)
     if alignment_value != 0:
-        sys.stderr.write("Error in alignment step: look at stderr\n")
+        sys.stdout.write("Error in alignment step: look at stderr\n")
+        cleanup_files(genome_list,output_dir)
         sys.exit(-1)
     if run_cuffdiff_pipeline:
         cufflinks_pipeline.run_cufflinks(genome_list, condition_dict, parameters, output_dir)
@@ -448,6 +443,11 @@ def main(genome_list, condition_dict, parameters_str, output_dir, gene_matrix=Fa
         #generate heatmaps 
         top_diffexp_genes(genome_list,dge_dict) 
         generate_heatmaps(genome_list,job_data,dge_dict,output_dir)
+    ###write the introduction to the multiqc report based on the recipe, number of samples, conditions, and contrasts
+    for genome in genome_list:
+        os.chdir(genome["output"])
+        num_samples = len(job_data.get("single_end_libs",[])) + len(job_data.get("paired_end_libs",[])) + len(job_data.get("srr_libs",[]))
+        mmo.write_introduction_pipeline(job_data.get("recipe","RNA-Rocket"),job_data.get("feature_count","htseq"),str(num_samples),str(len(job_data.get("experimental_conditions","0"))),str(len(job_data.get("contrasts","0"))))
     #write out any of the json files to the top level of the genomes
     for genome in genome_list:
         os.chdir(genome["output"])

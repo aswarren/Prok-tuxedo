@@ -68,13 +68,25 @@ def run_alignment(genome_list, condition_dict, parameters, output_dir, job_data,
         # strandedness determination requires a bam file, so inserting here since the above creates the hisat/bowtie indices
         # get strandedness parameter: stores the value in the replicates dictionary. Key does not exist if single end
         # return if there is an issue in strandedness
-        # TODO: Add output files based on error(?) 
-        # TODO: examine sampling alignment quality and output user report on it if necessary
+        for condition in condition_dict:
+            for r in condition_dict[condition]["replicates"]:
+                if genome["genome"] not in r:
+                    r[genome["genome"]] = {}
+        ret_val = run_fastqc(genome,condition_dict,parameters,pipeline_log)
+        if ret_val != 0:
+            print("Error in fastqc")
+            return -1
         ret_val = run_sample_alignment(genome,condition_dict,parameters)
         if ret_val != 0:
+            print("Error in running sample alignment")
+            return -1
+        ret_val = check_sample_alignment(genome,condition_dict,parameters)
+        if ret_val != 0:
+            print("Error from checking sample results")
             return -1
         ret_val = assign_strandedness_parameter(genome,condition_dict,parameters)
         if ret_val != 0:
+            print("Error in assigning strandedness")
             return -1
         ###
         if thread_count == 0:
@@ -87,8 +99,6 @@ def run_alignment(genome_list, condition_dict, parameters, output_dir, job_data,
                 if "bam" not in r:
                     continue
                 scount+=1
-                if genome["genome"] not in r:
-                    r[genome["genome"]] = {}
                 bam_file = link_file(r["target_dir"],r["bam"])
                 r[genome["genome"]]["bam"] = bam_file
                 samstat_cmd = ["samstat",bam_file]
@@ -133,7 +143,6 @@ def run_alignment(genome_list, condition_dict, parameters, output_dir, job_data,
                 cur_cleanup=[]
                 rcount+=1
                 target_dir=r["target_dir"]
-                fastqc_cmd=["fastqc","--outdir",target_dir]
                 samstat_cmd=["samstat"]
                 cur_cmd=list(cmd)
                 if "read2" in r:
@@ -141,18 +150,15 @@ def run_alignment(genome_list, condition_dict, parameters, output_dir, job_data,
                     name1=os.path.splitext(os.path.basename(r["read1"]))[0].replace(" ","")
                     name2=os.path.splitext(os.path.basename(r["read2"]))[0].replace(" ","")
                     sam_file=os.path.join(target_dir,name1+"_"+name2+".sam")
-                    fastqc_cmd+=[r["read1"],r["read2"]]
                 else:
                     cur_cmd+=[" -U",link_space(r["read1"])]
                     name1=os.path.splitext(os.path.basename(r["read1"]))[0].replace(" ","")
                     sam_file=os.path.join(target_dir,name1+".sam")
-                    fastqc_cmd+=[r["read1"]]
                 cur_cleanup.append(sam_file)
                 bam_file=sam_file[:-4]+".bam"
                 samstat_cmd.append(bam_file)
                 r[genome["genome"]]={}
                 r[genome["genome"]]["bam"]=bam_file
-                r[genome["genome"]]["fastqc"] = bam_file.replace(".bam","_fastqc.html") 
                 cur_cmd+=["-S",sam_file]
                 #add strandedness parameter
                 if "strand_param" in r:
@@ -161,10 +167,6 @@ def run_alignment(genome_list, condition_dict, parameters, output_dir, job_data,
                         cur_cmd.insert(2,r["strand_param"])
                     else:
                         cur_cmd.insert(1,"--"+r["strand_param"].lower()) #strand_param is uppercase by default, but bowtie requires lowercase
-                if not os.path.exists(r[genome["genome"]]["fastqc"]):
-                    print (" ".join(fastqc_cmd))
-                    pipeline_log.append(" ".join(fastqc_cmd))
-                    subprocess.check_call(fastqc_cmd)
                 if os.path.exists(bam_file):
                     sys.stderr.write(bam_file+" alignments file already exists. skipping\n")
                 else:
@@ -184,7 +186,7 @@ def run_alignment(genome_list, condition_dict, parameters, output_dir, job_data,
                     subprocess.check_call("samtools index "+bam_file, shell=True)
                     #subprocess.check_call('samtools view -S -b %s > %s' % (sam_file, bam_file+".tmp"), shell=True)
                     #subprocess.check_call('samtools sort %s %s' % (bam_file+".tmp", bam_file), shell=True)
-                #print " ".join(samstat_cmd)
+                print (" ".join(samstat_cmd))
                 stats_cmd = ["samtools","stats","--threads",str(samtools_threads),bam_file]
                 stats_outfile = bam_file.replace("bam","samtools_stats")
                 if not os.path.exists(stats_outfile):
@@ -216,6 +218,29 @@ def run_alignment(genome_list, condition_dict, parameters, output_dir, job_data,
         ###cleanup files
         for garbage in final_cleanup:
             subprocess.call(["rm", garbage])
+    return 0
+
+def run_fastqc(genome,condition_dict,parameters,pipeline_log):
+    for condition in condition_dict:
+        for r in condition_dict[condition]["replicates"]:
+            target_dir=r["target_dir"]
+            fastqc_cmd=["fastqc","--outdir",target_dir]
+            if "read2" in r:
+                fastqc_cmd+=[r["read1"],r["read2"]]
+                r[genome["genome"]]["fastqc"] = r["name"]+"_1_fastqc.html" 
+            else:
+                fastqc_cmd+=[r["read1"]]
+                r[genome["genome"]]["fastqc"] = r["name"]+"_fastqc.html" 
+            if not os.path.exists(r[genome["genome"]]["fastqc"]):
+                print (" ".join(fastqc_cmd))
+                pipeline_log.append(" ".join(fastqc_cmd))
+                try:
+                    subprocess.check_call(fastqc_cmd)
+                    #print("fastqc for sample {}".format(r["name"]))
+                except Exception as e:
+                    sys.stderr.write("ERROR in fastqc for sample {0}:\n{1}\n".format(r["name"]," ".join(fastqc_cmd)))
+                    return -1
+    return 0
 
 #Only applies to paired-end data
 def assign_strandedness_parameter(genome,condition_dict,parameters):
@@ -236,17 +261,18 @@ def assign_strandedness_parameter(genome,condition_dict,parameters):
             #skip if bam file is present
             if "bam" in r:
                 continue
-            #add sample sam file to cleanup
-            remove_list.append(r["sample_sam_file"])
+            #add sample sam file and alignment statistics to cleanup
+            remove_list.append(r[genome["genome"]]["sample_sam_file"])
+            remove_list.append(r[genome["genome"]]["sample_alignment_output"])
             ###generate RSEQc strandedness file using infer_experiment.py
-            infer_cmd = ["infer_experiment.py","-i",r["sample_sam_file"],"-r",genome["bed"],"-s",num_sample]
+            infer_cmd = ["infer_experiment.py","-i",r[genome["genome"]]["sample_sam_file"],"-r",genome["bed"],"-s",num_sample]
             infer_file = os.path.join(r["target_dir"],r["name"]+".infer") 
             print(" ".join(infer_cmd))
             with open(infer_file,"w") as o:
                 try:
                     subprocess.check_call(infer_cmd,stdout=o)
                 except Exception as e:
-                    sys.stderr.write("ERROR in infer_experiment for sampled file {0}:\n{1}\n".format(r["sample_sam_file"],e))
+                    sys.stderr.write("ERROR in infer_experiment for sampled file {0}:\n{1}\n".format(r[genome["genome"]]["sample_sam_file"],e))
                     return(-3)
             ###assess infer_file and set strandedness parameter for replicate
             with open(infer_file,"r") as i:
@@ -275,6 +301,7 @@ def assign_strandedness_parameter(genome,condition_dict,parameters):
                     geom_handle.write("%s\t%s\t%s\n"%(r["name"],condition,r["strand_param"]))
                 else:
                     geom_handle.write("%s\t%s\t%s\n"%(r["name"],condition,"NA"))
+    return 0
                     
 def run_sample_alignment(genome,condition_dict,parameters):
     remove_list = []
@@ -290,8 +317,8 @@ def run_sample_alignment(genome,condition_dict,parameters):
             #-s parameter sets the seed and ensures the same reads are sampled from each file, assuming the files are properly paired
             ###TODO: replace shell=True for redirecting the output to a file
             ###TODO: for the moment, termination run if any of the alignment steps outright fails
-            sample1_file = os.path.join(r["target_dir"],".".join(r["name"] + ".s1.fastq")
-            sample1_cmd = " ".join(["seqtk","sample","-s","42",r["read1"],num_sample,">",sample1_file])
+            sample1_file = os.path.join(r["target_dir"],r["name"] + ".s1.fastq")
+            sample1_cmd = " ".join(["seqtk","sample","-s","42",r["read1"],str(num_sample),">",sample1_file])
             remove_list.append(sample1_file)
             print(sample1_cmd)
             if not os.path.exists(sample1_file):
@@ -301,8 +328,8 @@ def run_sample_alignment(genome,condition_dict,parameters):
                     sys.stderr.write("ERROR in seqtk sampling of {0}:\n{1}\n".format(r["read1"],e))
                     return(-3)
             if "read2" in r:
-                sample2_file = os.path.join(r["target_dir"],".".join(r["name"] + ".s2.fastq")
-                sample2_cmd = " ".join(["seqtk","sample","-s","42",r["read2"],num_sample,">",sample2_file])
+                sample2_file = os.path.join(r["target_dir"],r["name"] + ".s2.fastq")
+                sample2_cmd = " ".join(["seqtk","sample","-s","42",r["read2"],str(num_sample),">",sample2_file])
                 remove_list.append(sample2_file)
                 print(sample2_cmd)
                 if not os.path.exists(sample2_file):
@@ -314,10 +341,11 @@ def run_sample_alignment(genome,condition_dict,parameters):
             ###run bowtie2 or hisat2 on sampled files
             sample_align_cmd = []
             sam_file = os.path.join(r["target_dir"],r["name"] + ".sample.sam")
-            r["sample_sam_file"] = sam_file
+            r[genome["genome"]]["sample_sam_file"] = sam_file
             ###TODO: replace hisat_index condition implementation with something more robust
             if len(genome["hisat_index"]) > 0:
                 sample_align_cmd = ["hisat2","-x",genome["index_prefix"],"-1",sample1_file]
+                r[genome["genome"]]["sample_alignment_output"] = sam_file.replace("sample.sam","hisat")
                 if "read2" in r:
                     sample_align_cmd+=["-2",sample2_file]
                 sample_align_cmd+=["--mp","1,0","--pen-noncansplice","20","-S",sam_file,"-p",str(parameters.get("hisat2",{}).get("-p","1"))] 
@@ -326,18 +354,66 @@ def run_sample_alignment(genome,condition_dict,parameters):
                 if "read2" in r:
                     sample_align_cmd+=["-2",sample2_file]
                 sample_align_cmd+=["-S",sam_file,"-p",str(parameters.get("bowtie2",{}).get("-p","1"))]
-            if not os.path.exists(sam_file):
+                r[genome["genome"]]["sample_alignment_output"] = sam_file.replace("sample.sam","bowtie")
+            if True or not os.path.exists(sam_file):
                 print(" ".join(sample_align_cmd))
                 try:
-                    subprocess.check_call(sample_align_cmd)
+                    with open(r[genome["genome"]]["sample_alignment_output"],"w") as sample_out: 
+                        subprocess.check_call(sample_align_cmd,stderr=sample_out)
+                    with open(r[genome["genome"]]["sample_alignment_output"],"r") as sample_out:
+                        sys.stdout.write("{}\n".format("".join(sample_out.readlines())))
                 except Exception as e:
-                    sys.stderr.write("ERROR in sampling alignment:\n{0}".format(" ".join(sample_align_cmd))
+                    sys.stderr.write("ERROR in sampling alignment:\n{0}".format(" ".join(sample_align_cmd)))
                     return(-3)
     ###remove all files in the remove_list
     for trash in remove_list:
         rm_cmd = ["rm",trash]
         subprocess.check_call(rm_cmd)
     return(0)
+
+def check_sample_alignment(genome,condition_dict,parameters):
+    error_threshold = 5.0 
+    error_list = []
+    error_alignment = []
+    warning_threshold = 50.0
+    warning_list = []
+    warning_alignment = []
+    for condition in condition_dict:
+        for r in condition_dict[condition]["replicates"]:
+            if not os.path.exists(r[genome["genome"]]["sample_alignment_output"]):
+                print("%s does not exist"%r[genome["genome"]]["sample_alignment_output"])
+            else:
+                print("%s exists"%r[genome["genome"]]["sample_alignment_output"])
+            with open(r[genome["genome"]]["sample_alignment_output"],"r") as sample_out:
+                alignment_output = sample_out.readlines()
+            ###Alignment output is as a percentage
+            #TODO: make sure hisat outputs in the same format as bowtie
+            alignment_value = float(alignment_output[-1].split()[0].replace("%","")) 
+            if alignment_value <= error_threshold:
+                error_list.append(r["name"])
+                error_alignment.append("".join(alignment_output))
+            elif alignment_value <= warning_threshold:
+                warning_list.append(r["name"])
+                warning_alignment.append("".join(alignment_output))
+    os.chdir(genome["output"])
+    if len(error_list) > 0:
+        with open("SAMPLE_ALIGNMENT_ERRORS.txt","w") as o:
+            o.write("The following samples contained poor alignment to reference genome_id {0}.\n".format(genome["genome"]))
+            o.write("SOLUTION: Check the fastqc output for errors or consider choosing a different reference genome:\n") 
+            for idx,sample in enumerate(error_list): 
+                o.write("{}\n".format("".join(["-"]*10)))
+                o.write("Sample {0}:\n{1}\n".format(sample,error_alignment[idx])) 
+    if len(warning_list) > 0:
+        with open("SAMPLE_ALIGNMENT_WARNINGS.txt","w") as o:
+            o.write("The following samples contained moderate alignment to reference genome_id {0}.\n".format(genome["genome"]))
+            o.write("SOLUTION: No action is necessary, but it is recommended to review sample quality or choose a different reference genome to improve results:\n")
+            for idx,sample in enumerate(warning_list):
+                o.write("{}\n".format("".join(["-"]*10)))
+                o.write("Sample {0}:\n{1}\n".format(sample,warning_alignment[idx]))
+    if len(error_list) > 0:
+        return (-3)
+    else:
+        return (0)
 
 def generate_bed_from_gff(genome):
     bed_file = genome["annotation_link"].replace(".gff",".bed")

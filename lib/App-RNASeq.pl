@@ -132,7 +132,7 @@ sub process_rnaseq {
     } else {
         die "Unrecognized recipe: $recipe \n";
     }
-    
+    print STDERR 'FINISHED RUNNING RNASEQ!!!!!'; 
     print STDERR '\@outputs = '. Dumper(\@outputs);
     
     #
@@ -276,10 +276,10 @@ sub run_rna_rocket {
     # output collection infrastructure.
     #
     my $ok = run(\@cmd);
-    if (!$ok)
-    {
-	die "Error $? running @cmd\n";
-    }
+    #if (!$ok)
+    #{
+	#die "Error $? running @cmd\n";
+    #}
     
     #    my ($rc, $out, $err) = run_cmd(\@cmd);
     #    print STDERR "STDOUT:\n$out\n";
