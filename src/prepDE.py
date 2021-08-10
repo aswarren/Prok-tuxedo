@@ -29,25 +29,25 @@ if (os.path.isfile(opts.input)):
             if line[0] != '#':
                 lineLst = tuple(line.strip().split())
                 if (len(lineLst) != 2):
-                    print "Error: Text file with sample ID and path invalid (%s)" % (line.strip())
+                    print ("Error: Text file with sample ID and path invalid (%s)" % (line.strip()))
                     exit(1)
                 if lineLst[0] in samples:
-                    print "Error: Sample ID duplicated (%s)" % (lineLst[0])
+                    print ("Error: Sample ID duplicated (%s)" % (lineLst[0]))
                     exit(1)
                 if not os.path.isfile(lineLst[1]):
-                    print "Error: GTF file not found (%s)" % (lineLst[1])
+                    print ("Error: GTF file not found (%s)" % (lineLst[1]))
                     exit(1)
                 samples.append(lineLst)
     except IOError:
-        print "Error: List of .gtf files, %s, doesn't exist" % (opts.input)
+        print ("Error: List of .gtf files, %s, doesn't exist" % (opts.input))
         exit(1)
 else:
     # gtfList = False
     ## Check that opts.input directory exists
     if not os.path.isdir(opts.input):
       parser.print_help()
-      print " "
-      print "Error: sub-directory '%s' not found!" % (opts.input)
+      print (" ")
+      print ("Error: sub-directory '%s' not found!" % (opts.input))
       sys.exit(1)
 
     #####
@@ -57,8 +57,8 @@ else:
 
 if len(samples) == 0:
   parser.print_help()
-  print " "
-  print "Error: no GTF files found under ./%s !" % (opts.input)
+  print (" ")
+  print ("Error: no GTF files found under ./%s !" % (opts.input))
   sys.exit(1)
 
 RE_GENE_ID=re.compile('gene_id "([^"]+)"')
@@ -140,8 +140,8 @@ for s in samples:
                 try:
                   g_id=getGeneID(v[len(v)-1], v[0], t_id)
                 except:
-                  print "Problem at line:\n:%s\n" % (v)
-                  print "i='%s', len(v)=%s" % (i, len(v));
+                  print ("Problem at line:\n:%s\n" % (v))
+                  print ("i='%s', len(v)=%s" % (i, len(v)));
                   sys.exit(1)
                 geneIDs.setdefault(t_id, g_id)
                 if not RE_STRING.match(g_id):
@@ -179,7 +179,7 @@ if opts.cluster and len(badGenes)>0:
             clusters.append([t[2] for t in temp_cluster])
         i+=1
 
-    print len(clusters)
+    print (len(clusters))
 
     for c in clusters:
         c.sort()
@@ -200,7 +200,7 @@ if opts.cluster and len(badGenes)>0:
 geneDict={} #key=gene/cluster, value=dictionary with key=sample, value=summed counts
 t_dict={}
 for q, s in enumerate(samples):
-    print q, s[0]
+    print (q, s[0])
 
     try:
         #with open(glob.iglob(os.path.join(opts.input,s,"*.gtf")).next()) as f: #grabs first .gtf file it finds inside the sample subdirectory

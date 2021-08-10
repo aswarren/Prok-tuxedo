@@ -149,7 +149,7 @@ def write_gmx_file(genome_list):
 #   - go through and keep two sorted lists: upregulated and downregulated
 #   - pass top 50(?) into heatmap program 
 #Returns: number of genes in the heatmap, skip heatmap if 0
-def top_diffexp_genes(genome_list,dge_dict): 
+def top_diffexp_genes(genome_list,dge_dict,feature_count): 
     #report number of genes that are significant in the heatmap and in the overall report
     pval_threshold = 0.05
     num_sig_genes = 0
@@ -165,7 +165,9 @@ def top_diffexp_genes(genome_list,dge_dict):
         down_log_list = []
         #grab all signification genes
         for contrast_file in contrast_file_list:
-            if "Transcripts" in contrast_file:
+            if "Transcripts" in contrast_file and feature_count == "htseq":
+                continue
+            if "Genes" in contrast_file and feature_count == "stringtie":
                 continue
             with open(contrast_file,"r") as cf:
                 next(cf) #skip header
@@ -284,7 +286,8 @@ def cleanup_files(genome_list,output_dir):
     for hisat_file in glob.glob("*ht2"):
         cleanup_list.append(os.path.abspath(hisat_file))
     #cleanup html images
-    cleanup_list.append(os.path.abspath("html_images"))
+    if os.path.exists("html_images"):
+        cleanup_list.append(os.path.abspath("html_images"))
     #cleanup files in each genome directory
     for genome in genome_list:
         os.chdir(genome["output"])
@@ -441,7 +444,7 @@ def main(genome_list, condition_dict, parameters_str, output_dir, gene_matrix=Fa
         if not job_data.get("recipe","RNA-Rocket") == "Host":
             pathways.setup_specialty_genes(genome_list)
         #generate heatmaps 
-        top_diffexp_genes(genome_list,dge_dict) 
+        top_diffexp_genes(genome_list,dge_dict,job_data.get("feature_count","htseq")) 
         generate_heatmaps(genome_list,job_data,dge_dict,output_dir)
     ###write the introduction to the multiqc report based on the recipe, number of samples, conditions, and contrasts
     for genome in genome_list:

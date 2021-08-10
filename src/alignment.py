@@ -265,7 +265,7 @@ def assign_strandedness_parameter(genome,condition_dict,parameters):
             remove_list.append(r[genome["genome"]]["sample_sam_file"])
             remove_list.append(r[genome["genome"]]["sample_alignment_output"])
             ###generate RSEQc strandedness file using infer_experiment.py
-            infer_cmd = ["infer_experiment.py","-i",r[genome["genome"]]["sample_sam_file"],"-r",genome["bed"],"-s",num_sample]
+            infer_cmd = ["infer_experiment.py","-i",r[genome["genome"]]["sample_sam_file"],"-r",genome["bed"],"-s",str(num_sample)]
             infer_file = os.path.join(r["target_dir"],r["name"]+".infer") 
             print(" ".join(infer_cmd))
             with open(infer_file,"w") as o:
@@ -345,17 +345,19 @@ def run_sample_alignment(genome,condition_dict,parameters):
             ###TODO: replace hisat_index condition implementation with something more robust
             if len(genome["hisat_index"]) > 0:
                 sample_align_cmd = ["hisat2","-x",genome["index_prefix"],"-1",sample1_file]
-                r[genome["genome"]]["sample_alignment_output"] = sam_file.replace("sample.sam","hisat")
+                r[genome["genome"]]["sample_alignment_output"] = sam_file.replace("sample.sam","sample.hisat")
                 if "read2" in r:
                     sample_align_cmd+=["-2",sample2_file]
                 sample_align_cmd+=["--mp","1,0","--pen-noncansplice","20","-S",sam_file,"-p",str(parameters.get("hisat2",{}).get("-p","1"))] 
             else: #bowtie
-                sample_align_cmd = ["bowtie2","-x",genome["genome_link"],"-1",sample1_file]
+                sample_align_cmd = ["bowtie2","-x",genome["genome_link"]]
                 if "read2" in r:
-                    sample_align_cmd+=["-2",sample2_file]
+                    sample_align_cmd+=["-1",sample1_file,"-2",sample2_file]
+                else:
+                    sample_align_cmd+=["-U",sample1_file]
                 sample_align_cmd+=["-S",sam_file,"-p",str(parameters.get("bowtie2",{}).get("-p","1"))]
-                r[genome["genome"]]["sample_alignment_output"] = sam_file.replace("sample.sam","bowtie")
-            if True or not os.path.exists(sam_file):
+                r[genome["genome"]]["sample_alignment_output"] = sam_file.replace("sample.sam","sample.bowtie")
+            if not os.path.exists(sam_file):
                 print(" ".join(sample_align_cmd))
                 try:
                     with open(r[genome["genome"]]["sample_alignment_output"],"w") as sample_out: 
@@ -382,8 +384,6 @@ def check_sample_alignment(genome,condition_dict,parameters):
         for r in condition_dict[condition]["replicates"]:
             if not os.path.exists(r[genome["genome"]]["sample_alignment_output"]):
                 print("%s does not exist"%r[genome["genome"]]["sample_alignment_output"])
-            else:
-                print("%s exists"%r[genome["genome"]]["sample_alignment_output"])
             with open(r[genome["genome"]]["sample_alignment_output"],"r") as sample_out:
                 alignment_output = sample_out.readlines()
             ###Alignment output is as a percentage
