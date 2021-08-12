@@ -1,6 +1,6 @@
 #!/usr/bin/env python
 
-import os,sys,subprocess
+import os,sys,glob,subprocess
 import shutil
 import tarfile
 import json,gzip
@@ -45,9 +45,14 @@ def run_alignment(genome_list, condition_dict, parameters, output_dir, job_data,
             print (" ".join(tar_cmd))
             subprocess.check_call(tar_cmd)
             index_prefix = os.path.join(output_dir, os.path.basename(genome["hisat_index"]).replace(".ht2.tar","")) #somewhat fragile convention. tar prefix is underlying index prefix
+            print("index_prefix = %s"%index_prefix)
             genome["index_prefix"] = index_prefix
+            #for index in glob.glob(index_prefix+"*.ht2"):
+            #    print(index)
             if not os.path.exists(index_prefix+".1.ht2"):
                 print("hisant indices were not unpacked correctly: %s"%index_prefix)
+                #for h_index in glob.glob(os.path.dirname(genome["hisat_index"])+"*ht2"):
+                #    os.symlink(h_index,os.path.join(output_dir,os.path.basename(h_index)))
                 sys.exit(1)
             cmd=["hisat2","--dta-cufflinks", "-x", index_prefix] 
             #cmd=["hisat2","--dta-cufflinks", "-x", index_prefix,"--no-spliced-alignment"] 
@@ -235,8 +240,8 @@ def run_fastqc(genome,condition_dict,parameters,pipeline_log):
                 print (" ".join(fastqc_cmd))
                 pipeline_log.append(" ".join(fastqc_cmd))
                 try:
-                    subprocess.check_call(fastqc_cmd)
-                    #print("fastqc for sample {}".format(r["name"]))
+                    #subprocess.check_call(fastqc_cmd)
+                    print("fastqc for sample {}".format(r["name"]))
                 except Exception as e:
                     sys.stderr.write("ERROR in fastqc for sample {0}:\n{1}\n".format(r["name"]," ".join(fastqc_cmd)))
                     return -1
@@ -344,10 +349,12 @@ def run_sample_alignment(genome,condition_dict,parameters):
             r[genome["genome"]]["sample_sam_file"] = sam_file
             ###TODO: replace hisat_index condition implementation with something more robust
             if len(genome["hisat_index"]) > 0:
-                sample_align_cmd = ["hisat2","-x",genome["index_prefix"],"-1",sample1_file]
                 r[genome["genome"]]["sample_alignment_output"] = sam_file.replace("sample.sam","sample.hisat")
+                sample_align_cmd = ["hisat2","-x",genome["index_prefix"]]
                 if "read2" in r:
-                    sample_align_cmd+=["-2",sample2_file]
+                    sample_align_cmd+=["-1",sample1_file,"-2",sample2_file]
+                else:
+                    sample_align_cmd+=["-U",sample1_file]
                 sample_align_cmd+=["--mp","1,0","--pen-noncansplice","20","-S",sam_file,"-p",str(parameters.get("hisat2",{}).get("-p","1"))] 
             else: #bowtie
                 sample_align_cmd = ["bowtie2","-x",genome["genome_link"]]
@@ -365,7 +372,7 @@ def run_sample_alignment(genome,condition_dict,parameters):
                     with open(r[genome["genome"]]["sample_alignment_output"],"r") as sample_out:
                         sys.stdout.write("{}\n".format("".join(sample_out.readlines())))
                 except Exception as e:
-                    sys.stderr.write("ERROR in sampling alignment:\n{0}".format(" ".join(sample_align_cmd)))
+                    sys.stderr.write("ERROR in sampling alignment {0}:\n{1}".format(" ".join(sample_align_cmd),e))
                     return(-3)
     ###remove all files in the remove_list
     for trash in remove_list:

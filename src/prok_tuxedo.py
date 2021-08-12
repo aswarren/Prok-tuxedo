@@ -403,11 +403,15 @@ def main(genome_list, condition_dict, parameters_str, output_dir, gene_matrix=Fa
     if alignment_value != 0:
         sys.stdout.write("Error in alignment step: look at stderr\n")
         cleanup_files(genome_list,output_dir)
-        sys.exit(-1)
+        sys.exit(0)
     if run_cuffdiff_pipeline:
         cufflinks_pipeline.run_cufflinks(genome_list, condition_dict, parameters, output_dir)
     else:
-        quantification.run_featurecount(genome_list, condition_dict, parameters, output_dir, job_data, pipeline_log)
+        quant_val = quantification.run_featurecount(genome_list, condition_dict, parameters, output_dir, job_data, pipeline_log)
+        if quant_val != 0:
+            sys.stdout.write("Error in quantification step for %s: look at stderr\n"%job_data.get("feature_count","host"))
+            #cleanup_files(genome_list,output_dir)
+            sys.exit(0)
     prep_diffexp_files.create_metadata_file(genome_list,condition_dict,output_dir)
     if not run_cuffdiff_pipeline and job_data.get("feature_count","htseq") == "stringtie":
         prep_diffexp_files.write_gtf_list(genome_list,condition_dict) #function that writes the input for prepDE.py, which is a list of samples and paths to their gtf files. Do this for each genome

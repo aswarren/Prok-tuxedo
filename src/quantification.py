@@ -7,12 +7,13 @@ def run_featurecount(genome_list, condition_dict, parameters, output_dir, job_da
     #check parameters for stringtie option. Assuming htseq2
     program = job_data.get("feature_count","htseq")
     if program == "htseq":
-        run_htseq_count(genome_list, condition_dict, parameters, job_data, output_dir, pipeline_log)
+        return_val = run_htseq_count(genome_list, condition_dict, parameters, job_data, output_dir, pipeline_log)
     elif program == "stringtie":
-        run_stringtie(genome_list, condition_dict, parameters, job_data, output_dir, pipeline_log)
+        return_val = run_stringtie(genome_list, condition_dict, parameters, job_data, output_dir, pipeline_log)
     else: #not a valid program
         sys.stderr.write("Invalid feature count program: htseq or stringtie only\n")
         os.exit(1)
+    return return_val
 
 def run_stringtie(genome_list, condition_dict, parameters, job_data, output_dir, pipeline_log):
     thread_count= parameters.get("stringtie",{}).get("-p",0)
@@ -42,7 +43,11 @@ def run_stringtie(genome_list, condition_dict, parameters, job_data, output_dir,
                 print (" ".join(stringtie_cmd))
                 if not os.path.exists(cuff_gtf):
                     pipeline_log.append(" ".join(stringtie_cmd))
-                    subprocess.check_call(stringtie_cmd)
+                    try:
+                        subprocess.check_call(stringtie_cmd)
+                    except Exception as e:
+                        sys.stderr.write("ERRROR running stringtie:\n{0}\n{1}\n".format(" ".join(stringtie_cmd),e))
+                        return -1
                 else:
                     sys.stderr.write(cuff_gtf+" stringtie file already exists. skipping\n")
         #True: Skip merged annotation pipeline
@@ -58,7 +63,11 @@ def run_stringtie(genome_list, condition_dict, parameters, job_data, output_dir,
             merge_cmd = ["stringtie","--merge","-G",genome["annotation"],"-o",merge_file]+gtf_list
             print(" ".join(merge_cmd))
             pipeline_log.append(" ".join(merge_cmd))
-            subprocess.check_call(merge_cmd)
+            try:
+                subprocess.check_call(merge_cmd)
+            except Exception as e:
+                sys.stderr.write("ERRROR running stringtie-merge:\n{0}\n{1}\n".format(" ".join(merge_cmd),e))
+                return -1
         genome["merged_annotation"] = merge_file 
         #requantify transcriptome results with merged annotation
         for library in condition_dict:
@@ -71,7 +80,11 @@ def run_stringtie(genome_list, condition_dict, parameters, job_data, output_dir,
                 if not os.path.exists(merge_gtf):
                     print (" ".join(stringtie_cmd))
                     pipeline_log.append(" ".join(stringtie_cmd))
-                    subprocess.check_call(stringtie_cmd)
+                    try:
+                        subprocess.check_call(stringtie_cmd)
+                    except Exception as e:
+                        sys.stderr.write("ERRROR running stringtie after merge:\n{0}\n{1}\n".format(" ".join(stringtie_cmd),e))
+                        return -1
                 else:
                     sys.stderr.write(merge_gtf+" stringtie file already exists. skipping\n")
     create_stringtie_gene_transcript_dict(genome_list,condition_dict,False if skip_merged_annotation else True)
@@ -159,14 +172,17 @@ def run_htseq_parallel(genome_annotation,replicate_bam,counts_file,strand,featur
     print(" ".join(htseq_cmd))
     pipeline_log.append(" ".join(htseq_cmd))
     #htseq_stdout = subprocess.Popen(htseq_cmd,stdout=subprocess.PIPE,shell=True)
-    htseq_stdout = subprocess.Popen(htseq_cmd,stdout=subprocess.PIPE)
-    print("running htseq-parallel: communicate()")
-    htseq_output,htseq_err = htseq_stdout.communicate()
-    sys.stdout.flush()
+    try:
+        htseq_stdout = subprocess.Popen(htseq_cmd,stdout=subprocess.PIPE)
+        print("running htseq-parallel: communicate()")
+        htseq_output,htseq_err = htseq_stdout.communicate()
+        sys.stdout.flush()
+    except Exception as e:
+        sys.stderr.write("ERROR running htseq-parallel:\n{0}\n{1}\n".format(" ".join(htseq_cmd),e))
+        return -1
     print("finished communicate(), writing to Output.txt")
     with open("Output.txt","w") as o:
         o.write(htseq_output.decode("utf-8"))
-    #    subprocess.check_call(htseq_cmd,stdout=o)
     #Combine output into counts file and delete Split_Bams directory
     #TODO: maybe rewrite using a bash command?
     with open("Output.txt","r") as split_counts:
