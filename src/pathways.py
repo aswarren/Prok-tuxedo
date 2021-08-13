@@ -37,7 +37,7 @@ def run_subsystem_analysis(genome_list,job_data,pathway_dict,output_dir):
                 subprocess.check_call(subsystem_plot_cmd)
                 pathway_dict[genome["genome"]]["subsystem_grid"] = wrap_svg_in_html(output_grid_file,output_dir)
             except Exception as e:
-                sys.stderr.write("ERROR generating subsystem plots,skipping heatmap generation:\n{0}\n{1}\n".format(" ".join(subsystem_plot_cmd,e))
+                sys.stderr.write("ERROR generating subsystem plots,skipping heatmap generation:\n{0}\n{1}\n".format(" ".join(subsystem_plot_cmd),e))
             #subsystem_violin_plot(subsystem_dict,genome["gene_matrix"],genome["deseq_metadata"],level,feature_count)
             
 def run_kegg_analysis(genome_list,job_data,pathway_dict,output_dir):
