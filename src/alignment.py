@@ -166,7 +166,7 @@ def run_alignment(genome_list, condition_dict, parameters, output_dir, job_data,
                 r[genome["genome"]]["bam"]=bam_file
                 cur_cmd+=["-S",sam_file]
                 #add strandedness parameter
-                if "strand_param" in r:
+                if "strand_param" in r and r["strand_param"] not "undetermined":
                     if cur_cmd[0] == "hisat2":
                         cur_cmd.insert(1,"--rna-strandness")
                         cur_cmd.insert(2,r["strand_param"])
