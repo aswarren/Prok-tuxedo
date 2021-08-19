@@ -22,6 +22,7 @@ def run_stringtie(genome_list, condition_dict, parameters, job_data, output_dir,
     skip_merged_annotation = False 
     if thread_count == 0:
         thread_count=2 #multiprocessing.cpu_count()
+    return_val = 0
     for genome in genome_list:
         genome_file=genome["genome"]
         genome_link = genome["genome_link"]
@@ -53,6 +54,7 @@ def run_stringtie(genome_list, condition_dict, parameters, job_data, output_dir,
         #True: Skip merged annotation pipeline
         #False: Run merged annotation pipeline
         if skip_merged_annotation:
+            return return_val
             continue 
         #merge reconstructed transcriptomes
         ##stringtie --merge -G <reference annotation> -o <merged annotation> <gtf list>
@@ -88,6 +90,7 @@ def run_stringtie(genome_list, condition_dict, parameters, job_data, output_dir,
                 else:
                     sys.stderr.write(merge_gtf+" stringtie file already exists. skipping\n")
     create_stringtie_gene_transcript_dict(genome_list,condition_dict,False if skip_merged_annotation else True)
+    return 0
 
 #Sometimes strintie puts in STRG genes 
 #Put a dictionary for each replicate into the condition_dict
@@ -176,6 +179,7 @@ def run_htseq_parallel(genome_annotation,replicate_bam,counts_file,strand,featur
         htseq_stdout = subprocess.Popen(htseq_cmd,stdout=subprocess.PIPE)
         print("running htseq-parallel: communicate()")
         htseq_output,htseq_err = htseq_stdout.communicate()
+        print(htseq_err)
         sys.stdout.flush()
     except Exception as e:
         sys.stderr.write("ERROR running htseq-parallel:\n{0}\n{1}\n".format(" ".join(htseq_cmd),e))
@@ -193,6 +197,7 @@ def run_htseq_parallel(genome_annotation,replicate_bam,counts_file,strand,featur
                 counts = [int(x) for x in line[1:]]
                 cf.write("%s\t%s\n"%(gene,sum(counts))) 
     os.remove("Output.txt")
+    return 0
 
 # -s: (yes,no,reverse) 
 # -i: feature to look for in annotation file (final column)
@@ -204,6 +209,7 @@ def run_htseq_count(genome_list, condition_dict, parameters, job_data, output_di
     #recipe to check for host and change parameters
     recipe = job_data.get("recipe","RNA-Rocket")
     threads = parameters.get("htseq",{}).get("-p","1")
+    return_val = 0
     for genome in genome_list:
         genome_file = genome["genome"]
         genome_annotation = genome["annotation"]
@@ -232,8 +238,8 @@ def run_htseq_count(genome_list, condition_dict, parameters, job_data, output_di
                             #Create two counts files and append them together
                             genes_file = os.path.basename(replicate[genome_file]["gene_counts"])
                             genes_file_1 = genes_file+".tmp" 
-                            run_htseq_parallel(genome_annotation,replicate[genome_file]["bam"],genes_file,strand,"ID","gene",threads,pipeline_log)
-                            run_htseq_parallel(genome_annotation,replicate[genome_file]["bam"],genes_file_1,strand,"ID","pseudogene",threads,pipeline_log)
+                            return_val = run_htseq_parallel(genome_annotation,replicate[genome_file]["bam"],genes_file,strand,"ID","gene",threads,pipeline_log)
+                            return_val = run_htseq_parallel(genome_annotation,replicate[genome_file]["bam"],genes_file_1,strand,"ID","pseudogene",threads,pipeline_log)
                             cf_open = open(genes_file,"a")
                             cf1_open = open(genes_file_1,"r")
                             cf1_lines = cf1_open.readlines()
@@ -249,7 +255,7 @@ def run_htseq_count(genome_list, condition_dict, parameters, job_data, output_di
                             feature_list = ["mRNA","lnc_RNA","transcript","snRNA","V_gene_segment","snoRNA","enhancer","biological_region","primary_transcript","miRNA","C_gene_segment","rRNA","tRNA"]
                             for f in feature_list:
                                 transcript_file_tmp = transcript_file+".tmp" 
-                                run_htseq_parallel(genome_annotation,replicate[genome_file]["bam"],transcript_file_tmp,strand,"ID",f,threads,pipeline_log)
+                                return_val = run_htseq_parallel(genome_annotation,replicate[genome_file]["bam"],transcript_file_tmp,strand,"ID",f,threads,pipeline_log)
                                 tf_open = open(transcript_file,"a")
                                 tf1_open = open(transcript_file_tmp,"r") 
                                 tf1_lines = tf1_open.readlines()
@@ -262,7 +268,7 @@ def run_htseq_count(genome_list, condition_dict, parameters, job_data, output_di
                             sys.stderr.write("%s exists for genome file %s: skipping htseq-count\n"%(counts_file,genome_file))
                         else:
                             split_bam_file(replicate[genome_file]["bam"],threads, pipeline_log)
-                            run_htseq_parallel(genome_annotation,replicate[genome_file]["bam"],counts_file,strand,feature,feature_type,threads,pipeline_log)
+                            return_val = run_htseq_parallel(genome_annotation,replicate[genome_file]["bam"],counts_file,strand,feature,feature_type,threads,pipeline_log)
                     if os.path.exists("Split_Bams"):
                         shutil.rmtree("Split_Bams")
                 else:
@@ -275,5 +281,6 @@ def run_htseq_count(genome_list, condition_dict, parameters, job_data, output_di
                     #prints to stdout, so redirect output to file
                     with open(counts_file,"w") as cf:
                         subprocess.check_call(htseq_cmd,stdout=cf)
+    return return_val
 
 

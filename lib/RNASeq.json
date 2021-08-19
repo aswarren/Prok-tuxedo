@@ -178,10 +178,18 @@
         },
         {
             "id":"unit_test",
-            "label":"json file used for the gene set unit test",
+            "label":"Unit Test Path",
             "required":0,
             "default": null,
             "desc": "Path to the json file used for unit testing",
+            "type":"string"
+        },
+        {
+            "id":"skip_sampling",
+            "label":"Skip Sampling",
+            "required":0,
+            "default":null,
+            "desc":"flag to skip the sampling step in alignment.py",
             "type":"string"
         }
     ]

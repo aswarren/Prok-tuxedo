@@ -81,10 +81,11 @@ def run_alignment(genome_list, condition_dict, parameters, output_dir, job_data,
         if ret_val != 0:
             print("Error in fastqc")
             return -1
-        ret_val = run_sample_alignment(genome,condition_dict,parameters)
-        if ret_val != 0:
-            print("Error in running sample alignment")
-            return -1
+        if not job_data.get("skip_sampling",False):
+            ret_val = run_sample_alignment(genome,condition_dict,parameters)
+            if ret_val != 0:
+                print("Error in running sample alignment")
+                return -1
         ret_val = check_sample_alignment(genome,condition_dict,parameters)
         if ret_val != 0:
             print("Error from checking sample results")
@@ -166,7 +167,7 @@ def run_alignment(genome_list, condition_dict, parameters, output_dir, job_data,
                 r[genome["genome"]]["bam"]=bam_file
                 cur_cmd+=["-S",sam_file]
                 #add strandedness parameter
-                if "strand_param" in r and r["strand_param"] not "undetermined":
+                if "strand_param" in r and r["strand_param"] != "undetermined":
                     if cur_cmd[0] == "hisat2":
                         cur_cmd.insert(1,"--rna-strandness")
                         cur_cmd.insert(2,r["strand_param"])
@@ -240,8 +241,8 @@ def run_fastqc(genome,condition_dict,parameters,pipeline_log):
                 print (" ".join(fastqc_cmd))
                 pipeline_log.append(" ".join(fastqc_cmd))
                 try:
-                    #subprocess.check_call(fastqc_cmd)
-                    print("fastqc for sample {}".format(r["name"]))
+                    subprocess.check_call(fastqc_cmd)
+                    #print("fastqc for sample {}".format(r["name"]))
                 except Exception as e:
                     sys.stderr.write("ERROR in fastqc for sample {0}:\n{1}\n".format(r["name"]," ".join(fastqc_cmd)))
                     return -1
