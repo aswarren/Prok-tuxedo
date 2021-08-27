@@ -34,6 +34,8 @@ def run_alignment(genome_list, condition_dict, parameters, output_dir, job_data,
         samstat_dict["reports"] = []
         final_cleanup=[]
         if "hisat_index" in genome and genome["hisat_index"]:
+            if type(genome["hisat_index"]) is list:
+                genome["hisat_index"] = genome["hisat_index"][0] 
             archive = tarfile.open(genome["hisat_index"])
             indices = [os.path.join(output_dir,os.path.basename(x)) for x in archive.getnames()]
             final_cleanup+=indices
@@ -81,19 +83,19 @@ def run_alignment(genome_list, condition_dict, parameters, output_dir, job_data,
         if ret_val != 0:
             print("Error in fastqc")
             return -1
-        if not job_data.get("skip_sampling",False):
+        if not job_data.get("skip_sampling",False): #assigning strandedness requires sampling
             ret_val = run_sample_alignment(genome,condition_dict,parameters)
             if ret_val != 0:
                 print("Error in running sample alignment")
                 return -1
-        ret_val = check_sample_alignment(genome,condition_dict,parameters)
-        if ret_val != 0:
-            print("Error from checking sample results")
-            return -1
-        ret_val = assign_strandedness_parameter(genome,condition_dict,parameters)
-        if ret_val != 0:
-            print("Error in assigning strandedness")
-            return -1
+            ret_val = check_sample_alignment(genome,condition_dict,parameters)
+            if ret_val != 0:
+                print("Error from checking sample results")
+                return -1
+            ret_val = assign_strandedness_parameter(genome,condition_dict,parameters)
+            if ret_val != 0:
+                print("Error in assigning strandedness")
+                return -1
         ###
         if thread_count == 0:
             thread_count=2 #multiprocessing.cpu_count()

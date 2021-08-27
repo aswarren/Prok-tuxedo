@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 
 import sys,os,subprocess
+import multiqc 
 
 SPACE = "    " #multiqc does not like the tab character, using a 4-space macro
 
@@ -70,6 +71,7 @@ def add_to_config_section(config_dict,section,index,entry):
 
 #returns a dictionary with strings for the sections contained in this function
 def setup_shared_config_sections(recipe,feature_count,dge_flag=False):
+    bvbrc_img = os.path.join(os.path.dirname(multiqc.__file__),"BV_BRC.png") 
     config_dict = {}
     title_list = [
                 "title: \"BVBRC Transcriptomic Service\"",
@@ -77,7 +79,7 @@ def setup_shared_config_sections(recipe,feature_count,dge_flag=False):
                 ]
     config_dict["title"] = title_list
     logo_list = [
-                "custom_logo: \'/homes/clarkc/RNASeq_Pipeline/Prok-tuxedo/lib/Multiqc/BV_BRC.png\'",
+                "custom_logo: \'"+bvbrc_img+"\'",
                 "custom_logo_title: \'BV-BRC\'"
                 ]
     config_dict["logo"] = logo_list

@@ -308,6 +308,21 @@ def cleanup_files(genome_list,output_dir):
     for rm_file in cleanup_list:
         subprocess.check_call(["rm","-r",rm_file])
         
+def check_replicates(condition_dict,job_data,contrasts):
+    exp_dict = {}
+    for condition in condition_dict:
+        exp_dict[condition] = 0
+        for rep in condition_dict[condition]["replicates"]:
+            exp_dict[condition] = exp_dict[condition] + 1
+    exp_conds = job_data.get("experimental_conditions",[])
+    if len(exp_conds) == 0:
+        return False
+    for pair in contrasts:
+        c1 = pair[0]
+        c2 = pair[1]
+        if exp_dict[c1] < 2 or exp_dict[c2] < 2:
+            return False
+    return True
 
 ###eventually if dual-RNASeq is enabled in the pipeline, need to adjust target_dir
 #since it only references one genome directory, and a few function implementations depend on target_dir
@@ -341,7 +356,7 @@ def setup(genome_list, condition_dict, parameters, output_dir, job_data):
                     sys.stderr.write("Error, duplicate sample names: %s. Check json file or rename a sample\n"%(r_name))
                     sys.exit(-1)
                 else:
-                    rep_names.append(r_name)
+                    rep_names.append(r_name.replace(".fastq","").replace(".fq",""))
                 r["name"] = r_name
                 ###
                 target_dir=r["target_dir"]
@@ -428,9 +443,10 @@ def main(genome_list, condition_dict, parameters_str, output_dir, gene_matrix=Fa
         pathways.run_subsystem_analysis(genome_list,job_data,pathway_dict,output_dir)
         pathways.run_kegg_analysis(genome_list,job_data,pathway_dict,output_dir)
     
-    dge_flag = False #used for multiqc_report
-    if len(condition_dict.keys()) > 1 and not job_data.get("novel_features",False):
-        dge_flag = True
+    dge_multiqc_flag = False #used for multiqc_report
+    check_rep_flag = check_replicates(condition_dict,job_data,contrasts) 
+    if check_rep_flag and len(condition_dict.keys()) > 1 and not job_data.get("novel_features",False):
+        dge_multiqc_flag = True
         #If running cuffdiff pipeline, terminated after running expression import
         if run_cuffdiff_pipeline:
             cufflinks_pipeline.run_cuffdiff(genome_list, condition_dict, parameters, output_dir, gene_matrix, contrasts, job_data, map_args, diffexp_json)
@@ -465,7 +481,7 @@ def main(genome_list, condition_dict, parameters_str, output_dir, gene_matrix=Fa
         with open("references.json","w") as ref_handle:
             ref_handle.write(json.dumps(ref_dict))
             
-    multiqc_report.run_multiqc(genome_list,condition_dict,job_data,dge_flag=dge_flag)
+    multiqc_report.run_multiqc(genome_list,condition_dict,job_data,dge_flag=dge_multiqc_flag)
     ###output pipeline txt file
     os.chdir(output_dir)
     with open("Pipeline.txt","w") as o:
