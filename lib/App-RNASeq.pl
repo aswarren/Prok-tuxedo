@@ -829,7 +829,7 @@ sub save_output_files
     while (my $p = readdir($dh))
     {
         next if $p =~ /^\./;
-        
+        next if $p =~ /\.fna\z/;  
         my @cmd = ("p3-cp", "-r", @suffix_map, "$output/$p", "ws:" . $app->result_folder);
         print "@cmd\n";
         my $ok = IPC::Run::run(\@cmd);

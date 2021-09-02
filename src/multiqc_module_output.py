@@ -15,12 +15,11 @@ def write_introduction_pipeline(recipe,feature_count,num_samples,num_conditions,
         output_str = output_str + ".<br/>"
     ###Paragraph section
     output_str = output_str + get_intro_paragraph() + "<br/>"
-    ###QC Report section
-    #output_str = output_str + "<b>Sample assessment portion</b><br/>"
+    ###Pipeline details 
+    output_str = output_str + "- <b>Pipeline</b>: To see the specific commands executed, check pipeline.txt<br/>"
     ###Tool order section 
     output_str = output_str + "Structure of the report:<br/>"
     output_str = output_str + "- <b>General Statistics</b>: A table providing summary information about the quantity and quality of alignments for each sample<br/>"
-    output_str = output_str + "- <b>Introduction</b>: Provides an introduction to the service and summarizes the structure of the report<br/>"
     output_str = output_str + "- <b>Fastqc</b>: A quality control too for assessing high throught sequence data<br/>"  
     output_str = output_str + "- <b>RSeQC</b>: A package providing a number of modules used to evaluated high throughput RNA-seq data<br/>"
     if feature_count == "htseq":

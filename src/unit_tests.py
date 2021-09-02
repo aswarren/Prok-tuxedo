@@ -68,6 +68,7 @@ def get_expected_files(genome_list,condition_dict,output_dir,contrast_list,job_d
         mqc_report = os.path.join(genome["output"],genome_id + "_report.html")
         expected_files.append(mqc_report)
         #if differential expression, check for contrast files at genome folder level
+        check_reps_flag = check_replicates(condition_dict,job_data,contrast_list)
         if len(contrast_list) > 0 and not job_data.get("novel_features",False):
             #gene matrix output
             gmx_file = os.path.join(genome["output"],"gene_exp.gmx")
@@ -188,3 +189,19 @@ def run_top_genes_test(test_file,genome_list,condition_dict,output_dir,contrast_
             gmx_up_stats.append(h+"\t"+str(gmx_stat_dict[h]["up"]))
         print("\n".join(gmx_up_stats))
         print("\n".join(gmx_down_stats))
+
+def check_replicates(condition_dict,job_data,contrasts):
+    exp_dict = {}
+    for condition in condition_dict:
+        exp_dict[condition] = 0
+        for rep in condition_dict[condition]["replicates"]:
+            exp_dict[condition] = exp_dict[condition] + 1
+    exp_conds = job_data.get("experimental_conditions",[])
+    if len(exp_conds) == 0:
+        return False
+    for pair in contrasts:
+        c1 = pair[0]
+        c2 = pair[1]
+        if exp_dict[c1] < 2 or exp_dict[c2] < 2:
+            return False
+    return True

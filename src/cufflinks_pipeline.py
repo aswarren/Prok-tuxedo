@@ -4,7 +4,7 @@ import os,sys,subprocess
 import cuffdiff_to_genematrix 
 
 #TODO: smallRNA estimation in a future release
-def run_cufflinks(genome_list, condition_dict, parameters, output_dir):
+def run_cufflinks(genome_list, condition_dict, parameters, output_dir, pipeline_log):
     for genome in genome_list:
         if genome.get("host",False):
             continue
@@ -67,6 +67,7 @@ def run_cufflinks(genome_list, condition_dict, parameters, output_dir):
                 cuff_gtf=os.path.join(cur_dir,"transcripts.gtf")
                 if not os.path.exists(cuff_gtf):
                     print (" ".join(cur_cmd))
+                    pipeline_log.append(" ".join(cur_cmd))
                     try:
                         sys.stderr.write("Invoke cufflinks: %s\n" % (cur_cmd))
                         subprocess.check_call(cur_cmd)
@@ -82,7 +83,7 @@ def run_cufflinks(genome_list, condition_dict, parameters, output_dir):
                     os.unlink(bam_tmp)
 
 #Differential expression pipeline using the cufflinks protocol 
-def run_cuffdiff(genome_list, condition_dict, parameters, output_dir, gene_matrix, contrasts, job_data, map_args, diffexp_json):
+def run_cuffdiff(genome_list, condition_dict, parameters, output_dir, gene_matrix, contrasts, job_data, map_args, diffexp_json, pipeline_log):
     #run cuffquant on every replicate, cuffmerge on all resulting gtf, and cuffdiff on the results. all per genome.
     for genome in genome_list:
         genome_file=genome["genome"]
@@ -109,6 +110,7 @@ def run_cuffdiff(genome_list, condition_dict, parameters, output_dir, gene_matri
 
         if not os.path.exists(merge_file):
             print (" ".join(merge_cmd))
+            pipeline_log.append(" ".join(merge_cmd))
             subprocess.check_call(merge_cmd)
         else:
             sys.stderr.write(merge_file+" cuffmerge file already exists. skipping\n")
@@ -140,6 +142,7 @@ def run_cuffdiff(genome_list, condition_dict, parameters, output_dir, gene_matri
                 quant_file=os.path.join(cur_dir,"abundances.cxb")
                 quant_list.append(quant_file)
                 if not os.path.exists(quant_file):
+                    pipeline_log.append(quant_cmd)
                     subprocess.check_call(quant_cmd)
                 else:
                     print (" ".join(quant_cmd))
@@ -151,6 +154,7 @@ def run_cuffdiff(genome_list, condition_dict, parameters, output_dir, gene_matri
         cds_tracking=os.path.join(cur_dir,"cds.fpkm_tracking")
         if not os.path.exists(cds_tracking):
             print (" ".join(diff_cmd))
+            pipeline_log.append(" ".join(diff_cmd))
             subprocess.check_call(diff_cmd)
         else:
             sys.stderr.write(cds_tracking+" cuffdiff file already exists. skipping\n")

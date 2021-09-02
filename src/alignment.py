@@ -1,6 +1,7 @@
 #!/usr/bin/env python
 
 import os,sys,glob,subprocess
+import concurrent.futures
 import shutil
 import tarfile
 import json,gzip
@@ -45,6 +46,7 @@ def run_alignment(genome_list, condition_dict, parameters, output_dir, job_data,
             if num_parts > 0:
                 tar_cmd += ["--strip-components",str(num_parts)]
             print (" ".join(tar_cmd))
+            pipeline_log.append(" ".join(tar_cmd))
             subprocess.check_call(tar_cmd)
             index_prefix = os.path.join(output_dir, os.path.basename(genome["hisat_index"]).replace(".ht2.tar","")) #somewhat fragile convention. tar prefix is underlying index prefix
             print("index_prefix = %s"%index_prefix)
@@ -84,7 +86,7 @@ def run_alignment(genome_list, condition_dict, parameters, output_dir, job_data,
             print("Error in fastqc")
             return -1
         if not job_data.get("skip_sampling",False): #assigning strandedness requires sampling
-            ret_val = run_sample_alignment(genome,condition_dict,parameters)
+            ret_val = run_sample_alignment(genome,condition_dict,parameters,pipeline_log)
             if ret_val != 0:
                 print("Error in running sample alignment")
                 return -1
@@ -92,7 +94,7 @@ def run_alignment(genome_list, condition_dict, parameters, output_dir, job_data,
             if ret_val != 0:
                 print("Error from checking sample results")
                 return -1
-            ret_val = assign_strandedness_parameter(genome,condition_dict,parameters)
+            ret_val = assign_strandedness_parameter(genome,condition_dict,parameters,pipeline_log)
             if ret_val != 0:
                 print("Error in assigning strandedness")
                 return -1
@@ -155,13 +157,14 @@ def run_alignment(genome_list, condition_dict, parameters, output_dir, job_data,
                 cur_cmd=list(cmd)
                 if "read2" in r:
                     cur_cmd+=["-1",link_space(r["read1"]),"-2",link_space(r["read2"])]
-                    name1=os.path.splitext(os.path.basename(r["read1"]))[0].replace(" ","")
-                    name2=os.path.splitext(os.path.basename(r["read2"]))[0].replace(" ","")
-                    sam_file=os.path.join(target_dir,name1+"_"+name2+".sam")
+                    #name1=os.path.splitext(os.path.basename(r["read1"]))[0].replace(" ","")
+                    #name2=os.path.splitext(os.path.basename(r["read2"]))[0].replace(" ","")
+                    #sam_file=os.path.join(target_dir,name1+"_"+name2+".sam")
                 else:
                     cur_cmd+=[" -U",link_space(r["read1"])]
-                    name1=os.path.splitext(os.path.basename(r["read1"]))[0].replace(" ","")
-                    sam_file=os.path.join(target_dir,name1+".sam")
+                    #name1=os.path.splitext(os.path.basename(r["read1"]))[0].replace(" ","")
+                    #sam_file=os.path.join(target_dir,name1+".sam")
+                sam_file=os.path.join(target_dir,r["name"]+".sam")
                 cur_cleanup.append(sam_file)
                 bam_file=sam_file[:-4]+".bam"
                 samstat_cmd.append(bam_file)
@@ -229,6 +232,7 @@ def run_alignment(genome_list, condition_dict, parameters, output_dir, job_data,
     return 0
 
 def run_fastqc(genome,condition_dict,parameters,pipeline_log):
+    fastqc_cmd_list = []
     for condition in condition_dict:
         for r in condition_dict[condition]["replicates"]:
             target_dir=r["target_dir"]
@@ -242,16 +246,26 @@ def run_fastqc(genome,condition_dict,parameters,pipeline_log):
             if not os.path.exists(r[genome["genome"]]["fastqc"]):
                 print (" ".join(fastqc_cmd))
                 pipeline_log.append(" ".join(fastqc_cmd))
-                try:
-                    subprocess.check_call(fastqc_cmd)
-                    #print("fastqc for sample {}".format(r["name"]))
-                except Exception as e:
-                    sys.stderr.write("ERROR in fastqc for sample {0}:\n{1}\n".format(r["name"]," ".join(fastqc_cmd)))
-                    return -1
+                fastqc_cmd_list.append(fastqc_cmd)
+    future_returns = []
+    with concurrent.futures.ThreadPoolExecutor(max_workers=8) as pool:
+        future_returns = list(pool.map(run_fastqc_pool,fastqc_cmd_list))
+    for f in future_returns:
+        if f != 0:
+            return -1
+    return 0
+
+def run_fastqc_pool(job):
+    print(" ".join(job))
+    try:
+        subprocess.check_call(job)
+    except Exception as e:
+        sys.stderr.write("ERROR in fastqc for sample {0}:\n{1}\n".format(r["name"]," ".join(fastqc_cmd)))
+        return -1
     return 0
 
 #Only applies to paired-end data
-def assign_strandedness_parameter(genome,condition_dict,parameters):
+def assign_strandedness_parameter(genome,condition_dict,parameters,pipeline_log):
     #generate bed files for genome
     ret_val = generate_bed_from_gff(genome)
     if ret_val != 0:
@@ -276,6 +290,7 @@ def assign_strandedness_parameter(genome,condition_dict,parameters):
             infer_cmd = ["infer_experiment.py","-i",r[genome["genome"]]["sample_sam_file"],"-r",genome["bed"],"-s",str(num_sample)]
             infer_file = os.path.join(r["target_dir"],r["name"]+".infer") 
             print(" ".join(infer_cmd))
+            pipeline_log.append(" ".join(infer_cmd))
             with open(infer_file,"w") as o:
                 try:
                     subprocess.check_call(infer_cmd,stdout=o)
@@ -311,7 +326,7 @@ def assign_strandedness_parameter(genome,condition_dict,parameters):
                     geom_handle.write("%s\t%s\t%s\n"%(r["name"],condition,"NA"))
     return 0
                     
-def run_sample_alignment(genome,condition_dict,parameters):
+def run_sample_alignment(genome,condition_dict,parameters,pipeline_log):
     remove_list = []
     for condition in condition_dict:
         for r in condition_dict[condition]["replicates"]:
@@ -329,6 +344,7 @@ def run_sample_alignment(genome,condition_dict,parameters):
             sample1_cmd = " ".join(["seqtk","sample","-s","42",r["read1"],str(num_sample),">",sample1_file])
             remove_list.append(sample1_file)
             print(sample1_cmd)
+            pipeline_log.append(" ".join(sample1_cmd))
             if not os.path.exists(sample1_file):
                 try:
                     subprocess.check_call(sample1_cmd,shell=True)
@@ -340,6 +356,7 @@ def run_sample_alignment(genome,condition_dict,parameters):
                 sample2_cmd = " ".join(["seqtk","sample","-s","42",r["read2"],str(num_sample),">",sample2_file])
                 remove_list.append(sample2_file)
                 print(sample2_cmd)
+                pipeline_log.append(" ".join(sample2_cmd))
                 if not os.path.exists(sample2_file):
                     try:
                         subprocess.check_call(sample2_cmd,shell=True)
@@ -369,6 +386,7 @@ def run_sample_alignment(genome,condition_dict,parameters):
                 r[genome["genome"]]["sample_alignment_output"] = sam_file.replace("sample.sam","sample.bowtie")
             if not os.path.exists(sam_file):
                 print(" ".join(sample_align_cmd))
+                pipeline_log.append(" ".join(sample_align_cmd))
                 try:
                     with open(r[genome["genome"]]["sample_alignment_output"],"w") as sample_out: 
                         subprocess.check_call(sample_align_cmd,stderr=sample_out)

@@ -278,6 +278,7 @@ def run_htseq_count(genome_list, condition_dict, parameters, job_data, output_di
                     print("running htseq-count and writing to %s"%counts_file)
                     htseq_cmd = ["htseq-count","-t",feature_type,"-f","bam","-r","pos","-s",strand,"-i",feature,replicate[genome_file]["bam"],genome_annotation]
                     print(" ".join(htseq_cmd))
+                    pipeline_log.append(" ".join(htseq_cmd))
                     #prints to stdout, so redirect output to file
                     with open(counts_file,"w") as cf:
                         subprocess.check_call(htseq_cmd,stdout=cf)

@@ -6,10 +6,10 @@ import json
 from prok_tuxedo import wrap_svg_in_html
 from authenticate import authenticateByEnv
 
-def run_subsystem_analysis(genome_list,job_data,pathway_dict,output_dir):
+def run_subsystem_analysis(genome_list,job_data,pathway_dict,output_dir,pipeline_log):
     for genome in genome_list:
         #retrieve subsystem information
-        subsystem_dict = get_subsystem_mapping(genome)
+        subsystem_dict = get_subsystem_mapping(genome,pipeline_log)
         if not subsystem_dict:
             sys.stderr.write("Error in subsystem analysis for genome_id %s\n"%genome["genome"])
             return
@@ -33,6 +33,7 @@ def run_subsystem_analysis(genome_list,job_data,pathway_dict,output_dir):
             #output_grid_file = level + "_Pathway_Distribution_mqc.svg"
             output_grid_file = os.path.join(genome["output"],level + "_Pathway_Distribution.svg")
             print(" ".join(subsystem_plot_cmd))
+            pipeline_log.append(" ".join(subsystem_plot_cmd))
             try:
                 subprocess.check_call(subsystem_plot_cmd)
                 pathway_dict[genome["genome"]]["subsystem_grid"] = wrap_svg_in_html(output_grid_file,output_dir)
@@ -40,9 +41,9 @@ def run_subsystem_analysis(genome_list,job_data,pathway_dict,output_dir):
                 sys.stderr.write("ERROR generating subsystem plots,skipping heatmap generation:\n{0}\n{1}\n".format(" ".join(subsystem_plot_cmd),e))
             #subsystem_violin_plot(subsystem_dict,genome["gene_matrix"],genome["deseq_metadata"],level,feature_count)
             
-def run_kegg_analysis(genome_list,job_data,pathway_dict,output_dir):
+def run_kegg_analysis(genome_list,job_data,pathway_dict,output_dir,pipeline_log):
     for genome in genome_list:
-        kegg_dict = get_kegg_genes_mapping(genome) 
+        kegg_dict = get_kegg_genes_mapping(genome,pipeline_log) 
         if not kegg_dict:
             sys.stderr.write("Error in kegg analysis for genome_id %s\n"%genome["genome"])
             return
@@ -64,14 +65,16 @@ def run_kegg_analysis(genome_list,job_data,pathway_dict,output_dir):
             kegg_plot_cmd = ["grid_violin_plots",genome[kegg_map[i]],genome["genes_tpm_matrix"],genome["deseq_metadata"],level,feature_count]
             output_kegg_grid_file = os.path.join(genome["output"],level + "_Pathway_Distribution.svg") 
             print(" ".join(kegg_plot_cmd))
+            pipeline_log.append(" ".join(kegg_plot_cmd))
             try:
                 subprocess.check_call(kegg_plot_cmd)
                 pathway_dict[genome["genome"]]["kegg_grid"] = wrap_svg_in_html(output_kegg_grid_file,output_dir)
             except Exception as e:
                 sys.stderr.write("ERROR generating kegg plots, skipping heatmap generation:\n{0}\n{1}\n".format(" ".join(kegg_plot_cmd),e))
 
-def get_subsystem_mapping(genome):
+def get_subsystem_mapping(genome,pipeline_log):
     genome_url = "https://patricbrc.org/api/subsystem/?eq(genome_id,"+genome["genome_id"]+")&limit(10000000)&http_accept=application/solr+json"
+    pipeline_log.append("GET Request: "+genome_url)
     req = requests.Request('GET',genome_url)
     authenticateByEnv(req)
     prepared = req.prepare()
@@ -167,10 +170,11 @@ def get_specialty_genes_mapping(genome):
         sp_dict[entry['patric_id']]['property'] = entry['property']
     return sp_dict
 
-def get_kegg_genes_mapping(genome):
+def get_kegg_genes_mapping(genome,pipeline_log):
     prefix_url = "https://patricbrc.org/api/pathway/?eq(genome_id,"
     suffix_url = ")&limit(10000000)&http_accept=application/solr+json"
     pathway_url = prefix_url + genome["genome_id"] + suffix_url
+    pipeline_log.append("GET Request: "+pathway_url)
     print("Retrieving pathway mapping for genome_id %s\n"%(genome["genome_id"]))
     print(pathway_url) 
     req = requests.Request('GET',pathway_url)

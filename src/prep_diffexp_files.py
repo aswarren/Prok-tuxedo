@@ -217,7 +217,7 @@ def average_read_length_total(condition_dict,genome):
     avg_length = int(total_length/num_replicates)
     return avg_length
 
-def create_tpm_matrix_htseq(genome_list,condition_dict,host_flag,num_threads):
+def create_tpm_matrix_htseq(genome_list,condition_dict,host_flag,num_threads,pipeline_log):
     #TPMCalculator -g ~/Genomes/9606/GCF_000001405.39_GRCh38.p13_genomic.mod.gtf -b Test_Htseq/9606/avirulent/replicate1/SRR10307420.bam -e
     #might need -a flag to output genes/transcripts with 0 counts
     #tpm_calc_cmd = ["TPMCalculator","-g",<genome_gtf>,"-b",<rep_bam>,<transcript_flag>]
@@ -230,6 +230,7 @@ def create_tpm_matrix_htseq(genome_list,condition_dict,host_flag,num_threads):
         genome["gtf"] = genome_gtf
         gff_to_gtf_cmd = ["gffread",genome_gff,"-T","-o",genome_gtf_tmp]
         print(" ".join(gff_to_gtf_cmd))
+        pipeline_log.append(" ".join(gff_to_gtf_cmd))
         if not os.path.exists(genome_gtf_tmp):
             subprocess.check_call(gff_to_gtf_cmd)
         if not os.path.exists(genome_gtf):
@@ -249,6 +250,7 @@ def create_tpm_matrix_htseq(genome_list,condition_dict,host_flag,num_threads):
             with open(genome_gtf,"w") as o:
                 o.write("\n".join(gtf_lines))
         rm_tmp_gff = ["rm",genome_gtf_tmp]
+        pipeline_log.append(" ".join(rm_tmp_gff))
         subprocess.check_call(rm_tmp_gff)
         ###Sometimes the gene_id field is not present: switch gene_name to gene_id if not present
         tpm_calc_list = []
@@ -266,6 +268,8 @@ def create_tpm_matrix_htseq(genome_list,condition_dict,host_flag,num_threads):
                 tpm_calc_tuple = (tpm_calc_cmd,tpm_stdout,tpm_stderr)
                 if True:
                     tpm_calc_list.append(tpm_calc_tuple)
+        for tpm_cmd in tpm_calc_list:
+            pipeline_log.append(" ".join(tpm_cmd[0]))
         ###Run using a pool thread
         #calcs the run_tpm_calc function for executing the TPMCalculator program with a single thread
         tpm_dir = os.path.join(genome["output"],"TPMCalculator_Output")

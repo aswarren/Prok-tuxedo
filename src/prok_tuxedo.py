@@ -37,7 +37,7 @@ def make_directory_names(genome, condition_dict):
             r["target_dir"]=target_dir
 
 #Runs the differential expression import protocol 
-def run_diff_exp_import(genome_list, condition_dict, parameters, output_dir, contrasts, job_data, map_args, diffexp_json):
+def run_diff_exp_import(genome_list, condition_dict, parameters, output_dir, contrasts, job_data, map_args, diffexp_json,pipeline_log):
     for genome in genome_list:
         cur_dir = genome["output"]
         gmx_file=os.path.join(cur_dir,"gene_exp.gmx")
@@ -55,6 +55,7 @@ def run_diff_exp_import(genome_list, condition_dict, parameters, output_dir, con
                 params_handle.write(json.dumps(transform_params))
             convert_cmd=[transform_script, "--ufile", params_file, "--sstring", map_args.sstring, "--output_path",experiment_path,"--xfile",gmx_file]
             print (" ".join(convert_cmd))
+            pipeline_log.append(" ".join(convert_cmd))
             try:
                subprocess.check_call(convert_cmd)
             except(subprocess.CalledProcessError):
@@ -68,7 +69,7 @@ def run_diff_exp_import(genome_list, condition_dict, parameters, output_dir, con
 
 #Gets the lists of contrasts and runs DESeq2
 #Runs DESeq2 once for each genome
-def run_deseq2(genome_list,contrasts,job_data,dge_dict,output_dir):
+def run_deseq2(genome_list,contrasts,job_data,dge_dict,output_dir,pipeline_log):
     #Get list of contrasts to pass into deseq2 R script
     contrast_cmd = []
     for pair in contrasts:
@@ -102,7 +103,12 @@ def run_deseq2(genome_list,contrasts,job_data,dge_dict,output_dir):
             #diffexp_cmd = ["run_deseq2.R",diffexp_params[0],metadata_file,diffexp_params[1],diffexp_params[2]]+contrast_cmd
             diffexp_cmd = ["run_deseq2",diffexp_params[0],metadata_file,diffexp_params[1],diffexp_params[2]]+contrast_cmd
             print("%s\n"%" ".join(diffexp_cmd))
-            subprocess.check_call(diffexp_cmd)
+            pipeline_log.append(" ".join(diffexp_cmd))
+            try:
+                subprocess.check_call(diffexp_cmd)
+            except Exception as e:
+                sys.stderr.write("ERROR running DESeq2:\ncmd = {0}\nError = {1}\n".format(" ".join(diffexp_cmd),e))
+                return -1
             dge_dict[genome["genome"]]["volcano"] = wrap_svg_in_html("Volcano_Plots.svg",output_dir)
             for pair in contrasts:
                 pair = [x.replace(",","_") for x in pair]
@@ -110,6 +116,7 @@ def run_deseq2(genome_list,contrasts,job_data,dge_dict,output_dir):
                 #diffexp_file = genome_prefix + "_" + pair + ".txt"
                 diffexp_output = pair+"."+diffexp_params[2]+"."+diffexp_params[1]+".deseq2.tsv"
                 genome["diff_exp_contrasts"].append(os.path.join(genome["output"],diffexp_output))
+    return 0
             
          
 #Writes the gene_exp.gmx file used in expression_transform.py from DESeq2 output
@@ -324,6 +331,11 @@ def check_replicates(condition_dict,job_data,contrasts):
             return False
     return True
 
+def write_pipeline_log(output_dir,pipeline_log):
+    os.chdir(output_dir)
+    with open("Pipeline.txt","w") as o:
+        o.write("\n".join(pipeline_log))
+
 ###eventually if dual-RNASeq is enabled in the pipeline, need to adjust target_dir
 #since it only references one genome directory, and a few function implementations depend on target_dir
 # - assign_stradedness_parameter() in alignment.py
@@ -357,7 +369,7 @@ def setup(genome_list, condition_dict, parameters, output_dir, job_data):
                     sys.exit(-1)
                 else:
                     rep_names.append(r_name.replace(".fastq","").replace(".fq",""))
-                r["name"] = r_name
+                r["name"] = r_name.replace(".fastq","").replace(".fq","")
                 ###
                 target_dir=r["target_dir"]
                 rcount+=1
@@ -413,19 +425,21 @@ def main(genome_list, condition_dict, parameters_str, output_dir, gene_matrix=Fa
     pipeline_log = []
     #TRUE: runs cufflinks then cuffdiff if differential expression is turned on
     #FALSE: runs either htseq-count or stringtie
-    run_cuffdiff_pipeline = job_data.get("feature_count","htseq") == "cuffdiff"
+    run_cuffdiff_pipeline = job_data.get("recipe","cufflinks") == "cufflinks"
     alignment_value = alignment.run_alignment(genome_list, condition_dict, parameters, output_dir, job_data, pipeline_log)
     if alignment_value != 0:
         sys.stdout.write("Error in alignment step: look at stderr\n")
         cleanup_files(genome_list,output_dir)
+        write_pipeline_log(output_dir,pipeline_log)
         sys.exit(0)
     if run_cuffdiff_pipeline:
-        cufflinks_pipeline.run_cufflinks(genome_list, condition_dict, parameters, output_dir)
+        cufflinks_pipeline.run_cufflinks(genome_list, condition_dict, parameters, output_dir, pipeline_log)
     else:
         quant_val = quantification.run_featurecount(genome_list, condition_dict, parameters, output_dir, job_data, pipeline_log)
         if quant_val != 0:
             sys.stdout.write("Error in quantification step for %s: look at stderr\n"%job_data.get("feature_count","host"))
-            #cleanup_files(genome_list,output_dir)
+            cleanup_files(genome_list,output_dir)
+            write_pipeline_log(output_dir,pipeline_log)
             sys.exit(0)
     prep_diffexp_files.create_metadata_file(genome_list,condition_dict,output_dir)
     if not run_cuffdiff_pipeline and job_data.get("feature_count","htseq") == "stringtie":
@@ -435,25 +449,27 @@ def main(genome_list, condition_dict, parameters_str, output_dir, gene_matrix=Fa
     elif not run_cuffdiff_pipeline and job_data.get("feature_count","htseq") == "htseq": #htseq
         if job_data.get("recipe","RNA-Rocket") == "Host":
             prep_diffexp_files.create_counts_table_host(genome_list,condition_dict,job_data)
-            prep_diffexp_files.create_tpm_matrix_htseq(genome_list,condition_dict,True,8) #true for host_flag
+            prep_diffexp_files.create_tpm_matrix_htseq(genome_list,condition_dict,True,8,pipeline_log) #true for host_flag
         else:
             prep_diffexp_files.create_counts_table(genome_list,condition_dict,job_data)
-            prep_diffexp_files.create_tpm_matrix_htseq(genome_list,condition_dict,False,8) #false for host_flag
+            prep_diffexp_files.create_tpm_matrix_htseq(genome_list,condition_dict,False,8,pipeline_log) #false for host_flag
     if not run_cuffdiff_pipeline and not job_data.get("recipe","RNA-Rocket") == "Host":
-        pathways.run_subsystem_analysis(genome_list,job_data,pathway_dict,output_dir)
-        pathways.run_kegg_analysis(genome_list,job_data,pathway_dict,output_dir)
+        pathways.run_subsystem_analysis(genome_list,job_data,pathway_dict,output_dir,pipeline_log)
+        pathways.run_kegg_analysis(genome_list,job_data,pathway_dict,output_dir,pipeline_log)
     
     dge_multiqc_flag = False #used for multiqc_report
     check_rep_flag = check_replicates(condition_dict,job_data,contrasts) 
+    deseq_ret = 0
     if check_rep_flag and len(condition_dict.keys()) > 1 and not job_data.get("novel_features",False):
         dge_multiqc_flag = True
         #If running cuffdiff pipeline, terminated after running expression import
         if run_cuffdiff_pipeline:
-            cufflinks_pipeline.run_cuffdiff(genome_list, condition_dict, parameters, output_dir, gene_matrix, contrasts, job_data, map_args, diffexp_json)
+            cufflinks_pipeline.run_cuffdiff(genome_list, condition_dict, parameters, output_dir, gene_matrix, contrasts, job_data, map_args, diffexp_json,pipeline_log)
             run_diff_exp_import(genome_list, condition_dict, parameters, output_dir, contrasts, job_data, map_args, diffexp_json)
+            write_pipeline_log(output_dir,pipeline_log)
             sys.exit(0)
         #volcano plots are generated in the same script that runs deseq2
-        run_deseq2(genome_list,contrasts,job_data,dge_dict,output_dir)
+        deseq_ret = run_deseq2(genome_list,contrasts,job_data,dge_dict,output_dir,pipeline_log)
         write_gmx_file(genome_list)
         try:
             if not job_data.get("recipe","RNA-Rocket") == "Host":
@@ -482,18 +498,16 @@ def main(genome_list, condition_dict, parameters_str, output_dir, gene_matrix=Fa
             ref_handle.write(json.dumps(ref_dict))
             
     multiqc_report.run_multiqc(genome_list,condition_dict,job_data,dge_flag=dge_multiqc_flag)
-    ###output pipeline txt file
-    os.chdir(output_dir)
-    with open("Pipeline.txt","w") as o:
-        o.write("\n".join(pipeline_log))
     ###cleanup files not to be submitted to the user workspace
     cleanup_files(genome_list,output_dir)
+    ###output pipeline txt file
+    write_pipeline_log(output_dir,pipeline_log)
     ###Run 'basic' test to check if all expected files exist
     #run top_n_genes test if parameter and file is included
     basic_result = unit_tests.run_unit_test("basic",genome_list,condition_dict,output_dir,contrasts,job_data)
     if "unit_json" in map_args: #unit test json is loaded in the pre-main block
         unit_tests.run_unit_test(map_args.unit_json,genome_list,condition_dict,output_dir,contrasts,job_data)
-    if basic_result == 0:
+    if deseq_ret == 0 and basic_result == 0:
         sys.exit(0) 
     else:
         sys.exit(2) #exit code specific to basic test 
