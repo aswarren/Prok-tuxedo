@@ -458,7 +458,10 @@ def main(genome_list, condition_dict, parameters_str, output_dir, gene_matrix=Fa
         pathways.run_kegg_analysis(genome_list,job_data,pathway_dict,output_dir,pipeline_log)
     
     dge_multiqc_flag = False #used for multiqc_report
-    check_rep_flag = check_replicates(condition_dict,job_data,contrasts) 
+    if job_data.get("recipe","RNA-Rocket") == "cufflinks":
+        check_rep_flag = True
+    else:
+        check_rep_flag = check_replicates(condition_dict,job_data,contrasts) 
     deseq_ret = 0
     if check_rep_flag and len(condition_dict.keys()) > 1 and not job_data.get("novel_features",False):
         dge_multiqc_flag = True
