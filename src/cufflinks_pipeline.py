@@ -2,6 +2,7 @@
 
 import os,sys,subprocess
 import cuffdiff_to_genematrix 
+import tempfile
 
 #TODO: smallRNA estimation in a future release
 def run_cufflinks(genome_list, condition_dict, parameters, output_dir, pipeline_log):
@@ -36,7 +37,7 @@ def run_cufflinks(genome_list, condition_dict, parameters, output_dir, pipeline_
                 bam_to_use = None
                 
                 try:
-                    bam_tmp = os.tempnam("/dev/shm", "CUFFL")
+                    bam_tmp = tempfile.TemporaryFile(dir="/dev/shm", prefix="CUFFL")
                     shutil.copy(bam_file, bam_tmp)
                     print ("Copy succeeded to %s" % (bam_tmp))
                     bam_to_use = bam_tmp
@@ -48,7 +49,7 @@ def run_cufflinks(genome_list, condition_dict, parameters, output_dir, pipeline_
 
                 if bam_to_use == None:
                     try:
-                        bam_tmp = os.tempnam(None, "CUFFL")
+                        bam_tmp = tempfile.TemporaryFile(dir=None, prefix="CUFFL")
                         shutil.copy(bam_file, bam_tmp)
                         bam_to_use = bam_tmp
 
