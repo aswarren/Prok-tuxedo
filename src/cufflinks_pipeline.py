@@ -81,6 +81,7 @@ def run_cufflinks(genome_list, condition_dict, parameters, output_dir, pipeline_
                 if bam_tmp != None:
                     sys.stderr.write("remove temp %s\n" % (bam_tmp))
                     os.unlink(bam_tmp)
+    return 0
 
 #Differential expression pipeline using the cufflinks protocol 
 def run_cuffdiff(genome_list, condition_dict, parameters, output_dir, gene_matrix, contrasts, job_data, map_args, diffexp_json, pipeline_log):
@@ -163,5 +164,6 @@ def run_cuffdiff(genome_list, condition_dict, parameters, output_dir, gene_matri
         gmx_file=os.path.join(cur_dir,"gene_exp.gmx")
         if os.path.exists(de_file) and not os.path.exists(gmx_file):
             cuffdiff_to_genematrix.main([de_file],gmx_file)
+    return 0
 
 

@@ -433,7 +433,13 @@ def main(genome_list, condition_dict, parameters_str, output_dir, gene_matrix=Fa
         write_pipeline_log(output_dir,pipeline_log)
         sys.exit(0)
     if run_cuffdiff_pipeline:
-        cufflinks_pipeline.run_cufflinks(genome_list, condition_dict, parameters, output_dir, pipeline_log)
+        try:
+            ret_val = cufflinks_pipeline.run_cufflinks(genome_list, condition_dict, parameters, output_dir, pipeline_log)
+        except Exception as e:
+            ret_val = -1
+            sys.stderr.write("ERROR in cufflinks pipeline:{0}\n".format(e))
+        if ret_vall != 0:
+            sys.exit(-1)
     else:
         quant_val = quantification.run_featurecount(genome_list, condition_dict, parameters, output_dir, job_data, pipeline_log)
         if quant_val != 0:
@@ -467,9 +473,15 @@ def main(genome_list, condition_dict, parameters_str, output_dir, gene_matrix=Fa
         dge_multiqc_flag = True
         #If running cuffdiff pipeline, terminated after running expression import
         if run_cuffdiff_pipeline:
-            cufflinks_pipeline.run_cuffdiff(genome_list, condition_dict, parameters, output_dir, gene_matrix, contrasts, job_data, map_args, diffexp_json,pipeline_log)
-            run_diff_exp_import(genome_list, condition_dict, parameters, output_dir, contrasts, job_data, map_args, diffexp_json)
-            write_pipeline_log(output_dir,pipeline_log)
+            try:
+                ret_val = cufflinks_pipeline.run_cuffdiff(genome_list, condition_dict, parameters, output_dir, gene_matrix, contrasts, job_data, map_args, diffexp_json,pipeline_log)
+                run_diff_exp_import(genome_list, condition_dict, parameters, output_dir, contrasts, job_data, map_args, diffexp_json)
+                write_pipeline_log(output_dir,pipeline_log)
+            except Exception as e:
+                sys.stderr.write("ERROR in running cuffdiff:\n {0}\n".format(e))
+                ret_val = -1
+            if ret_val != 0:
+                sys.exit(-1)
             sys.exit(0)
         #volcano plots are generated in the same script that runs deseq2
         deseq_ret = run_deseq2(genome_list,contrasts,job_data,dge_dict,output_dir,pipeline_log)
