@@ -65,7 +65,6 @@ def run_cufflinks(genome_list, condition_dict, parameters, output_dir, pipeline_
                 
                 cur_cmd += [bam_to_use]
                 cuff_gtf=os.path.join(cur_dir,"transcripts.gtf")
-                sys.stdout.write("ATTEMPTING INVOKE CUFFLINKS\ncmd=\n{}\n".format(" ".join(cur_cmd)))
                 if not os.path.exists(cuff_gtf):
                     print (" ".join(cur_cmd))
                     pipeline_log.append(" ".join(cur_cmd))
@@ -106,8 +105,6 @@ def run_cuffdiff(genome_list, condition_dict, parameters, output_dir, gene_matri
         with open(merge_manifest, "w") as manifest: 
             for library in condition_dict:
                 for r in condition_dict[library]["replicates"]:
-                    #bam_dir=os.path.dirname(os.path.realpath(r[genome_file]["bam"])) #should be done in run_cufflinks() but "dir" key isn't stored for some reason
-                    #r[genome_file]["dir"] = bam_dir
                     manifest.write("\n"+os.path.join(r[genome_file]["dir"],"transcripts.gtf"))
         merge_cmd+=[merge_manifest]
 
