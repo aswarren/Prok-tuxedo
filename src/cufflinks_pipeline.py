@@ -1,13 +1,13 @@
 #!/usr/bin/env python3
 
-import os,sys,subprocess
+import os,sys,subprocess,shutil
 import cuffdiff_to_genematrix 
 
 #TODO: smallRNA estimation in a future release
 def run_cufflinks(genome_list, condition_dict, parameters, output_dir, pipeline_log):
     for genome in genome_list:
-        if genome.get("host",False):
-            continue
+        #if genome.get("host",False):
+        #    continue
         genome_file=genome["genome"]
         genome_link = genome["genome_link"]
         annotation_only =  int(parameters.get("cufflinks",{}).get("annotation_only",0))
@@ -27,7 +27,7 @@ def run_cufflinks(genome_list, condition_dict, parameters, output_dir, pipeline_
                 cur_dir=os.path.dirname(os.path.realpath(r[genome_file]["bam"]))
                 os.chdir(cur_dir)
                 cur_cmd=list(cmd)
-                r[genome_file]["dir"]=cur_dir
+                r[genome_file]["dir"] = cur_dir
                 bam_file = r[genome_file]["bam"]
                 # Review: Memory mapped location on each system
                 # Attempt to copy to /dev/shm. cufflinks seeks a lot in the file.
@@ -65,6 +65,7 @@ def run_cufflinks(genome_list, condition_dict, parameters, output_dir, pipeline_
                 
                 cur_cmd += [bam_to_use]
                 cuff_gtf=os.path.join(cur_dir,"transcripts.gtf")
+                sys.stdout.write("ATTEMPTING INVOKE CUFFLINKS\ncmd=\n{}\n".format(" ".join(cur_cmd)))
                 if not os.path.exists(cuff_gtf):
                     print (" ".join(cur_cmd))
                     pipeline_log.append(" ".join(cur_cmd))
@@ -105,6 +106,8 @@ def run_cuffdiff(genome_list, condition_dict, parameters, output_dir, gene_matri
         with open(merge_manifest, "w") as manifest: 
             for library in condition_dict:
                 for r in condition_dict[library]["replicates"]:
+                    #bam_dir=os.path.dirname(os.path.realpath(r[genome_file]["bam"])) #should be done in run_cufflinks() but "dir" key isn't stored for some reason
+                    #r[genome_file]["dir"] = bam_dir
                     manifest.write("\n"+os.path.join(r[genome_file]["dir"],"transcripts.gtf"))
         merge_cmd+=[merge_manifest]
 
