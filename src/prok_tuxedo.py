@@ -438,7 +438,7 @@ def main(genome_list, condition_dict, parameters_str, output_dir, gene_matrix=Fa
         except Exception as e:
             ret_val = -1
             sys.stderr.write("ERROR in cufflinks pipeline:{0}\n".format(e))
-        if ret_vall != 0:
+        if ret_val != 0:
             sys.exit(-1)
     else:
         quant_val = quantification.run_featurecount(genome_list, condition_dict, parameters, output_dir, job_data, pipeline_log)
@@ -475,7 +475,7 @@ def main(genome_list, condition_dict, parameters_str, output_dir, gene_matrix=Fa
         if run_cuffdiff_pipeline:
             try:
                 ret_val = cufflinks_pipeline.run_cuffdiff(genome_list, condition_dict, parameters, output_dir, gene_matrix, contrasts, job_data, map_args, diffexp_json,pipeline_log)
-                run_diff_exp_import(genome_list, condition_dict, parameters, output_dir, contrasts, job_data, map_args, diffexp_json)
+                run_diff_exp_import(genome_list, condition_dict, parameters, output_dir, contrasts, job_data, map_args, diffexp_json, pipeline_log)
                 write_pipeline_log(output_dir,pipeline_log)
             except Exception as e:
                 sys.stderr.write("ERROR in running cuffdiff:\n {0}\n".format(e))
@@ -488,7 +488,7 @@ def main(genome_list, condition_dict, parameters_str, output_dir, gene_matrix=Fa
         write_gmx_file(genome_list)
         try:
             if not job_data.get("recipe","RNA-Rocket") == "Host":
-                run_diff_exp_import(genome_list, condition_dict, parameters, output_dir, contrasts, job_data, map_args, diffexp_json)
+                run_diff_exp_import(genome_list, condition_dict, parameters, output_dir, contrasts, job_data, map_args, diffexp_json, pipeline_log)
         except:
             print("Expression import failed")
         #get amr and specialty genes for labeling the heatmap
