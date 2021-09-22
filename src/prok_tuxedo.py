@@ -426,7 +426,7 @@ def main(genome_list, condition_dict, parameters_str, output_dir, gene_matrix=Fa
     pipeline_log = []
     #TRUE: runs cufflinks then cuffdiff if differential expression is turned on
     #FALSE: runs either htseq-count or stringtie
-    run_cuffdiff_pipeline = job_data.get("recipe","cufflinks") == "cufflinks"
+    run_cuffdiff_pipeline = job_data.get("feature_count","htseq") == "cufflinks" 
     alignment_value = alignment.run_alignment(genome_list, condition_dict, parameters, output_dir, job_data, pipeline_log)
     if alignment_value != 0:
         sys.stdout.write("Error in alignment step: look at stderr\n")
@@ -465,7 +465,7 @@ def main(genome_list, condition_dict, parameters_str, output_dir, gene_matrix=Fa
         pathways.run_kegg_analysis(genome_list,job_data,pathway_dict,output_dir,pipeline_log)
     
     dge_multiqc_flag = False #used for multiqc_report
-    if job_data.get("recipe","RNA-Rocket") == "cufflinks":
+    if job_data.get("feature_count","RNA-Rocket") == "cufflinks":
         check_rep_flag = True
     else:
         check_rep_flag = check_replicates(condition_dict,job_data,contrasts) 
