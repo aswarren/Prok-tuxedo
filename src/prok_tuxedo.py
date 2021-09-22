@@ -332,6 +332,7 @@ def check_replicates(condition_dict,job_data,contrasts):
     return True
 
 def write_pipeline_log(output_dir,pipeline_log):
+    print(pipeline_log)
     os.chdir(output_dir)
     with open("Pipeline.txt","w") as o:
         o.write("\n".join(pipeline_log))
@@ -475,7 +476,8 @@ def main(genome_list, condition_dict, parameters_str, output_dir, gene_matrix=Fa
         if run_cuffdiff_pipeline:
             try:
                 ret_val = cufflinks_pipeline.run_cuffdiff(genome_list, condition_dict, parameters, output_dir, gene_matrix, contrasts, job_data, map_args, diffexp_json,pipeline_log)
-                run_diff_exp_import(genome_list, condition_dict, parameters, output_dir, contrasts, job_data, map_args, diffexp_json, pipeline_log)
+                if not genome.get("host",False):
+                    run_diff_exp_import(genome_list, condition_dict, parameters, output_dir, contrasts, job_data, map_args, diffexp_json, pipeline_log)
                 write_pipeline_log(output_dir,pipeline_log)
             except Exception as e:
                 sys.stderr.write("ERROR in running cuffdiff:\n {0}\n".format(e))

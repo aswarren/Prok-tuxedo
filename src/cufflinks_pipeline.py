@@ -143,7 +143,7 @@ def run_cuffdiff(genome_list, condition_dict, parameters, output_dir, gene_matri
                 quant_file=os.path.join(cur_dir,"abundances.cxb")
                 quant_list.append(quant_file)
                 if not os.path.exists(quant_file):
-                    pipeline_log.append(quant_cmd)
+                    pipeline_log.append(" ".join(quant_cmd))
                     subprocess.check_call(quant_cmd)
                 else:
                     print (" ".join(quant_cmd))

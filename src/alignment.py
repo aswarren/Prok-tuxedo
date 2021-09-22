@@ -188,7 +188,7 @@ def run_alignment(genome_list, condition_dict, parameters, output_dir, job_data,
                         alignment_log = bam_file.replace("bam","bowtie") 
                     with open(alignment_log,"w") as al:
                         pipeline_log.append(" ".join(cur_cmd))
-                        subprocess.check_call(cur_cmd,stdout=al,stderr=al) #call bowtie2 or hisat2
+                        subprocess.check_call(cur_cmd,stdout=al) #call bowtie2 or hisat2
                 samtools_threads = parameters.get("samtools",{}).get("-@",1)
                 if not os.path.exists(bam_file):
                     pipeline_log.append("samtools view -Su "+sam_file+" | samtools sort -o - - -@ "+str(samtools_threads)+" > "+bam_file)
@@ -344,7 +344,7 @@ def run_sample_alignment(genome,condition_dict,parameters,pipeline_log):
             sample1_cmd = " ".join(["seqtk","sample","-s","42",r["read1"],str(num_sample),">",sample1_file])
             remove_list.append(sample1_file)
             print(sample1_cmd)
-            pipeline_log.append(" ".join(sample1_cmd))
+            pipeline_log.append(sample1_cmd)
             if not os.path.exists(sample1_file):
                 try:
                     subprocess.check_call(sample1_cmd,shell=True)
@@ -356,7 +356,7 @@ def run_sample_alignment(genome,condition_dict,parameters,pipeline_log):
                 sample2_cmd = " ".join(["seqtk","sample","-s","42",r["read2"],str(num_sample),">",sample2_file])
                 remove_list.append(sample2_file)
                 print(sample2_cmd)
-                pipeline_log.append(" ".join(sample2_cmd))
+                pipeline_log.append(sample2_cmd)
                 if not os.path.exists(sample2_file):
                     try:
                         subprocess.check_call(sample2_cmd,shell=True)
