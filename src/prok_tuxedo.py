@@ -332,7 +332,6 @@ def check_replicates(condition_dict,job_data,contrasts):
     return True
 
 def write_pipeline_log(output_dir,pipeline_log):
-    print(pipeline_log)
     os.chdir(output_dir)
     with open("Pipeline.txt","w") as o:
         o.write("\n".join(pipeline_log))
