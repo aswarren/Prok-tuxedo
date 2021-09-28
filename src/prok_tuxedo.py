@@ -292,6 +292,11 @@ def cleanup_files(genome_list,output_dir):
         cleanup_list.append(os.path.abspath(bed_file))
     for hisat_file in glob.glob("*ht2"):
         cleanup_list.append(os.path.abspath(hisat_file))
+    #cleanup fastq files
+    for fastq in glot.glob("*fastq"):
+        cleanup_list.append(os.path.abspath(fastq))
+    for fq in glob.glob("*fq"):
+        cleanup_list.append(os.path.abspath(fq))
     #cleanup html images
     if os.path.exists("html_images"):
         cleanup_list.append(os.path.abspath("html_images"))
