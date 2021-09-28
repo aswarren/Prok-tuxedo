@@ -574,6 +574,8 @@ if __name__ == "__main__":
         job_data = json.load(job_handle)
 
     condition_list= job_data.get("experimental_conditions",[])
+    #remove spaces in condition names
+    condition_list = [x.replace(" ","_") for x in condition_list]
     got_conditions=False
     if not len(condition_list):
         condition_list.append("results")
