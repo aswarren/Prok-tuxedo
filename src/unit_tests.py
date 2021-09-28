@@ -118,6 +118,7 @@ def run_gene_set_test(test_json,genome_list,condition_dict,output_dir,contrast_l
     #rpoB_Exposed_vs_rpoB_Unexposed.htseq.Genes.deseq2
     test_contrasts = test_json.get("contrasts")
     test_conditions = test_json.get("experimental_conditions")
+    test_conditions = [x.replace(" ","_") for x in test_conditions]
     contrast_key = ".".join([test_conditions[test_contrasts[0]-1]+"_vs_"+test_conditions[test_contrasts[1]-1],job_data.get("feature_count","htseq"),"Genes.deseq2"])
     for genome in genome_list:
         os.chdir(genome["output"])
