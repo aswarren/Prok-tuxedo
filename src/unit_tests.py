@@ -124,7 +124,7 @@ def run_gene_set_test(test_json,genome_list,condition_dict,output_dir,contrast_l
         os.chdir(genome["output"])
         gmx_file = genome["gmx"] 
         gmx_df = pandas.read_csv(gmx_file,sep="\t",header=0)
-        top_hundred_genes = gmx_df.sort(contrast_key,ascending=False)["Gene_ID"].iloc[0:100].tolist() 
+        top_hundred_genes = gmx_df.sort_values(contrast_key,ascending=False)["Gene_ID"].iloc[0:100].tolist() 
         #if 90% of genes in gene_list are in top_hundred_genes, test passes. Otherwise, it fails
         intersect_length = len(list(set(gene_list)&set(top_hundred_genes)))
         intersect_prop = float(intersect_length)/float(len(gene_list))*100
@@ -153,7 +153,7 @@ def run_top_genes_test(test_file,genome_list,condition_dict,output_dir,contrast_
         #store that statistic and report for each sample
         tpm_stat_dict = {}
         for h in tpm_headers:
-            curr_df = tpm_df.sort(h,ascending=False)
+            curr_df = tpm_df.sort_values(h,ascending=False)
             top_n_genes = curr_df['Gene'].iloc[0:len(genes_list)].tolist() 
             tpm_stat_dict[h] = len(list(set(top_n_genes)&set(genes_list)))
         tpm_stats_out = [] 
@@ -174,8 +174,8 @@ def run_top_genes_test(test_file,genome_list,condition_dict,output_dir,contrast_
         #store that statistic and report for each comparison, upregulated and downregulated
         gmx_stat_dict = {}
         for h in gmx_headers:
-            up_df = gmx_df.sort(h,ascending=False)
-            down_df = gmx_df.sort(h,ascending=True)
+            up_df = gmx_df.sort_values(h,ascending=False)
+            down_df = gmx_df.sort_values(h,ascending=True)
             up_n_genes = up_df['Gene_ID'].iloc[0:len(genes_list)].tolist()
             down_n_genes = down_df['Gene_ID'].iloc[0:len(genes_list)].tolist()
             gmx_stat_dict[h] = {}

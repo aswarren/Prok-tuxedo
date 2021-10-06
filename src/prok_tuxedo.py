@@ -293,7 +293,7 @@ def cleanup_files(genome_list,output_dir):
     for hisat_file in glob.glob("*ht2"):
         cleanup_list.append(os.path.abspath(hisat_file))
     #cleanup fastq files
-    for fastq in glot.glob("*fastq"):
+    for fastq in glob.glob("*fastq"):
         cleanup_list.append(os.path.abspath(fastq))
     for fq in glob.glob("*fq"):
         cleanup_list.append(os.path.abspath(fq))
@@ -626,7 +626,7 @@ if __name__ == "__main__":
         cur_genome={"genome":[],"annotation":[],"dir":g,"hisat_index":[]}
         cur_genome["genome_id"] = job_data.get("reference_genome_id",None)
         if not cur_genome["genome_id"]:
-            sys.stderr("Cannot find reference genome ID in job submission json: aborting\n")
+            sys.stderr.write("Cannot find reference genome ID in job submission json: aborting\n")
             sys.exit(-1)
         for f in os.listdir(g):
             if f.endswith(".fna") or f.endswith(".fa") or f.endswith(".fasta"):

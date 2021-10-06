@@ -252,7 +252,7 @@ def run_fastqc(genome,condition_dict,parameters,pipeline_log):
         future_returns = list(pool.map(run_fastqc_pool,fastqc_cmd_list))
     for f in future_returns:
         if f != 0:
-            return -1
+            return -1 
     return 0
 
 def run_fastqc_pool(job):
@@ -260,7 +260,7 @@ def run_fastqc_pool(job):
     try:
         subprocess.check_call(job)
     except Exception as e:
-        sys.stderr.write("ERROR in fastqc for sample {0}:\n{1}\n".format(r["name"]," ".join(fastqc_cmd)))
+        sys.stderr.write("ERROR in fastqc:\n{0}\n".format(" ".join(job)))
         return -1
     return 0
 

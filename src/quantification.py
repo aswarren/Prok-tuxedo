@@ -12,7 +12,7 @@ def run_featurecount(genome_list, condition_dict, parameters, output_dir, job_da
         return_val = run_stringtie(genome_list, condition_dict, parameters, job_data, output_dir, pipeline_log)
     else: #not a valid program
         sys.stderr.write("Invalid feature count program: htseq or stringtie only\n")
-        os.exit(1)
+        sys.exit(1)
     return return_val
 
 def run_stringtie(genome_list, condition_dict, parameters, job_data, output_dir, pipeline_log):
