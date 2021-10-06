@@ -53,7 +53,8 @@ else:
     #####
     ## Collect all samples file paths and if empty print help message and quit
     #####
-    samples = [(i,glob.iglob(os.path.join(opts.input,i,"*.gtf")).next()) for i in next(os.walk(opts.input))[1] if re.search(opts.pattern,i)]
+    #samples = [(i,glob.iglob(os.path.join(opts.input,i,"*.gtf")).next()) for i in next(os.walk(opts.input))[1] if re.search(opts.pattern,i)]
+    samples = [(i,next(glob.iglob(os.path.join(opts.input,i,"*.gtf")))) for i in next(os.walk(opts.input))[1] if re.search(opts.pattern,i)]
 
 if len(samples) == 0:
   parser.print_help()
@@ -250,7 +251,8 @@ for q, s in enumerate(samples):
 
 ##        transcriptList.sort(key=lambda bla: bla[1]) #gene_id
 
-    for i,v in t_dict.iteritems():
+    #for i,v in t_dict.iteritems():
+    for i,v in t_dict.items():
 ##        print i,v
         geneDict.setdefault(geneIDs[i],{}) #gene_id
         geneDict[geneIDs[i]].setdefault(s[0],0)
