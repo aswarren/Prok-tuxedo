@@ -9,7 +9,7 @@ def run_multiqc(genome_list,condition_dict,job_data,dge_flag=False):
     #config_path = "/homes/clarkc/RNASeq_Pipeline/Prok-tuxedo/Multiqc/multiqc_config.yaml"
     config_path_list = setup_multiqc_configs(genome_list,condition_dict,job_data,dge_flag=dge_flag) 
     debug_multiqc = False
-    remove_data_dir = False
+    remove_data_dir = True 
     force_overwrite = True
     for index,genome in enumerate(genome_list):
         os.chdir(genome["output"])
