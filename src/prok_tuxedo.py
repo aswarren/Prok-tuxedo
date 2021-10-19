@@ -284,6 +284,8 @@ def cleanup_files(genome_list,output_dir):
     #cleanup genome files
     for gff_file in glob.glob("*gff"):
         cleanup_list.append(os.path.abspath(gff_file))
+    for gtf_file in glob.glob("*gtf"):
+        cleanup_list.append(os.path.abspath(gtf_file))
     for bowtie_file in glob.glob("*bt2"):
         cleanup_list.append(os.path.abspath(bowtie_file))
     for fasta_file in glob.glob("*fna"):
