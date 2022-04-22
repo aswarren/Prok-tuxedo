@@ -131,8 +131,8 @@ def run_cuffdiff(genome_list, condition_dict, parameters, output_dir, gene_matri
         with open(contrasts_file,'w') as contrasts_handle:
             contrasts_handle.write("condition_A\tcondition_B\n")
             for c in contrasts:
-                #contrasts_handle.write(str(c[0])+"\t"+str(c[1])+"\n")
-                contrasts_handle.write(str(c[1])+"\t"+str(c[0])+"\n")
+                contrasts_handle.write(str(c[0])+"\t"+str(c[1])+"\n")
+                #contrasts_handle.write(str(c[1])+"\t"+str(c[0])+"\n")
         diff_cmd+=["--contrast-file",contrasts_file,"-o",cur_dir]
 
         #create quant files and add to diff command
