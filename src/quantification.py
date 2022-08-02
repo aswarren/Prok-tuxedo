@@ -2,16 +2,16 @@
 
 import os,sys,glob,math,shutil,subprocess
 
-#Run the feature count program specified in json input, or run htseq-count by default
+#Run the feature count recipe specified in json input, or run htseq-count by default
 def run_featurecount(genome_list, condition_dict, parameters, output_dir, job_data, pipeline_log):
     #check parameters for stringtie option. Assuming htseq2
-    program = job_data.get("feature_count","htseq")
-    if program == "htseq":
+    recipe = job_data.get("recipe","RNA-Rocket")
+    if recipe == "RNA-Rocket" or recipe == 'Rockhopper':
         return_val = run_htseq_count(genome_list, condition_dict, parameters, job_data, output_dir, pipeline_log)
-    elif program == "stringtie":
+    elif recipe == "Host":
         return_val = run_stringtie(genome_list, condition_dict, parameters, job_data, output_dir, pipeline_log)
-    else: #not a valid program
-        sys.stderr.write("Invalid feature count program: htseq or stringtie only\n")
+    else: #not a valid recipe
+        sys.stderr.write("Invalid feature count recipe: htseq or stringtie only\n")
         sys.exit(1)
     return return_val
 

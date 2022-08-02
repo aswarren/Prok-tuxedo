@@ -455,7 +455,7 @@ def main(genome_list, condition_dict, parameters_str, output_dir, gene_matrix=Fa
             write_pipeline_log(output_dir,pipeline_log)
             sys.exit(0)
     prep_diffexp_files.create_metadata_file(genome_list,condition_dict,output_dir)
-    if not run_cuffdiff_pipeline and job_data.get("feature_count","htseq") == "stringtie":
+    if not run_cuffdiff_pipeline and job_data.get("recipe","RNA-Rocket") == "Host":
         prep_diffexp_files.write_gtf_list(genome_list,condition_dict) #function that writes the input for prepDE.py, which is a list of samples and paths to their gtf files. Do this for each genome
         prep_diffexp_files.prep_stringtie_diffexp(genome_list,condition_dict,job_data.get("recipe","RNA-Rocket") == "Host",pipeline_log)   
         prep_diffexp_files.create_tpm_matrix_stringtie(genome_list,condition_dict,host_flag=job_data.get("recipe","RNA-Rocket") == "Host")
