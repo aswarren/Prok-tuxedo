@@ -461,6 +461,7 @@ def main(genome_list, condition_dict, parameters_str, output_dir, gene_matrix=Fa
         prep_diffexp_files.create_tpm_matrix_stringtie(genome_list,condition_dict,host_flag=job_data.get("recipe","RNA-Rocket") == "Host")
     elif not run_cuffdiff_pipeline and job_data.get("feature_count","htseq") == "htseq": #htseq
         if job_data.get("recipe","RNA-Rocket") == "Host":
+            print('shouldnt happen')
             prep_diffexp_files.create_counts_table_host(genome_list,condition_dict,job_data)
             prep_diffexp_files.create_tpm_matrix_htseq(genome_list,condition_dict,True,8,pipeline_log) #true for host_flag
         else:
