@@ -41,10 +41,10 @@ library(gridExtra,quietly=TRUE)
 library(svglite)
 
 #Load counts table and metadata table 
-count.mtx <- read.table(counts.file,sep=count_sep,header=T,row.names=1,stringsAsFactors=FALSE)
+count.mtx <- read.table(counts.file,sep=count_sep,header=T,row.names=1,stringsAsFactors=FALSE,check.names=FALSE)
 rownames(count.mtx) = gsub("gene-","",rownames(count.mtx))
 rownames(count.mtx) = gsub("rna-","",rownames(count.mtx))
-metadata <- read.table(metadata.file,sep=meta_sep,header=T,stringsAsFactors=FALSE)
+metadata <- read.table(metadata.file,sep=meta_sep,header=T,stringsAsFactors=FALSE, check.names=FALSE)
 
 #calculate png width and height
 png_width = 600
@@ -67,7 +67,7 @@ for (i in 5:length(args))
     #Subset data on current contrast
     curr_contrast = unlist(strsplit(args[i],","))
     #curr_contrast = gsub("-","_",curr_contrast)
-    curr.metadata = subset(metadata,(subset=Condition==curr_contrast[1])|(subset=Condition==curr_contrast[2]))
+    curr.metadata = subset(metadata,(Condition==curr_contrast[1])|(Condition==curr_contrast[2]))
     curr.count.mtx = count.mtx[,curr.metadata$Sample] 
     #Remove all zero rows and add pseudocount to genes: Will not work for some samples otherwise
     curr.count.mtx = curr.count.mtx[rowSums(curr.count.mtx) != 0,]

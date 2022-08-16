@@ -32,21 +32,21 @@ library(graphics)
 ###TODO: add units to the heatmap (TPM, TPKM, etc)
 
 #create a heatmap with normalized expression 
-counts.mtx <- read.table(counts.file,sep=count_sep,header=T,row.names=1,stringsAsFactors=FALSE)
-metadata <- read.table(metadata.file,sep="\t",header=T,stringsAsFactors=FALSE)
-genes.list <- read.table(genes.file,stringsAsFactors=FALSE)
+counts.mtx <- read.table(counts.file,sep=count_sep,header=T,row.names=1,stringsAsFactors=FALSE,check.names=FALSE)
+metadata <- read.table(metadata.file,sep="\t",header=T,stringsAsFactors=FALSE,check.names=FALSE)
+genes.list <- read.table(genes.file,stringsAsFactors=FALSE,check.names=FALSE)
 colnames(genes.list) <- c("Genes")
 #check for if specialty genes were found for this genome: if not don't include in heatmap
 if (specialty_genes.file == "NONE") {
     specialty.genes <- NULL
 } else {
-    specialty.genes <- read.table(specialty_genes.file,header=T,sep="\t")
+    specialty.genes <- read.table(specialty_genes.file,header=T,sep="\t",check.names=FALSE)
 }
 #check for if subsystem genes were found for this genome: if not don't include in heatmap
 if (subsystem.file == "NONE") {
     subsystem.map <- NULL
 } else {
-    subsystem.map <- read.table(subsystem.file,sep="\t",header=T,stringsAsFactors=FALSE)
+    subsystem.map <- read.table(subsystem.file,sep="\t",header=T,stringsAsFactors=FALSE,check.names=FALSE)
 }
 
 #Usually doesn't happen, but sometimes for host there heatmap genes and counts table do not share all genes
