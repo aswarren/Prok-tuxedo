@@ -1,4 +1,3 @@
-#!/opt/p3/deployment/libexec/p3_prok_tuxedo/bin/python3
 #!/usr/bin/env python3
 
 import os,sys,glob,subprocess,concurrent.futures,shutil
