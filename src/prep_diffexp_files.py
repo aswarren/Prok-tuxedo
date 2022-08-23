@@ -1,6 +1,7 @@
+#!/opt/p3/deployment/libexec/p3_prok_tuxedo/bin/python3
 #!/usr/bin/env python3
 
-import os,sys,glob,subprocess,concurrent.futures
+import os,sys,glob,subprocess,concurrent.futures,shutil
 
 def create_counts_table_host(genome_list,condition_dict,job_data):
     #Remove the last 5 lines from htseq-count output
@@ -181,6 +182,7 @@ def write_gtf_list(genome_list,condition_dict):
             for rep_gtf in rep_gtf_list:
                 gpf.write("%s\n"%("\t".join(rep_gtf)))
         genome["prepDE_input"] = gtf_path_filename
+        genome["prepDE_list"] = rep_gtf_list
 
 #Calls the prepDE.py script that transforms stringtie output into a format usable by DESeq2
 def prep_stringtie_diffexp(genome_list,condition_dict,host_bool,pipeline_log):
@@ -192,6 +194,33 @@ def prep_stringtie_diffexp(genome_list,condition_dict,host_bool,pipeline_log):
         os.chdir(genome_dir)
         genome_counts_mtx = genome_id+".stringtie.gene_counts.csv" 
         genome["gene_matrix"] = os.path.join(genome["output"],genome_counts_mtx)
+        rep_gtf_list = genome["prepDE_list"]
+        for rep, genome_gtf_tmp in rep_gtf_list:
+            genome_gtf_tmp2 = genome_gtf_tmp+".tmp"
+            with open(genome_gtf_tmp,"r") as tmp_g, open(genome_gtf_tmp2,'w') as tmp_g2:
+                for line in tmp_g:
+                    if line[0] == "#":
+                        tmp_g2.write(line)
+                    else:
+                        parts = line.strip().split("\t")
+                        if parts[2] in ["exon", "transcript"]:
+                            parsed_line = [tuple(i.strip().split(" ")[0:2]) for i in parts[-1].replace('"',"").split(";") if i.strip()]
+                            ordered_keys = [i[0] for i in parsed_line]
+                            features = dict(parsed_line)
+                            gene_id = features.get("gene_id","").replace("\"","").replace("gene-","")
+                            transcript_id = features.get("transcript_id","").replace("\"","").replace("rna-","")
+                            ref_gene_name = features.get("ref_gene_name",features.get("gene_name",""))
+                            features["transcript_id"] = transcript_id
+                            if (gene_id.startswith("MSTRG.") or gene_id.startswith("STRG.")) and ref_gene_name:
+                                ordered_keys.append("stie_id")
+                                features["stie_id"] = gene_id
+                                features["gene_id"] = ref_gene_name
+                            else:
+                                features["gene_id"] = gene_id
+                            parts[-1] = "; ".join([i+' "'+features[i]+'"' for i in ordered_keys])
+                        tmp_g2.write("\t".join(parts)+"\n")
+            shutil.move(genome_gtf_tmp2, genome_gtf_tmp) 
+                                
         prep_cmd = ["prepDE.py","-i",genome["prepDE_input"],"-l",avg_length,"-g",genome_counts_mtx]
         '''
         if host_bool:
@@ -342,20 +371,28 @@ def create_tpm_matrix_stringtie(genome_list,condition_dict,host_flag):
                     for line in gtf_handle:
                         if line[0] == "#":
                             continue
-                        line = line.strip().split("\t")  
-                        if line[2] == "transcript":
-                            features = line[-1].split(";")
-                            gene_id = features[0].replace("gene_id ","").replace("transcript_id ","").replace("\"","").replace("gene-","")
-                            transcript_id = features[1].replace("gene_id ","").replace("transcript_id ","").replace("\"","").replace(" ","").replace("rna-","")
-                            if "STRG" in gene_id: #stringtie can label some genes with STRG, which provides no information in looking up the gene/transcript later
-                                gene_id = transcript_id
-                            tpm_val = features[-2].replace("TPM ","").replace("\"","") 
-                            if feature_field == "gene_id":
-                                feature_set.add(gene_id)
-                                tpm_dict[rep_id][gene_id] = tpm_val
-                            else:
-                                feature_set.add(transcript_id)
-                                tpm_dict[rep_id][transcript_id] = tpm_val
+                        else:
+                            parts = line.strip().split("\t")
+                            if parts[2] in ["transcript"]:
+                                try:
+                                    parsed_line = [tuple(i.strip().split(" ")[0:2]) for i in parts[-1].replace('"',"").split(";") if i.strip()]
+                                    features = dict(parsed_line)
+                                except:
+                                    sys.stderr.write("Problem parsing line for tpms file "+rep_gtf+"\n"+line)
+                                    continue
+                                ordered_keys = [i[0] for i in parsed_line]
+                                gene_id = features.get("gene_id","").replace("\"","").replace("gene-","")
+                                transcript_id = features.get("transcript_id","").replace("\"","").replace("rna-","")
+                                ref_gene_name = features.get("ref_gene_name","")
+                                tpm_val = features.get("TPM", 0)
+                                if (gene_id.startswith("MSTRG.") or gene_id.startswith("STRG.")) and ref_gene_name:
+                                    gene_id = ref_gene_name
+                                if feature_field == "gene_id":
+                                    feature_set.add(gene_id)
+                                    tpm_dict[rep_id][gene_id] = tpm_val
+                                else:
+                                    feature_set.add(transcript_id)
+                                    tpm_dict[rep_id][transcript_id] = tpm_val
         with open(tpm_file,"w") as o:
             o.write("Gene")
             for rep in tpm_dict:
